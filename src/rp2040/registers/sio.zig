@@ -2,6 +2,7 @@ const registers = @import("../registers.zig");
 
 const Register = registers.Register;
 const RegisterArray = registers.RegisterArray;
+const RegisterMatrix = registers.RegisterMatrix;
 const RegisterField = registers.RegisterField;
 
 const base_address = 0xd0000000;
@@ -52,3 +53,82 @@ pub const fifo_st = struct {
     pub const rdy = RegisterField(bool, 1);
     pub const vld = RegisterField(bool, 0);
 };
+
+pub const fifo_wr = Register(base_address + 0x054);
+
+pub const fifo_rd = Register(base_address + 0x058);
+
+pub const spinlock_st = Register(base_address + 0x05c);
+
+pub const div_udividend = Register(base_address + 0x060);
+
+pub const div_udivisor = Register(base_address + 0x064);
+
+pub const div_sdividend = Register(base_address + 0x068);
+
+pub const div_sdivisor = Register(base_address + 0x06c);
+
+pub const div_quotient = Register(base_address + 0x070);
+
+pub const div_remainder = Register(base_address + 0x074);
+
+pub const div_csr = struct {
+    pub usingnamespace Register(base_address + 0x078);
+
+    pub const dirty = RegisterField(bool, 1);
+    pub const ready = RegisterField(bool, 0);
+};
+
+pub const interp_accum = RegisterMatrix(2, 2, base_address + 0x080, 0x40, 0x4);
+
+pub const interp_base = RegisterMatrix(2, 3, base_address + 0x088, 0x40, 0x4);
+
+pub const interp_pop_lane = RegisterMatrix(2, 2, base_address + 0x094, 0x40, 0x4);
+
+pub const interp_pop_full = RegisterArray(2, base_address + 0x09c, 0x40);
+
+pub const interp_peek_lane = RegisterMatrix(2, 2, base_address + 0x0a0, 0x40, 0x4);
+
+pub const interp_peek_full = RegisterArray(2, base_address + 0x0a8, 0x40);
+
+const interp_ctrl_lane_common = struct {
+    pub const force_msb = RegisterField(u2, 19);
+    pub const add_raw = RegisterField(bool, 18);
+    pub const cross_result = RegisterField(bool, 17);
+    pub const cross_input = RegisterField(bool, 16);
+    pub const signed = RegisterField(bool, 15);
+    pub const mask_msb = RegisterField(u5, 10);
+    pub const mask_lsb = RegisterField(u5, 5);
+    pub const shift = RegisterField(u5, 0);
+};
+
+pub const interp0_ctrl_lane0 = struct {
+    pub usingnamespace Register(base_address + 0x0ac);
+    pub usingnamespace interp_ctrl_lane_common;
+
+    pub const overf = RegisterField(bool, 25);
+    pub const overf1 = RegisterField(bool, 24);
+    pub const overf0 = RegisterField(bool, 23);
+    pub const blend = RegisterField(bool, 21);
+};
+
+pub const interp1_ctrl_lane0 = struct {
+    pub usingnamespace Register(base_address + 0x0ec);
+    pub usingnamespace interp_ctrl_lane_common;
+
+    pub const overf = RegisterField(bool, 25);
+    pub const overf1 = RegisterField(bool, 24);
+    pub const overf0 = RegisterField(bool, 23);
+    pub const clamp = RegisterField(bool, 22);
+};
+
+pub const interp_ctrl_lane1 = struct {
+    pub usingnamespace RegisterArray(2, base_address + 0x0b0, 0x40);
+    pub usingnamespace interp_ctrl_lane_common;
+};
+
+pub const interp_accum_add = RegisterMatrix(2, 2, base_address + 0x0b4, 0x40, 0x4);
+
+pub const interp_base1and0 = RegisterArray(2, base_address + 0x0bc, 0x40);
+
+pub const spinlock = RegisterArray(32, base_address + 0x100, 0x4);

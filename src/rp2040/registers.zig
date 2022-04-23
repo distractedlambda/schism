@@ -5,7 +5,11 @@ const BitField = @import("bits.zig").BitField;
 pub const io_bank0 = @import("registers/io_bank0.zig");
 pub const pll_sys = @import("registers/pll_sys.zig");
 pub const pll_usb = @import("registers/pll_usb.zig");
+pub const psm = @import("registers/psm.zig");
+pub const resets = @import("registers/resets.zig");
 pub const rosc = @import("registers/rosc.zig");
+pub const sio = @import("registers/sio.zig");
+pub const vreg_and_chip_reset = @import("registers/vreg_and_chip_reset.zig");
 
 pub fn RegisterField(comptime T: type, comptime lsb: u16) type {
     return BitField(T, u32, lsb);
@@ -107,15 +111,15 @@ pub fn PeripheralRegisterMatrix(comptime rows: comptime_int, comptime cols: comp
         pub usingnamespace PeripheralRegisterMatrix(rows, cols, base_address, row_stride, col_stride);
 
         pub fn toggle(row: @This().Row, col: @This().Col, mask: u32) void {
-            @intToPtr(*volatile u32, @This().address(index) + 0x1000).* = mask;
+            @intToPtr(*volatile u32, @This().address(row, col) + 0x1000).* = mask;
         }
 
         pub fn set(row: @This().Row, col: @This().Col, mask: u32) void {
-            @intToPtr(*volatile u32, @This().address(index) + 0x2000).* = mask;
+            @intToPtr(*volatile u32, @This().address(row, col) + 0x2000).* = mask;
         }
 
         pub fn clear(row: @This().Row, col: @This().Col, mask: u32) void {
-            @intToPtr(*volatile u32, @This().address(index) + 0x3000).* = mask;
+            @intToPtr(*volatile u32, @This().address(row, col) + 0x3000).* = mask;
         }
     };
 }
