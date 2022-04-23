@@ -9,7 +9,10 @@ pub const psm = @import("registers/psm.zig");
 pub const resets = @import("registers/resets.zig");
 pub const rosc = @import("registers/rosc.zig");
 pub const sio = @import("registers/sio.zig");
+pub const syscfg = @import("registers/syscfg.zig");
+pub const sysinfo = @import("registers/sysinfo.zig");
 pub const vreg_and_chip_reset = @import("registers/vreg_and_chip_reset.zig");
+pub const xosc = @import("registers/xosc.zig");
 
 pub fn RegisterField(comptime T: type, comptime lsb: u16) type {
     return BitField(T, u32, lsb);
