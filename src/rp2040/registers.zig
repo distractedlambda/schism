@@ -2,6 +2,9 @@ const std = @import("std");
 
 const BitField = @import("bits.zig").BitField;
 
+pub const io_bank0 = @import("registers/io_bank0.zig");
+pub const pll_sys = @import("registers/pll_sys.zig");
+pub const pll_usb = @import("registers/pll_usb.zig");
 pub const rosc = @import("registers/rosc.zig");
 
 pub fn RegisterField(comptime T: type, comptime lsb: u16) type {
@@ -51,8 +54,30 @@ pub fn RegisterArray(comptime len: comptime_int, comptime base_address: u32, com
             return @intToPtr(*volatile u32, address(index));
         }
 
-        pub fn write(index: Index, value: u32) u32 {
+        pub fn write(index: Index, value: u32) void {
             @intToPtr(*volatile u32, address(index)).* = value;
+        }
+    };
+}
+
+pub fn RegisterMatrix(comptime rows: comptime_int, comptime cols: comptime_int, comptime base_address: u32, comptime row_stride: u32, comptime col_stride: u32) type {
+    return struct {
+        pub const Row = std.math.IntFittingRange(0, rows - 1);
+
+        pub const Col = std.math.IntFittingRange(0, cols - 1);
+
+        fn address(row: Row, col: Col) u32 {
+            std.debug.assert(row >= 0 and row < rows);
+            std.debug.assert(col >= 0 and col < cols);
+            return base_address + row * row_stride + col * col_stride;
+        }
+
+        pub fn read(row: Row, col: Col) u32 {
+            return @intToPtr(*volatile u32, address(row, col));
+        }
+
+        pub fn write(row: Row, col: Col, value: u32) void {
+            @intToPtr(*volatile u32, address(row, col)).* = value;
         }
     };
 }
@@ -72,6 +97,24 @@ pub fn PeripheralRegisterArray(comptime len: comptime_int, comptime base_address
         }
 
         pub fn clear(index: @This().Index, mask: u32) void {
+            @intToPtr(*volatile u32, @This().address(index) + 0x3000).* = mask;
+        }
+    };
+}
+
+pub fn PeripheralRegisterMatrix(comptime rows: comptime_int, comptime cols: comptime_int, comptime base_address: u32, comptime row_stride: u32, comptime col_stride: u32) type {
+    return struct {
+        pub usingnamespace PeripheralRegisterMatrix(rows, cols, base_address, row_stride, col_stride);
+
+        pub fn toggle(row: @This().Row, col: @This().Col, mask: u32) void {
+            @intToPtr(*volatile u32, @This().address(index) + 0x1000).* = mask;
+        }
+
+        pub fn set(row: @This().Row, col: @This().Col, mask: u32) void {
+            @intToPtr(*volatile u32, @This().address(index) + 0x2000).* = mask;
+        }
+
+        pub fn clear(row: @This().Row, col: @This().Col, mask: u32) void {
             @intToPtr(*volatile u32, @This().address(index) + 0x3000).* = mask;
         }
     };
