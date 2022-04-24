@@ -1,3 +1,10 @@
+// FIXME is tihs the correct way to attribute copyright?
+/*
+ * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 .cpu cortex-m0plus
 .thumb
 

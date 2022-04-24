@@ -108,3 +108,84 @@ pub const al1_ctrl = struct {
     pub usingnamespace PeripheralRegisterArray(12, base_address + 0x010, 0x40);
     pub usingnamespace ctrl_common;
 };
+
+pub const al1_read_addr = PeripheralRegisterArray(12, base_address + 0x014, 0x40);
+
+pub const al1_write_addr = PeripheralRegisterArray(12, base_address + 0x018, 0x40);
+
+pub const al1_trans_count_trig = PeripheralRegisterArray(12, base_address + 0x01c, 0x40);
+
+pub const al2_ctrl = struct {
+    pub usingnamespace PeripheralRegisterArray(12, base_address + 0x020, 0x40);
+    pub usingnamespace ctrl_common;
+};
+
+pub const al2_trans_count = PeripheralRegisterArray(12, base_address + 0x024, 0x40);
+
+pub const al2_read_addr = PeripheralRegisterArray(12, base_address + 0x024, 0x40);
+
+pub const al2_write_addr_trig = PeripheralRegisterArray(12, base_address + 0x024, 0x40);
+
+pub const al3_ctrl = struct {
+    pub usingnamespace PeripheralRegisterArray(12, base_address + 0x030, 0x40);
+    pub usingnamespace ctrl_common;
+};
+
+pub const al3_write_addr = PeripheralRegisterArray(12, base_address + 0x034, 0x40);
+
+pub const al3_trans_count = PeripheralRegisterArray(12, base_address + 0x038, 0x40);
+
+pub const al3_read_addr_trig = PeripheralRegisterArray(12, base_address + 0x03c, 0x40);
+
+pub const intr = PeripheralRegister(base_address + 0x400);
+
+pub const inte = PeripheralRegisterArray(2, base_address + 0x404, 0x10);
+
+pub const intf = PeripheralRegisterArray(2, base_address + 0x408, 0x10);
+
+pub const ints = PeripheralRegisterArray(2, base_address + 0x40c, 0x10);
+
+pub const timer = struct {
+    pub usingnamespace PeripheralRegisterArray(4, base_address + 0x420, 0x04);
+
+    pub const x = RegisterField(u16, 16);
+    pub const y = RegisterField(u16, 0);
+};
+
+pub const multi_chan_trigger = PeripheralRegister(base_address + 0x430);
+
+pub const sniff_ctrl = struct {
+    pub usingnamespace PeripheralRegister(base_address + 0x434);
+
+    pub const Calc = enum(u4) {
+        crc32 = 0x0,
+        crc32_rev = 0x1,
+        crc16_ccitt = 0x2,
+        crc16_ccitt_rev = 0x3,
+        xor = 0xe,
+        sum = 0xf,
+    };
+
+    pub const out_inv = RegisterField(bool, 11);
+    pub const out_rev = RegisterField(bool, 10);
+    pub const bswap = RegisterField(bool, 9);
+    pub const calc = RegisterField(Calc, 5);
+    pub const dmach = RegisterField(u4, 1);
+    pub const en = RegisterField(bool, 0);
+};
+
+pub const sniff_data = PeripheralRegister(base_address + 0x438);
+
+pub const fifo_levels = struct {
+    pub usingnamespace PeripheralRegister(base_address + 0x440);
+
+    pub const raf_lvl = RegisterField(u8, 16);
+    pub const waf_lvl = RegisterField(u8, 8);
+    pub const tdf_lvl = RegisterField(u8, 0);
+};
+
+pub const chan_abort = PeripheralRegister(base_address + 0x444);
+
+pub const dbg_ctdreq = PeripheralRegisterArray(12, base_address + 0x800, 0x40);
+
+pub const dbg_tcr = PeripheralRegisterArray(12, base_address + 0x804, 0x40);

@@ -2,6 +2,7 @@ const std = @import("std");
 
 const BitField = @import("bits.zig").BitField;
 
+pub const dma = @import("registers/dma.zig");
 pub const io_bank0 = @import("registers/io_bank0.zig");
 pub const pll_sys = @import("registers/pll_sys.zig");
 pub const pll_usb = @import("registers/pll_usb.zig");
