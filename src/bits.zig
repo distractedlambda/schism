@@ -45,3 +45,18 @@ pub fn fromBits(comptime T: type, bits: BitsOf(T)) T {
         else => @compileError("unsupported type '" ++ @typeName(T) ++ "' for fromBits"),
     };
 }
+
+pub fn insert(word: anytype, fields: anytype) fields[0][0].Word {
+    var result: fields[0][0].Word = word;
+
+    inline for (fields) |type_and_value| {
+        comptime std.debug.assert(type_and_value.len == 2 and type_and_value[0].Word == fields[0][0].Word);
+        result = type_and_value[0].insert(result, type_and_value[1]);
+    }
+
+    return result;
+}
+
+pub fn make(fields: anytype) fields[0][0].Word {
+    return insert(@as(u0, 0), fields);
+}
