@@ -14,6 +14,9 @@ pub var _flash_flush_cache: fn () callconv(.C) void = undefined;
 pub var _flash_enter_cmd_xip: fn () callconv(.C) void = undefined;
 
 pub fn link() void {
+    @setRuntimeSafety(false);
+    @setCold(true);
+
     lookUpFunction("P3", &_popcount32);
     lookUpFunction("R3", &_reverse32);
     lookUpFunction("L3", &_clz32);
@@ -41,13 +44,16 @@ const data_table = @intToPtr(*const u16, 0x00000016);
 const table_lookup = @intToPtr(*const u16, 0x00000018);
 
 fn tableCode(code: *const [2]u8) u32 {
+    @setRuntimeSafety(false);
     return (@as(u32, code[1]) << 8) | code[0];
 }
 
 fn tableLookupFn() (fn (*const u16, u32) callconv(.C) ?*const u8) {
+    @setRuntimeSafety(false);
     return @intToPtr(fn (*const u16, u32) callconv(.C) ?*const u8, table_lookup.*);
 }
 
 fn lookUpFunction(code: *const [2]u8, dst: anytype) void {
+    @setRuntimeSafety(false);
     dst.* = @ptrCast(@typeInfo(@TypeOf(dst)).Pointer.child, tableLookupFn()(func_table, tableCode(code)));
 }

@@ -1,5 +1,4 @@
-MEMORY
-{
+MEMORY {
     FLASH(rx) : ORIGIN = 0x10000000,  LENGTH = 12288k /* User Flash (12MiB) */
     FAT(r)    : ORIGIN = 0x10003000,  LENGTH = 4096K  /* Reserved for FAT (4MiB) */
     RAM(rwx)  : ORIGIN = 0x20000000,  LENGTH = 256k

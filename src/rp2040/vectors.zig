@@ -10,6 +10,7 @@ extern fn main() void;
 
 export fn handleReset() noreturn {
     @setRuntimeSafety(false);
+    @setCold(true);
 
     // Zero out .bss
     const bss_start = @extern([*]volatile u32, .{ .name = "__bss_start__" });
@@ -35,7 +36,15 @@ export fn handleNmi() void {
 }
 
 export fn handleHardfault() void {
-    return;
+    @setRuntimeSafety(false);
+    @setCold(true);
+
+    asm volatile (
+        \\ 1: bkpt 0x0000
+        \\    b.n 1b
+    );
+
+    unreachable;
 }
 
 export fn handleSvcall() void {

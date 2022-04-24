@@ -8,14 +8,16 @@ pub fn build(builder: *std.build.Builder) void {
         .abi = .eabi,
     };
 
+    const build_mode = builder.standardReleaseOptions();
+
     const exe = builder.addExecutable("schism.elf", "src/main.zig");
     exe.setTarget(rp2040_target);
-    exe.setBuildMode(.ReleaseSafe);
+    exe.setBuildMode(build_mode);
     exe.setLinkerScriptPath(std.build.FileSource.relative("src/picosystem/lscript.ld"));
     exe.install();
 
     const exe_tests = builder.addTest("src/main.zig");
-    exe_tests.setBuildMode(.ReleaseSafe);
+    exe_tests.setBuildMode(build_mode);
 
     const test_step = builder.step("test", "Run unit tests");
     test_step.dependOn(&exe_tests.step);
