@@ -5,6 +5,6 @@ comptime {
     _ = @import("rp2040.zig");
 }
 
-pub fn main() anyerror!void {
+export fn main() void {
     std.log.info("All your codebase are belong to us.", .{});
 }

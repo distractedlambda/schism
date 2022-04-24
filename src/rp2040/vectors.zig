@@ -12,15 +12,15 @@ export fn handleReset() noreturn {
     @setRuntimeSafety(false);
 
     // Zero out .bss
-    const bss_start = @ptrCast([*]volatile u32, @extern(u32, .{ .name = "__bss_start__" }));
-    const bss_end = @ptrCast([*]volatile u32, @extern(u32, .{ .name = "__bss_end__" }));
-    for (bss_start[0 .. bss_end - bss_start]) |*word| word.* = 0;
+    const bss_start = @extern([*]volatile u32, .{ .name = "__bss_start__" });
+    const bss_end = @extern([*]volatile u32, .{ .name = "__bss_end__" });
+    for (bss_start[0 .. (@ptrToInt(bss_end) - @ptrToInt(bss_start)) / @sizeOf(u32)]) |*word| word.* = 0;
 
     // Initialize .data
-    const data_source = @ptrCast([*]const u32, @extern(u32, .{ .name = "__etext" }));
-    const data_start = @ptrCast([*]volatile u32, @extern(u32, .{ .name = "__data_start__" }));
-    const data_end = @ptrCast([*]volatile u32, @extern(u32, .{ .name = "__data_end__" }));
-    for (data_start[0 .. data_end - data_start]) |*word, i| word.* = data_source[i];
+    const data_source = @extern([*]const u32, .{ .name = "__data_source__" });
+    const data_start = @extern([*]volatile u32, .{ .name = "__data_start__" });
+    const data_end = @extern([*]volatile u32, .{ .name = "__data_end__" });
+    for (data_start[0 .. (@ptrToInt(data_end) - @ptrToInt(data_start)) / @sizeOf(u32)]) |*word, i| word.* = data_source[i];
 
     // Link library routines from bootrom
     bootrom.link();
@@ -35,10 +35,6 @@ export fn handleNmi() void {
 }
 
 export fn handleHardfault() void {
-    return;
-}
-
-export fn handleSvcall() void {
     return;
 }
 
@@ -146,11 +142,11 @@ export fn handleAdcIrqFifo() void {
     return;
 }
 
-export fn handleAdcI2c0Irq() void {
+export fn handleI2c0Irq() void {
     return;
 }
 
-export fn handleAdcI2c1Irq() void {
+export fn handleI2c1Irq() void {
     return;
 }
 
