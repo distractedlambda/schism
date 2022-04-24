@@ -1,0 +1,53 @@
+pub var _popcount32: fn (u32) callconv(.C) u32;
+pub var _reverse32: fn (u32) callconv(.C) u32;
+pub var _clz32: fn (u32) callconv(.C) u32;
+pub var _ctz32: fn (u32) callconv(.C) u32;
+pub var _memset: fn (*u8, u8, u32) callconv(.C) *u8;
+pub var _memset4: fn (*u32, u8, u32) callconv(.C) *u32;
+pub var _memcpy: fn (*u8, *u8, u32) callconv(.C) *u8;
+pub var _mempcy44: fn (*u32, *u32, u32) callconv(.C) *u8;
+pub var _connect_internal_flash: fn () callconv(.C) void;
+pub var _flash_exit_xip: fn () callconv(.C) void;
+pub var _flash_range_erase: fn (u32, u32, u32, u8) callconv(.C) void;
+pub var _flash_range_program: fn (u32, *u8, u32) callconv(.C) void;
+pub var _flash_flush_cache: fn () callconv(.C) void;
+pub var _flash_enter_cmd_xip: fn () callconv(.C) void;
+
+pub fn link() void {
+    lookUpFunction("P3", &_popcount32);
+    lookUpFunction("R3", &_reverse32);
+    lookUpFunction("L3", &_clz32);
+    lookUpFunction("T3", &_ctz32);
+    lookUpFunction("MS", &_memset);
+    lookUpFunction("M4", &_memset4);
+    lookUpFunction("MC", &_memcpy);
+    lookUpFunction("C4", &_mempcy44);
+    lookUpFunction("IF", &_connect_internal_flash);
+    lookUpFunction("EX", &_flash_exit_xip);
+    lookUpFunction("RE", &_flash_range_erase);
+    lookUpFunction("RP", &_flash_range_program);
+    lookUpFunction("FC", &_flash_flush_cache);
+    lookUpFunction("CX", &_flash_enter_cmd_xip);
+}
+
+const initial_stack_pointer = @intToPtr(*allowzero const u32, 0x00000000);
+const reset_handler = @intToPtr(*const fn() void, 0x00000004);
+const nmi_handler = @intToPtr(*const fn() void, 0x00000008);
+const hard_fault_handler = @intToPtr(*const fn() void, 0x0000000c);
+const magic = @intToPtr(*const [3]u8, 0x00000010);
+const version = @intToPtr(*const u8, 0x00000013);
+const func_table = @intToPtr(*const u16, 0x00000014);
+const data_table = @intToPtr(*const u16, 0x00000016);
+const table_lookup = @intToPtr(*const u16, 0x00000018);
+
+fn tableCode(code: [2]u8) u32 {
+    return (@as(u32, code[1]) << 8) | code[0];
+}
+
+fn tableLookupFn() (fn(*const u16, u32) callconv(.C) ?*const u8) {
+    return @intToPtr(fn(*const u16, u32) callconv(.C) ?*const u8, table_lookup.*);
+}
+
+fn lookUpFunction(code: [2]u8, dst: anytype) void {
+    return dst.* = @ptrCast(@typeInfo(@TypeOf(dst)).child, tableLookupFn()(func_table, tableCode(code)));
+}
