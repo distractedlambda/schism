@@ -12,6 +12,7 @@ pub var _flash_range_erase: fn (u32, u32, u32, u8) callconv(.C) void = undefined
 pub var _flash_range_program: fn (u32, *u8, u32) callconv(.C) void = undefined;
 pub var _flash_flush_cache: fn () callconv(.C) void = undefined;
 pub var _flash_enter_cmd_xip: fn () callconv(.C) void = undefined;
+pub var _reset_to_usb_boot: fn (u32, u32) callconv(.C) noreturn = undefined;
 
 pub fn link() void {
     @setRuntimeSafety(false);
@@ -31,6 +32,7 @@ pub fn link() void {
     lookUpFunction("RP", &_flash_range_program);
     lookUpFunction("FC", &_flash_flush_cache);
     lookUpFunction("CX", &_flash_enter_cmd_xip);
+    lookUpFunction("UB", &_reset_to_usb_boot);
 }
 
 const initial_stack_pointer = @intToPtr(*allowzero const u32, 0x00000000);
