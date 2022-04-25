@@ -6,11 +6,8 @@ comptime {
     asm (@embedFile("vectors.S"));
 }
 
-extern fn main() void;
-
 export fn handleReset() noreturn {
     @setRuntimeSafety(false);
-    @setCold(true);
 
     // Zero out .bss
     const bss_start = @extern([*]volatile u32, .{ .name = "__bss_start__" });
@@ -26,7 +23,8 @@ export fn handleReset() noreturn {
     // Link library routines from bootrom
     bootrom.link();
 
-    main();
+    // Call main()
+    @import("root").main();
 
     @panic("return from main()");
 }
@@ -37,7 +35,6 @@ export fn handleNmi() void {
 
 export fn handleHardfault() void {
     @setRuntimeSafety(false);
-    @setCold(true);
 
     asm volatile (
         \\ 1: bkpt 0x0000

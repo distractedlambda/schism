@@ -16,8 +16,6 @@ pub var _reset_to_usb_boot: fn (u32, u32) callconv(.C) noreturn = undefined;
 
 pub fn link() void {
     @setRuntimeSafety(false);
-    @setCold(true);
-
     lookUpFunction("P3", &_popcount32);
     lookUpFunction("R3", &_reverse32);
     lookUpFunction("L3", &_clz32);
