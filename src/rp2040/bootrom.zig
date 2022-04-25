@@ -55,5 +55,5 @@ fn tableLookupFn() (fn (*const u16, u32) callconv(.C) ?*const u8) {
 
 fn lookUpFunction(code: *const [2]u8, dst: anytype) void {
     @setRuntimeSafety(false);
-    dst.* = @ptrCast(@typeInfo(@TypeOf(dst)).Pointer.child, tableLookupFn()(func_table, tableCode(code)));
+    dst.* = @ptrCast(@typeInfo(@TypeOf(dst)).Pointer.child, tableLookupFn()(@intToPtr(*const u16, func_table.*), tableCode(code)));
 }

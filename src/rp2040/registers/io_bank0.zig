@@ -86,15 +86,17 @@ pub const gpio_ctrl = struct {
         comptime var next_enum_field: comptime_int = 0;
 
         inline for (funcsel_table[index]) |field_name, i| {
-            enum_fields[next_enum_field] = .{ .name = field_name, .value = i };
-            next_enum_field += 1;
+            if (field_name) |fname| {
+                enum_fields[next_enum_field] = .{ .name = fname, .value = i + 1 };
+                next_enum_field += 1;
+            }
         }
 
         const enum_type = @Type(.{ .Enum = .{
-            .layout = .auto,
+            .layout = .Auto,
             .tag_type = u5,
             .fields = enum_fields[0..next_enum_field],
-            .decls = [_]_{},
+            .decls = &[_]std.builtin.Type.Declaration{},
             .is_exhaustive = true,
         } });
 

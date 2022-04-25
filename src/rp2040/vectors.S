@@ -15,7 +15,7 @@
 .global __vectors, __VECTOR_TABLE
 __VECTOR_TABLE:
 __vectors:
-.word 0x21030000
+.word 0x20042000
 .word handleReset
 .word handleNmi
 .word handleHardfault
