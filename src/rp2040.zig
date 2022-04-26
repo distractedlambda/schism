@@ -1,16 +1,15 @@
 pub const bootrom = @import("rp2040/bootrom.zig");
-pub const registers = @import("rp2040/registers.zig");
-
-comptime {
-    _ = @import("rp2040/vectors.zig");
-}
-
-pub fn placeInReset(peripherals: anytype) void {
-    registers.resets.reset.set(registers.maskFromPositions(registers.resets.Target, peripherals));
-}
-
-pub fn takeFromReset(peripherals: anytype) void {
-    const mask = registers.maskFromPositions(registers.resets.Target, peripherals);
-    registers.resets.reset.clear(mask);
-    while ((registers.resets.reset_done.read() & mask) != mask) {}
-}
+pub const dma = @import("rp2040/dma.zig");
+pub const io_bank0 = @import("rp2040/io_bank0.zig");
+pub const pads_bank0 = @import("rp2040/pads_bank0.zig");
+pub const pll_sys = @import("rp2040/pll_sys.zig");
+pub const pll_usb = @import("rp2040/pll_usb.zig");
+pub const ppb = @import("rp2040/ppb.zig");
+pub const psm = @import("rp2040/psm.zig");
+pub const pwm = @import("rp2040/pwm.zig");
+pub const resets = @import("rp2040/resets.zig");
+pub const rosc = @import("rp2040/rosc.zig");
+pub const sio = @import("rp2040/sio.zig");
+pub const syscfg = @import("rp2040/syscfg.zig");
+pub const vreg_and_chip_reset = @import("rp2040/vreg_and_chip_reset.zig");
+pub const xosc = @import("rp2040/xosc.zig");

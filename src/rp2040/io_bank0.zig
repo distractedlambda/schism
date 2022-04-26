@@ -1,10 +1,8 @@
 const std = @import("std");
 
-const registers = @import("../registers.zig");
-
-const PeripheralRegisterArray = registers.PeripheralRegisterArray;
-const PeripheralRegisterMatrix = registers.PeripheralRegisterMatrix;
-const RegisterField = registers.RegisterField;
+const PeripheralRegisterArray = @import("peripheral_register_array.zig").PeripheralRegisterArray;
+const PeripheralRegisterMatrix = @import("peripheral_register_matrix.zig").PeripheralRegisterMatrix;
+const RegisterField = @import("register_field.zig").RegisterField;
 
 const base_address = 0x40014000;
 
@@ -107,13 +105,9 @@ pub const gpio_ctrl = struct {
 pub const intr = PeripheralRegisterArray(4, base_address + 0x0f0, 0x4);
 
 pub const proc_inte = PeripheralRegisterMatrix(2, 30, base_address + 0x100, 0x30, 0x4);
-
 pub const proc_intf = PeripheralRegisterMatrix(2, 30, base_address + 0x110, 0x30, 0x4);
-
 pub const proc_ints = PeripheralRegisterMatrix(2, 30, base_address + 0x120, 0x30, 0x4);
 
 pub const dormant_wake_inte = PeripheralRegisterArray(30, base_address + 0x160, 0x4);
-
 pub const dormant_wake_intf = PeripheralRegisterArray(30, base_address + 0x170, 0x4);
-
 pub const dormant_wake_ints = PeripheralRegisterArray(30, base_address + 0x180, 0x4);

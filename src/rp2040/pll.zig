@@ -1,7 +1,5 @@
-const registers = @import("../registers.zig");
-
-const PeripheralRegister = registers.PeripheralRegister;
-const RegisterField = registers.RegisterField;
+const PeripheralRegister = @import("peripheral_register.zig").PeripheralRegister;
+const RegisterField = @import("register_field.zig").RegisterField;
 
 pub fn Pll(comptime base_address: u32) type {
     return struct {

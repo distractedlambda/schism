@@ -1,7 +1,5 @@
-const registers = @import("../registers.zig");
-
-const Register = registers.Register;
-const RegisterField = registers.RegisterField;
+const Register = @import("register.zig").Register;
+const RegisterField = @import("register_field.zig").RegisterField;
 
 const base_address = 0x40000000;
 

@@ -1,7 +1,5 @@
-const registers = @import("../registers.zig");
-
-const PeripheralRegister = registers.PeripheralRegister;
-const RegisterField = registers.RegisterField;
+const PeripheralRegister = @import("peripheral_register.zig").PeripheralRegister;
+const RegisterField = @import("register_field.zig").RegisterField;
 
 const base_address = 0x40064000;
 

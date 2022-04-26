@@ -1,8 +1,6 @@
-const registers = @import("../registers.zig");
-
-const Register = registers.Register;
-const RegisterArray = registers.RegisterArray;
-const RegisterField = registers.RegisterField;
+const Register = @import("register.zig").Register;
+const RegisterArray = @import("register_array.zig").RegisterArray;
+const RegisterField = @import("register_field.zig").RegisterField;
 
 const base_address = 0xe0000000;
 
@@ -133,8 +131,6 @@ pub const mpu_rasr = struct {
     pub usingnamespace Register(base_address + 0xeda0);
 
     pub const attrs = struct {
-        pub usingnamespace RegisterField(u16, 16);
-
         pub const xn = RegisterField(bool, 28);
         pub const ap = RegisterField(u3, 24);
         pub const s = RegisterField(bool, 18);

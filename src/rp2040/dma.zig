@@ -1,18 +1,10 @@
-const registers = @import("../registers.zig");
-
-const PeripheralRegister = registers.PeripheralRegister;
-const PeripheralRegisterArray = registers.PeripheralRegisterArray;
-const RegisterField = registers.RegisterField;
+const PeripheralRegister = @import("peripheral_register.zig").PeripheralRegister;
+const PeripheralRegisterArray = @import("peripheral_register_array.zig").PeripheralRegisterArray;
+const RegisterField = @import("register_field.zig").RegisterField;
 
 const base_address = 0x50000000;
 
-pub const read_addr = PeripheralRegisterArray(12, base_address + 0x000, 0x40);
-
-pub const write_addr = PeripheralRegisterArray(12, base_address + 0x004, 0x40);
-
-pub const trans_count = PeripheralRegisterArray(12, base_address + 0x008, 0x40);
-
-const ctrl_common = struct {
+pub const ctrl = struct {
     pub const TreqSel = enum(u6) {
         dreq_pio0_tx0,
         dreq_pio0_tx1,
@@ -99,50 +91,30 @@ const ctrl_common = struct {
     pub const en = RegisterField(bool, 0);
 };
 
-pub const ctrl_trig = struct {
-    pub usingnamespace PeripheralRegisterArray(12, base_address + 0x00c, 0x40);
-    pub usingnamespace ctrl_common;
-};
+pub const read_addr = PeripheralRegisterArray(12, base_address + 0x000, 0x40);
+pub const write_addr = PeripheralRegisterArray(12, base_address + 0x004, 0x40);
+pub const trans_count = PeripheralRegisterArray(12, base_address + 0x008, 0x40);
+pub const ctrl_trig = PeripheralRegisterArray(12, base_address + 0x00c, 0x40);
 
-pub const al1_ctrl = struct {
-    pub usingnamespace PeripheralRegisterArray(12, base_address + 0x010, 0x40);
-    pub usingnamespace ctrl_common;
-};
-
+pub const al1_ctrl = PeripheralRegisterArray(12, base_address + 0x010, 0x40);
 pub const al1_read_addr = PeripheralRegisterArray(12, base_address + 0x014, 0x40);
-
 pub const al1_write_addr = PeripheralRegisterArray(12, base_address + 0x018, 0x40);
-
 pub const al1_trans_count_trig = PeripheralRegisterArray(12, base_address + 0x01c, 0x40);
 
-pub const al2_ctrl = struct {
-    pub usingnamespace PeripheralRegisterArray(12, base_address + 0x020, 0x40);
-    pub usingnamespace ctrl_common;
-};
-
+pub const al2_ctrl = PeripheralRegisterArray(12, base_address + 0x020, 0x40);
 pub const al2_trans_count = PeripheralRegisterArray(12, base_address + 0x024, 0x40);
-
 pub const al2_read_addr = PeripheralRegisterArray(12, base_address + 0x024, 0x40);
-
 pub const al2_write_addr_trig = PeripheralRegisterArray(12, base_address + 0x024, 0x40);
 
-pub const al3_ctrl = struct {
-    pub usingnamespace PeripheralRegisterArray(12, base_address + 0x030, 0x40);
-    pub usingnamespace ctrl_common;
-};
-
+pub const al3_ctrl = PeripheralRegisterArray(12, base_address + 0x030, 0x40);
 pub const al3_write_addr = PeripheralRegisterArray(12, base_address + 0x034, 0x40);
-
 pub const al3_trans_count = PeripheralRegisterArray(12, base_address + 0x038, 0x40);
-
 pub const al3_read_addr_trig = PeripheralRegisterArray(12, base_address + 0x03c, 0x40);
 
 pub const intr = PeripheralRegister(base_address + 0x400);
 
 pub const inte = PeripheralRegisterArray(2, base_address + 0x404, 0x10);
-
 pub const intf = PeripheralRegisterArray(2, base_address + 0x408, 0x10);
-
 pub const ints = PeripheralRegisterArray(2, base_address + 0x40c, 0x10);
 
 pub const timer = struct {
