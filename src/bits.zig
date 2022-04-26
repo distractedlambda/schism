@@ -46,11 +46,11 @@ pub fn fromBits(comptime T: type, bits: BitsOf(T)) T {
     };
 }
 
-pub fn insert(word: anytype, fields: anytype) fields[0][0].Word {
-    var result: fields[0][0].Word = word;
+pub fn insert(word: anytype, fields: anytype) @TypeOf(word) {
+    var result = word;
 
     inline for (fields) |type_and_value| {
-        comptime std.debug.assert(type_and_value.len == 2 and type_and_value[0].Word == fields[0][0].Word);
+        comptime std.debug.assert(type_and_value.len == 2 and type_and_value[0].Word == @TypeOf(word));
         result = type_and_value[0].insert(result, type_and_value[1]);
     }
 
@@ -58,5 +58,22 @@ pub fn insert(word: anytype, fields: anytype) fields[0][0].Word {
 }
 
 pub fn make(fields: anytype) fields[0][0].Word {
-    return insert(@as(u0, 0), fields);
+    return insert(@as(fields[0][0].Word, 0), fields);
+}
+
+pub fn get(value: anytype, index: std.math.Log2Int(BitsOf(@TypeOf(value)))) bool {
+    std.debug.assert(index < @bitSizeOf(@TypeOf(value)));
+    return @truncate(u1, asBits(value) >> index) != 0;
+}
+
+pub fn maskFromPositions(comptime Mask: type, comptime Position: type, positions: anytype) Mask {
+    comptime std.debug.assert(@typeInfo(Mask).Int.signedness == .unsigned);
+
+    var mask: Mask = 0;
+
+    inline for (positions) |position| {
+        mask |= @as(Mask, 1) << @enumToInt(@as(Position, position));
+    }
+
+    return mask;
 }

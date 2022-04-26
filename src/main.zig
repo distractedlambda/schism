@@ -10,21 +10,14 @@ comptime {
 }
 
 pub fn main() void {
-    const pin = picosystem.pins.battery.charge_led;
+    rp2040.takeFromReset(.{.pads_bank0, .io_bank0});
 
-    const reset_mask = bits.make(.{
-        .{ rp2040.registers.resets.pads_bank0, true },
-        .{ rp2040.registers.resets.io_bank0, true },
-    });
-
-    rp2040.registers.resets.reset.clear(reset_mask);
-
-    while ((rp2040.registers.resets.reset_done.read() & reset_mask) != reset_mask) {}
+    const pin = picosystem.pins.user_led.blue;
 
     rp2040.registers.io_bank0.gpio_ctrl.write(pin, bits.make(.{
         .{ rp2040.registers.io_bank0.gpio_ctrl.funcsel(pin), .sio },
         .{ rp2040.registers.io_bank0.gpio_ctrl.oeover, .drive_high },
-        .{ rp2040.registers.io_bank0.gpio_ctrl.outover, .drive_low },
+        .{ rp2040.registers.io_bank0.gpio_ctrl.outover, .drive_high },
     }));
 
     while (true) {

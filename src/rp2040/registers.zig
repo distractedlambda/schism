@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const BitField = @import("../bits.zig").BitField;
+const bits = @import("../bits.zig");
 
 pub const dma = @import("registers/dma.zig");
 pub const io_bank0 = @import("registers/io_bank0.zig");
@@ -17,7 +17,7 @@ pub const vreg_and_chip_reset = @import("registers/vreg_and_chip_reset.zig");
 pub const xosc = @import("registers/xosc.zig");
 
 pub fn RegisterField(comptime T: type, comptime lsb: u16) type {
-    return BitField(T, u32, lsb);
+    return bits.BitField(T, u32, lsb);
 }
 
 pub fn Register(comptime address: u32) type {
@@ -28,6 +28,10 @@ pub fn Register(comptime address: u32) type {
 
         pub fn write(value: u32) void {
             @intToPtr(*volatile u32, address).* = value;
+        }
+
+        pub fn writeFields(fields: anytype) void {
+            write(bits.make(fields));
         }
     };
 }
@@ -66,6 +70,10 @@ pub fn RegisterArray(comptime len: comptime_int, comptime base_address: u32, com
         pub fn write(index: Index, value: u32) void {
             @intToPtr(*volatile u32, address(index)).* = value;
         }
+
+        pub fn writeFields(index: Index, fields: anytype) void {
+            write(index, bits.make(fields));
+        }
     };
 }
 
@@ -87,6 +95,10 @@ pub fn RegisterMatrix(comptime rows: comptime_int, comptime cols: comptime_int, 
 
         pub fn write(row: Row, col: Col, value: u32) void {
             @intToPtr(*volatile u32, address(row, col)).* = value;
+        }
+
+        pub fn writeFields(row: Row, col: Col, fields: anytype) void {
+            write(row, col, bits.make(fields));
         }
     };
 }
@@ -129,6 +141,6 @@ pub fn PeripheralRegisterMatrix(comptime rows: comptime_int, comptime cols: comp
     };
 }
 
-test {
-    std.testing.refAllDecls(@This());
+pub fn maskFromPositions(comptime Position: type, positions: anytype) u32 {
+    return bits.maskFromPositions(u32, Position, positions);
 }

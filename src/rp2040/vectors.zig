@@ -25,7 +25,6 @@ export fn handleReset() noreturn {
 
     // Call main()
     @import("root").main();
-
     @panic("return from main()");
 }
 
