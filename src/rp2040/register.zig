@@ -1,3 +1,4 @@
+const arm = @import("../arm.zig");
 const bits = @import("../bits.zig");
 
 pub fn Register(comptime address: u32) type {

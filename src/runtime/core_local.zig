@@ -1,8 +1,6 @@
 const rp2040 = @import("../rp2040.zig");
 
 pub fn CoreLocal(comptime T: type) type {
-    @setRuntimeSafety(false);
-
     return struct {
         pub const T = T;
 
