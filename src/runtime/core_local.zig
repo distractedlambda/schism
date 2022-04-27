@@ -10,8 +10,8 @@ pub fn CoreLocal(comptime T: type) type {
             return @intCast(u1, rp2040.sio.cpuid.readNonVolatile());
         }
 
-        pub fn init(values: [2]T) @This() {
-            return .{ .storage = values };
+        pub fn init(value: T) @This() {
+            return .{ .storage = [2]T{ value, value } };
         }
 
         pub fn constPtr(self: *const @This()) *const T {

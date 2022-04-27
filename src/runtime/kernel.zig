@@ -1,10 +1,13 @@
 const std = @import("std");
 
+const arm = @import("../arm.zig");
 const bootrom = @import("bootrom.zig");
 const core_local = @import("core_local.zig");
+const hardware_spin_lock = @import("hardware_spin_lock.zig");
 const task = @import("task.zig");
 
 const CoreLocal = core_local.CoreLocal;
+const HardwareSpinLock = hardware_spin_lock.HardwareSpinLock;
 const Task = task.Task;
 const TaskSet = task.TaskSet;
 
@@ -18,11 +21,56 @@ pub const Configuration = struct {
 
 pub fn Kernel(comptime config: Configuration) type {
     return struct {
-        pub const TaskPriority = std.math.IntFittingRange(0, config.num_priority_levels - 1);
+        const TaskSet = task.TaskSet(config.num_priority_levels);
 
+        const ready_tasks_lock = HardwareSpinLock.init(0);
         var ready_tasks = TaskSet(config.num_priority_levels).init();
 
-        var running_task_priority = CoreLocal(TaskPriority).init(undefined);
+        var current_task_priority = CoreLocal(?TaskSet.Priority).init(null);
+
+        pub fn setPriority(priority: TaskSet.Priority) void {
+            std.debug.assert(current_task_priority.get() != null);
+            current_task_priority.set(priority);
+        }
+
+        pub fn currentPriority() TaskSet.Priority {
+            return current_task_priority.get().*;
+        }
+
+        pub fn yield() void {
+            var task = Task.init(@frame());
+            suspend {
+                scheduleTask(task, current_task_priority.get().*);
+            }
+        }
+
+        fn scheduleTask(task: *Task, priority: TaskSet.Priority) void {
+            arm.disableInterrupts();
+            defer arm.enableInterrupts();
+
+            ready_tasks_lock.lock();
+            defer ready_tasks_lock.unlock();
+
+            ready_tasks.add(task, priority);
+        }
+
+        fn runTasks() noreturn {
+            while (true) {
+                const prioritized_task = blk: {
+                    arm.disableInterrupts();
+                    defer arm.enableInterrupts();
+
+                    ready_tasks_lock.lock();
+                    defer ready_tasks_lock.unlock();
+
+                    break :blk ready_tasks.removePrioritized();
+                } orelse std.debug.todo("");
+
+                current_task_priority.set(prioritized_task.priority);
+                resume prioritized_task.task.frame; // FIXME: is this safe if the Task object's lifetime ends?
+                current_task_priority.set(null);
+            }
+        }
 
         pub fn exportVectorTable() void {
             @export(vector_table, .{ .name = "__vectors", .section = "vectors" });

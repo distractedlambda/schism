@@ -20,10 +20,10 @@ pub const HardwareSpinLock = struct {
 
 pub fn lockIndexed(index: rp2040.sio.spinlock.Index) void {
     while (llvmintrin.expect(rp2040.sio.spinlock.read(index), 0) != 0) {}
-    arm.dmb();
+    arm.dataMemoryBarrier();
 }
 
 pub fn unlockIndexed(index: rp2040.sio.spinlock.Index) void {
-    arm.dmb();
+    arm.dataMemoryBarrier();
     rp2040.sio.spinlock.write(index, 0);
 }
