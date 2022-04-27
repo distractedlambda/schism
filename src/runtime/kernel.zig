@@ -56,15 +56,21 @@ pub fn Kernel(comptime config: Configuration) type {
 
         fn runTasks() noreturn {
             while (true) {
-                const prioritized_task = blk: {
-                    arm.disableInterrupts();
-                    defer arm.enableInterrupts();
+                const prioritized_task = while (true) {
+                    if (blk: {
+                        arm.disableInterrupts();
+                        defer arm.enableInterrupts();
 
-                    ready_tasks_lock.lock();
-                    defer ready_tasks_lock.unlock();
+                        ready_tasks_lock.lock();
+                        defer ready_tasks_lock.unlock();
 
-                    break :blk ready_tasks.removePrioritized();
-                } orelse std.debug.todo("");
+                        break :blk ready_tasks.removePrioritized();
+                    }) |task| {
+                        break task;
+                    }
+
+                    arm.waitForEvent();
+                };
 
                 current_task_priority.set(prioritized_task.priority);
                 resume prioritized_task.task.frame; // FIXME: is this safe if the Task object's lifetime ends?
@@ -133,6 +139,9 @@ pub fn Kernel(comptime config: Configuration) type {
 
             // Link library routines from bootrom
             bootrom.link();
+
+            // Enter task execution loop
+            runTasks();
         }
 
         fn handleNmi() callconv(.C) void {

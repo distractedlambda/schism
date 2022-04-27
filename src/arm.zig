@@ -17,3 +17,11 @@ pub fn disableInterrupts() void {
 pub fn enableInterrupts() void {
     asm volatile ("cpsie i");
 }
+
+pub fn waitForEvent() void {
+    asm volatile ("wfe" ::: "memory");
+}
+
+pub fn waitForInterrupt() void {
+    asm volatile ("wfi" ::: "memory");
+}
