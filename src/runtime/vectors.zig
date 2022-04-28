@@ -3,12 +3,53 @@ const std = @import("std");
 const bootrom = @import("bootrom.zig");
 
 comptime {
-    asm (@embedFile("vectors.S"));
+    @export(vector_table, .{ .name = "__vectors", .section = "vectors" });
+    @export(vector_table, .{ .name = "__VECTOR_TABLE", .section = "vectors" });
 }
 
-export fn handleReset() noreturn {
-    @setRuntimeSafety(false);
+const vector_table = VectorTable{
+    .stack_top = config.core0_stack_top,
+    .reset = handleReset,
+    .nmi = handleNmi,
+    .hardfault = handleHardfault,
+    .svcall = handleSvcall,
+    .pendsv = handlePendsv,
+    .systick = handleSystick,
+    .irq0 = handleTimerIrq0,
+    .irq1 = handleTimerIrq1,
+    .irq2 = handleTimerIrq2,
+    .irq3 = handleTimerIrq3,
+    .irq4 = handlePwmIrqWrap,
+    .irq5 = handleUsbctrlIrq,
+    .irq6 = handleXipIrq,
+    .irq7 = handlePio0Irq0,
+    .irq8 = handlePio0Irq1,
+    .irq9 = handlePio1Irq0,
+    .irq10 = handlePio1Irq1,
+    .irq11 = handleDmaIrq0,
+    .irq12 = handleDmaIrq1,
+    .irq13 = handleIoIrqBank0,
+    .irq14 = handleIoIrqQspi,
+    .irq15 = handleSioIrqProc0,
+    .irq16 = handleSioIrqProc1,
+    .irq17 = handleClocksIrq,
+    .irq18 = handleSpi0Irq,
+    .irq19 = handleSpi1Irq,
+    .irq20 = handleUart0Irq,
+    .irq21 = handleUart1Irq,
+    .irq22 = handleAdcIrqFifo,
+    .irq23 = handleI2c0Irq,
+    .irq24 = handleI2c1Irq,
+    .irq25 = handleRtcIrq,
+    .irq26 = handleUnconnectedIrq,
+    .irq27 = handleUnconnectedIrq,
+    .irq28 = handleUnconnectedIrq,
+    .irq29 = handleUnconnectedIrq,
+    .irq30 = handleUnconnectedIrq,
+    .irq31 = handleUnconnectedIrq,
+};
 
+fn handleReset() callconv(.C) noreturn {
     // Zero out .bss
     const bss_start = @extern([*]volatile u32, .{ .name = "__bss_start__" });
     const bss_end = @extern([*]volatile u32, .{ .name = "__bss_end__" });
@@ -23,18 +64,14 @@ export fn handleReset() noreturn {
     // Link library routines from bootrom
     bootrom.link();
 
-    // Call main()
-    @import("root").main();
-    @panic("return from main()");
+    std.debug.todo("");
 }
 
-export fn handleNmi() void {
+fn handleNmi() callconv(.C) void {
     return;
 }
 
-export fn handleHardfault() void {
-    @setRuntimeSafety(false);
-
+fn handleHardfault() callconv(.C) void {
     asm volatile (
         \\ 1: bkpt 0x0000
         \\    b.n 1b
@@ -43,122 +80,177 @@ export fn handleHardfault() void {
     unreachable;
 }
 
-export fn handleSvcall() void {
+fn handleSvcall() callconv(.C) void {
     return;
 }
 
-export fn handlePendsv() void {
+fn handlePendsv() callconv(.C) void {
     return;
 }
 
-export fn handleSystick() void {
+fn handleSystick() callconv(.C) void {
     return;
 }
 
-export fn handleTimerIrq0() void {
+fn handleTimerIrq0() callconv(.C) void {
     return;
 }
 
-export fn handleTimerIrq1() void {
+fn handleTimerIrq1() callconv(.C) void {
     return;
 }
 
-export fn handleTimerIrq2() void {
+fn handleTimerIrq2() callconv(.C) void {
     return;
 }
 
-export fn handleTimerIrq3() void {
+fn handleTimerIrq3() callconv(.C) void {
     return;
 }
 
-export fn handlePwmIrqWrap() void {
+fn handlePwmIrqWrap() callconv(.C) void {
     return;
 }
 
-export fn handleUsbctrlIrq() void {
+fn handleUsbctrlIrq() callconv(.C) void {
     return;
 }
 
-export fn handleXipIrq() void {
+fn handleXipIrq() callconv(.C) void {
     return;
 }
 
-export fn handlePio0Irq0() void {
+fn handlePio0Irq0() callconv(.C) void {
     return;
 }
 
-export fn handlePio0Irq1() void {
+fn handlePio0Irq1() callconv(.C) void {
     return;
 }
 
-export fn handlePio1Irq0() void {
+fn handlePio1Irq0() callconv(.C) void {
     return;
 }
 
-export fn handlePio1Irq1() void {
+fn handlePio1Irq1() callconv(.C) void {
     return;
 }
 
-export fn handleDmaIrq0() void {
+fn handleDmaIrq0() callconv(.C) void {
     return;
 }
 
-export fn handleDmaIrq1() void {
+fn handleDmaIrq1() callconv(.C) void {
     return;
 }
 
-export fn handleIoIrqBank0() void {
+fn handleIoIrqBank0() callconv(.C) void {
     return;
 }
 
-export fn handleIoIrqQspi() void {
+fn handleIoIrqQspi() callconv(.C) void {
     return;
 }
 
-export fn handleSioIrqProc0() void {
+fn handleSioIrqProc0() callconv(.C) void {
     return;
 }
 
-export fn handleSioIrqProc1() void {
+fn handleSioIrqProc1() callconv(.C) void {
     return;
 }
 
-export fn handleClocksIrq() void {
+fn handleClocksIrq() callconv(.C) void {
     return;
 }
 
-export fn handleSpi0Irq() void {
+fn handleSpi0Irq() callconv(.C) void {
     return;
 }
 
-export fn handleSpi1Irq() void {
+fn handleSpi1Irq() callconv(.C) void {
     return;
 }
 
-export fn handleUart0Irq() void {
+fn handleUart0Irq() callconv(.C) void {
     return;
 }
 
-export fn handleUart1Irq() void {
+fn handleUart1Irq() callconv(.C) void {
     return;
 }
 
-export fn handleAdcIrqFifo() void {
+fn handleAdcIrqFifo() callconv(.C) void {
     return;
 }
 
-export fn handleI2c0Irq() void {
+fn handleI2c0Irq() callconv(.C) void {
     return;
 }
 
-export fn handleI2c1Irq() void {
+fn handleI2c1Irq() callconv(.C) void {
     return;
 }
 
-export fn handleRtcIrq() void {
+fn handleRtcIrq() callconv(.C) void {
     return;
 }
 
-export fn handleUnconnectedIrq() void {
+fn handleUnconnectedIrq() callconv(.C) void {
     return;
+}
+
+const VectorTable = extern struct {
+    stack_top: usize,
+    reset: fn () callconv(.C) void,
+    nmi: fn () callconv(.C) void,
+    hardfault: fn () callconv(.C) void,
+    reserved_3: fn () callconv(.C) void = reservedVector,
+    reserved_4: fn () callconv(.C) void = reservedVector,
+    reserved_5: fn () callconv(.C) void = reservedVector,
+    reserved_6: fn () callconv(.C) void = reservedVector,
+    reserved_7: fn () callconv(.C) void = reservedVector,
+    reserved_8: fn () callconv(.C) void = reservedVector,
+    reserved_9: fn () callconv(.C) void = reservedVector,
+    svcall: fn () callconv(.C) void,
+    reserved_11: fn () callconv(.C) void = reservedVector,
+    reserved_12: fn () callconv(.C) void = reservedVector,
+    pendsv: fn () callconv(.C) void,
+    systick: fn () callconv(.C) void,
+    irq0: fn () callconv(.C) void,
+    irq1: fn () callconv(.C) void,
+    irq2: fn () callconv(.C) void,
+    irq3: fn () callconv(.C) void,
+    irq4: fn () callconv(.C) void,
+    irq5: fn () callconv(.C) void,
+    irq6: fn () callconv(.C) void,
+    irq7: fn () callconv(.C) void,
+    irq8: fn () callconv(.C) void,
+    irq9: fn () callconv(.C) void,
+    irq10: fn () callconv(.C) void,
+    irq11: fn () callconv(.C) void,
+    irq12: fn () callconv(.C) void,
+    irq13: fn () callconv(.C) void,
+    irq14: fn () callconv(.C) void,
+    irq15: fn () callconv(.C) void,
+    irq16: fn () callconv(.C) void,
+    irq17: fn () callconv(.C) void,
+    irq18: fn () callconv(.C) void,
+    irq19: fn () callconv(.C) void,
+    irq20: fn () callconv(.C) void,
+    irq21: fn () callconv(.C) void,
+    irq22: fn () callconv(.C) void,
+    irq23: fn () callconv(.C) void,
+    irq24: fn () callconv(.C) void,
+    irq25: fn () callconv(.C) void,
+    irq26: fn () callconv(.C) void,
+    irq27: fn () callconv(.C) void,
+    irq28: fn () callconv(.C) void,
+    irq29: fn () callconv(.C) void,
+    irq30: fn () callconv(.C) void,
+    irq31: fn () callconv(.C) void,
+};
+
+fn reservedVector() callconv(.C) void {
+    @panic("called from reserved entry in vector table");
 }
