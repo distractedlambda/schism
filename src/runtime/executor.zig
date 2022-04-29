@@ -1,31 +1,70 @@
 const std = @import("std");
 
 const arm = @import("../arm.zig");
-const bootrom = @import("bootrom.zig");
 const config = @import("config.zig");
 
-const Continuation = @import("Continuation.zig");
-const ContinuationSet = @import("ContinuationSet.zig");
-const CoreLocal = @import("core_local.zig").CoreLocal;
 const HardwareSpinLock = @import("HardwareSpinLock.zig");
 
-const ready_continuations_lock = HardwareSpinLock.init(0);
-var ready_continuations = ContinuationSet.init();
-var current_priority_level = CoreLocal(?config.PriorityLevel).init(null);
+pub const Continuation = struct {
+    frame: anyframe,
+    next: *Continuation = undefined,
+    prior: *Continuation = undefined,
+};
 
-pub fn submit(continuation: *Continuation, priority_level: config.PriorityLevel) void {
+pub const ContinuationQueue = struct {
+    head: ?*Continuation,
+
+    pub fn init() @This() {
+        return .{ .head = null };
+    }
+
+    pub fn isEmpty(self: @This()) bool {
+        return self.head == null;
+    }
+
+    pub fn pushBack(self: *@This(), continuation: *Continuation) void {
+        if (self.head) |head| {
+            continuation.next = self.head;
+            continuation.prior = self.head.prior;
+            self.head.prior = continuation;
+        } else {
+            continuation.next = continuation;
+            continuation.prior = continuation;
+            self.head = continuation;
+        }
+    }
+
+    // FIXME: scribble over next and prior pointers after pop?
+    pub fn popFront(self: *@This()) ?*Continuation {
+        if (self.head) |head| {
+            if (self.head.next == self.head) {
+                defer self.head = null;
+                return self.head;
+            } else {
+                defer self.head = self.head.next;
+                self.head.next.prior = self.head.prior;
+                return self.head;
+            }
+        }
+    }
+};
+
+const ready_continuations_lock = HardwareSpinLock.init(0);
+var ready_continuations = ContinuationQueue.init();
+
+pub fn submit(continuation: *Continuation) void {
     arm.disableInterrupts();
     defer arm.enableInterrupts();
 
     ready_continuations_lock.lock();
     defer ready_continuations_lock.unlock();
 
-    ready_continuations.add(continuation, priority_level);
+    ready_continuations.add(continuation);
 }
 
 pub fn run() noreturn {
     while (true) {
-        const prioritized_continuation = while (true) {
+        const continuation = while (true) {
             if (blk: {
                 arm.disableInterrupts();
                 defer arm.enableInterrupts();
@@ -34,15 +73,13 @@ pub fn run() noreturn {
                 defer ready_continuations_lock.unlock();
 
                 break :blk ready_continuations.removePrioritized();
-            }) |pc| {
-                break pc;
+            }) |cont| {
+                break cont;
             }
 
             arm.waitForEvent();
         };
 
-        current_priority_level.set(prioritized_continuation.priority_level);
-        resume prioritized_continuation.continuation.frame;
-        current_priority_level.set(null);
+        resume continuation.frame;
     }
 }

@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const bootrom = @import("bootrom.zig");
+const executor = @import("executor.zig");
 
 comptime {
     @export(vector_table, .{ .name = "__vectors", .section = "vectors" });
@@ -64,7 +65,7 @@ fn handleReset() callconv(.C) noreturn {
     // Link library routines from bootrom
     bootrom.link();
 
-    std.debug.todo("");
+    executor.run();
 }
 
 fn handleNmi() callconv(.C) void {
