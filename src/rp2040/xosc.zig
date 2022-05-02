@@ -7,8 +7,8 @@ pub const ctrl = struct {
     pub usingnamespace PeripheralRegister(base_address + 0x00);
 
     pub const Enable = enum(u12) {
-        disable = 0xd1e,
-        enable = 0xfab,
+        Disable = 0xd1e,
+        Enable = 0xfab,
     };
 
     pub const FreqRange = enum(u12) {

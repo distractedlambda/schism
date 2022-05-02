@@ -13,7 +13,12 @@ pub const DriveStrength = enum(u2) {
     @"2mA",
     @"4mA",
     @"8mA",
-    @"12mA"
+    @"12mA",
+};
+
+pub const SlewRate = enum(u1) {
+    Slow,
+    Fast,
 };
 
 pub const od = RegisterField(bool, 7);
@@ -22,7 +27,7 @@ pub const drive = RegisterField(DriveStrength, 4);
 pub const pue = RegisterField(bool, 3);
 pub const pde = RegisterField(bool, 2);
 pub const schmitt = RegisterField(bool, 1);
-pub const slewfast = RegisterField(bool, 0);
+pub const slewfast = RegisterField(SlewRate, 0);
 
 pub const voltage_select = PeripheralRegister(base_address + 0x00);
 

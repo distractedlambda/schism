@@ -7,15 +7,15 @@ pub const ctrl = struct {
     pub usingnamespace PeripheralRegister(base_address + 0x00);
 
     pub const Enable = enum(u12) {
-        disable = 0xd1e,
-        enable = 0xfab,
+        Disable = 0xd1e,
+        Enable = 0xfab,
     };
 
     pub const FreqRange = enum(u12) {
-        low = 0xfa4,
-        medium = 0xfa5,
-        high = 0xfa7,
-        toohigh = 0xfa6,
+        Low = 0xfa4,
+        Medium = 0xfa5,
+        High = 0xfa7,
+        TooHigh = 0xfa6,
     };
 
     pub const enable = RegisterField(Enable, 12);
@@ -23,10 +23,10 @@ pub const ctrl = struct {
 };
 
 pub const DriveStrength = enum(u3) {
-    default = 0b000,
-    double = 0b001,
-    triple = 0b011,
-    quadruple = 0b111,
+    Default = 0b000,
+    Double = 0b001,
+    Triple = 0b011,
+    Quadruple = 0b111,
 };
 
 pub const freqa = struct {

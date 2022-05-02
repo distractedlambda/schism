@@ -8,8 +8,8 @@ pub const syst_csr = struct {
     pub usingnamespace Register(base_address + 0xe010);
 
     pub const Clksource = enum(u1) {
-        external_reference,
-        processor,
+        ExternalReference,
+        Processor,
     };
 
     pub const countflag = RegisterField(bool, 16);

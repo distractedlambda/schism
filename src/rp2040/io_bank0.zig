@@ -7,10 +7,10 @@ const RegisterField = @import("register_field.zig").RegisterField;
 const base_address = 0x40014000;
 
 pub const InterruptKind = enum(u2) {
-    level_low,
-    level_high,
-    edge_low,
-    edge_high,
+    LevelLow,
+    LevelHigh,
+    EdgeLow,
+    EdgeHigh,
 };
 
 pub fn interruptBitIndex(gpio: u5, kind: InterruptKind) u32 {
@@ -35,10 +35,10 @@ pub const gpio_ctrl = struct {
     pub usingnamespace PeripheralRegisterArray(30, base_address + 0x004, 0x8);
 
     pub const Override = enum(u2) {
-        none,
-        invert,
-        drive_low,
-        drive_high,
+        None,
+        Invert,
+        DriveLow,
+        DriveHigh,
     };
 
     pub const irqover = RegisterField(Override, 28);
@@ -47,36 +47,36 @@ pub const gpio_ctrl = struct {
     pub const outover = RegisterField(Override, 8);
 
     const funcsel_table = [30][9]?[]const u8{
-        [9]?[]const u8{ "spi0_rx", "uart0_tx", "i2c0_sda", "pwm0_a", "sio", "pio0", "pio1", null, "usb_ovcur_det" },
-        [9]?[]const u8{ "spi0_csn", "uart0_rx", "i2c0_scl", "pwm0_b", "sio", "pio0", "pio1", null, "usb_vbus_det" },
-        [9]?[]const u8{ "spi0_sck", "uart0_cts", "i2c1_sda", "pwm1_a", "sio", "pio0", "pio1", null, "usb_vbus_en" },
-        [9]?[]const u8{ "spi0_tx", "uart0_rts", "i2c1_scl", "pwm1_b", "sio", "pio0", "pio1", null, "usb_ovcur_det" },
-        [9]?[]const u8{ "spi0_rx", "uart1_tx", "i2c0_sda", "pwm2_a", "sio", "pio0", "pio1", null, "usb_vbus_det" },
-        [9]?[]const u8{ "spi0_csn", "uart1_rx", "i2c0_scl", "pwm2_b", "sio", "pio0", "pio1", null, "usb_vbus_en" },
-        [9]?[]const u8{ "spi0_sck", "uart1_cts", "i2c1_sda", "pwm3_a", "sio", "pio0", "pio1", null, "usb_ovcur_det" },
-        [9]?[]const u8{ "spi0_tx", "uart1_rts", "i2c1_scl", "pwm3_b", "sio", "pio0", "pio1", null, "usb_vbus_det" },
-        [9]?[]const u8{ "spi1_rx", "uart1_tx", "i2c0_sda", "pwm4_a", "sio", "pio0", "pio1", null, "usb_vbus_en" },
-        [9]?[]const u8{ "spi1_csn", "uart1_rx", "i2c0_scl", "pwm4_b", "sio", "pio0", "pio1", null, "usb_ovcur_det" },
-        [9]?[]const u8{ "spi1_sck", "uart1_cts", "i2c1_sda", "pwm5_a", "sio", "pio0", "pio1", null, "usb_vbus_det" },
-        [9]?[]const u8{ "spi1_tx", "uart1_rts", "i2c1_scl", "pwm5_b", "sio", "pio0", "pio1", null, "usb_vbus_en" },
-        [9]?[]const u8{ "spi1_rx", "uart0_tx", "i2c0_sda", "pwm6_a", "sio", "pio0", "pio1", null, "usb_ovcur_det" },
-        [9]?[]const u8{ "spi1_csn", "uart0_rx", "i2c0_scl", "pwm6_b", "sio", "pio0", "pio1", null, "usb_vbus_det" },
-        [9]?[]const u8{ "spi1_sck", "uart0_cts", "i2c1_sda", "pwm7_a", "sio", "pio0", "pio1", null, "usb_vbus_en" },
-        [9]?[]const u8{ "spi1_tx", "uart0_rts", "i2c1_scl", "pwm7_b", "sio", "pio0", "pio1", null, "usb_ovcur_det" },
-        [9]?[]const u8{ "spi0_rx", "uart0_tx", "i2c0_sda", "pwm0_a", "sio", "pio0", "pio1", null, "usb_vbus_det" },
-        [9]?[]const u8{ "spi0_csn", "uart0_rx", "i2c0_scl", "pwm0_b", "sio", "pio0", "pio1", null, "usb_vbus_en" },
-        [9]?[]const u8{ "spi0_sck", "uart0_cts", "i2c1_sda", "pwm1_a", "sio", "pio0", "pio1", null, "usb_ovcur_det" },
-        [9]?[]const u8{ "spi0_tx", "uart0_rts", "i2c1_scl", "pwm1_b", "sio", "pio0", "pio1", null, "usb_vbus_det" },
-        [9]?[]const u8{ "spi0_rx", "uart1_tx", "i2c0_sda", "pwm2_a", "sio", "pio0", "pio1", "clock_gpin0", "usb_vbus_en" },
-        [9]?[]const u8{ "spi0_csn", "uart1_rx", "i2c0_scl", "pwm2_b", "sio", "pio0", "pio1", "clock_gpout0", "usb_ovcur_det" },
-        [9]?[]const u8{ "spi0_sck", "uart1_cts", "i2c1_sda", "pwm3_a", "sio", "pio0", "pio1", "clock_gpin1", "usb_vbus_det" },
-        [9]?[]const u8{ "spi0_tx", "uart1_rts", "i2c1_scl", "pwm3_b", "sio", "pio0", "pio1", "clock_gpout1", "usb_vbus_en" },
-        [9]?[]const u8{ "spi1_rx", "uart1_tx", "i2c0_sda", "pwm4_a", "sio", "pio0", "pio1", "clock_gpout2", "usb_ovcur_det" },
-        [9]?[]const u8{ "spi1_csn", "uart1_rx", "i2c0_scl", "pwm4_b", "sio", "pio0", "pio1", "clock_gpout3", "usb_vbus_det" },
-        [9]?[]const u8{ "spi1_sck", "uart1_cts", "i2c1_sda", "pwm5_a", "sio", "pio0", "pio1", null, "usb_vbus_en" },
-        [9]?[]const u8{ "spi1_tx", "uart1_rts", "i2c1_scl", "pwm5_b", "sio", "pio0", "pio1", null, "usb_ovcur_det" },
-        [9]?[]const u8{ "spi1_rx", "uart0_tx", "i2c0_sda", "pwm6_a", "sio", "pio0", "pio1", null, "usb_vbus_det" },
-        [9]?[]const u8{ "spi1_csn", "uart0_rx", "i2c0_scl", "pwm6_b", "sio", "pio0", "pio1", null, "usb_vbus_en" },
+        [9]?[]const u8{ "Spi0Rx", "Uart0Tx", "I2C0Sda", "Pwm0A", "Sio", "Pio0", "Pio1", null, "UsbOvcurDet" },
+        [9]?[]const u8{ "Spi0CsN", "Uart0Rx", "I2C0Scl", "Pwm0B", "Sio", "Pio0", "Pio1", null, "UsbVbusDet" },
+        [9]?[]const u8{ "Spi0Sck", "Uart0Cts", "I2C1Sda", "Pwm1A", "Sio", "Pio0", "Pio1", null, "UsbVbusEn" },
+        [9]?[]const u8{ "Spi0Tx", "Uart0Rts", "I2C1Scl", "Pwm1B", "Sio", "Pio0", "Pio1", null, "UsbOvcurDet" },
+        [9]?[]const u8{ "Spi0Rx", "Uart1Tx", "I2C0Sda", "Pwm2A", "Sio", "Pio0", "Pio1", null, "UsbVbusDet" },
+        [9]?[]const u8{ "Spi0CsN", "Uart1Rx", "I2C0Scl", "Pwm2B", "Sio", "Pio0", "Pio1", null, "UsbVbusEn" },
+        [9]?[]const u8{ "Spi0Sck", "Uart1Cts", "I2C1Sda", "Pwm3A", "Sio", "Pio0", "Pio1", null, "UsbOvcurDet" },
+        [9]?[]const u8{ "Spi0Tx", "Uart1Rts", "I2C1Scl", "Pwm3B", "Sio", "Pio0", "Pio1", null, "UsbVbusDet" },
+        [9]?[]const u8{ "Spi1Rx", "Uart1Tx", "I2C0Sda", "Pwm4A", "Sio", "Pio0", "Pio1", null, "UsbVbusEn" },
+        [9]?[]const u8{ "Spi1CsN", "Uart1Rx", "I2C0Scl", "Pwm4B", "Sio", "Pio0", "Pio1", null, "UsbOvcurDet" },
+        [9]?[]const u8{ "Spi1Sck", "Uart1Cts", "I2C1Sda", "Pwm5A", "Sio", "Pio0", "Pio1", null, "UsbVbusDet" },
+        [9]?[]const u8{ "Spi1Tx", "Uart1Rts", "I2C1Scl", "Pwm5B", "Sio", "Pio0", "Pio1", null, "UsbVbusEn" },
+        [9]?[]const u8{ "Spi1Rx", "Uart0Tx", "I2C0Sda", "Pwm6A", "Sio", "Pio0", "Pio1", null, "UsbOvcurDet" },
+        [9]?[]const u8{ "Spi1CsN", "Uart0Rx", "I2C0Scl", "Pwm6B", "Sio", "Pio0", "Pio1", null, "UsbVbusDet" },
+        [9]?[]const u8{ "Spi1Sck", "Uart0Cts", "I2C1Sda", "Pwm7A", "Sio", "Pio0", "Pio1", null, "UsbVbusEn" },
+        [9]?[]const u8{ "Spi1Tx", "Uart0Rts", "I2C1Scl", "Pwm7B", "Sio", "Pio0", "Pio1", null, "UsbOvcurDet" },
+        [9]?[]const u8{ "Spi0Rx", "Uart0Tx", "I2C0Sda", "Pwm0A", "Sio", "Pio0", "Pio1", null, "UsbVbusDet" },
+        [9]?[]const u8{ "Spi0CsN", "Uart0Rx", "I2C0Scl", "Pwm0B", "Sio", "Pio0", "Pio1", null, "UsbVbusEn" },
+        [9]?[]const u8{ "Spi0Sck", "Uart0Cts", "I2C1Sda", "Pwm1A", "Sio", "Pio0", "Pio1", null, "UsbOvcurDet" },
+        [9]?[]const u8{ "Spi0Tx", "Uart0Rts", "I2C1Scl", "Pwm1B", "Sio", "Pio0", "Pio1", null, "UsbVbusDet" },
+        [9]?[]const u8{ "Spi0Rx", "Uart1Tx", "I2C0Sda", "Pwm2A", "Sio", "Pio0", "Pio1", "ClockGpin0", "UsbVbusEn" },
+        [9]?[]const u8{ "Spi0CsN", "Uart1Rx", "I2C0Scl", "Pwm2B", "Sio", "Pio0", "Pio1", "ClockGpout0", "UsbOvcurDet" },
+        [9]?[]const u8{ "Spi0Sck", "Uart1Cts", "I2C1Sda", "Pwm3A", "Sio", "Pio0", "Pio1", "ClockGpin1", "UsbVbusDet" },
+        [9]?[]const u8{ "Spi0Tx", "Uart1Rts", "I2C1Scl", "Pwm3B", "Sio", "Pio0", "Pio1", "ClockGpout1", "UsbVbusEn" },
+        [9]?[]const u8{ "Spi1Rx", "Uart1Tx", "I2C0Sda", "Pwm4A", "Sio", "Pio0", "Pio1", "ClockGpout2", "UsbOvcurDet" },
+        [9]?[]const u8{ "Spi1CsN", "Uart1Rx", "I2C0Scl", "Pwm4B", "Sio", "Pio0", "Pio1", "ClockGpout3", "UsbVbusDet" },
+        [9]?[]const u8{ "Spi1Sck", "Uart1Cts", "I2C1Sda", "Pwm5A", "Sio", "Pio0", "Pio1", null, "UsbVbusEn" },
+        [9]?[]const u8{ "Spi1Tx", "Uart1Rts", "I2C1Scl", "Pwm5B", "Sio", "Pio0", "Pio1", null, "UsbOvcurDet" },
+        [9]?[]const u8{ "Spi1Rx", "Uart0Tx", "I2C0Sda", "Pwm6A", "Sio", "Pio0", "Pio1", null, "UsbVbusDet" },
+        [9]?[]const u8{ "Spi1CsN", "Uart0Rx", "I2C0Scl", "Pwm6B", "Sio", "Pio0", "Pio1", null, "UsbVbusEn" },
     };
 
     pub fn funcsel(comptime index: u5) type {

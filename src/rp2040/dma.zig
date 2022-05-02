@@ -6,71 +6,71 @@ const base_address = 0x50000000;
 
 pub const ctrl = struct {
     pub const TreqSel = enum(u6) {
-        dreq_pio0_tx0,
-        dreq_pio0_tx1,
-        dreq_pio0_tx2,
-        dreq_pio0_tx3,
+        DReqPio0Tx0,
+        DReqPio0Tx1,
+        DReqPio0Tx2,
+        DReqPio0Tx3,
 
-        dreq_pio0_rx0,
-        dreq_pio0_rx1,
-        dreq_pio0_rx2,
-        dreq_pio0_rx3,
+        DReqPio0Rx0,
+        DReqPio0Rx1,
+        DReqPio0Rx2,
+        DReqPio0Rx3,
 
-        dreq_pio1_tx0,
-        dreq_pio1_tx1,
-        dreq_pio1_tx2,
-        dreq_pio1_tx3,
+        DReqPio1Tx0,
+        DReqPio1Tx1,
+        DReqPio1Tx2,
+        DReqPio1Tx3,
 
-        dreq_pio1_rx0,
-        dreq_pio1_rx1,
-        dreq_pio1_rx2,
-        dreq_pio1_rx3,
+        DReqPio1Rx0,
+        DReqPio1Rx1,
+        DReqPio1Rx2,
+        DReqPio1Rx3,
 
-        dreg_spi0_tx,
-        dreq_spi0_rx,
+        DReqSpi0Tx,
+        DReqSpi0Rx,
 
-        dreg_spi1_tx,
-        dreq_spi1_rx,
+        DReqSpi1Tx,
+        DReqSpi1Rx,
 
-        dreg_uart0_tx,
-        dreq_uart0_rx,
+        DReqUart0Tx,
+        DReqUart0Rx,
 
-        dreg_uart1_tx,
-        dreq_uart1_rx,
+        DReqUart1Tx,
+        DReqUart1Rx,
 
-        dreq_pwm_wrap0,
-        dreq_pwm_wrap1,
-        dreq_pwm_wrap2,
-        dreq_pwm_wrap3,
-        dreq_pwm_wrap4,
-        dreq_pwm_wrap5,
-        dreq_pwm_wrap6,
-        dreq_pwm_wrap7,
+        DReqPwmWrap0,
+        DReqPwmWrap1,
+        DReqPwmWrap2,
+        DReqPwmWrap3,
+        DReqPwmWrap4,
+        DReqPwmWrap5,
+        DReqPwmWrap6,
+        DReqPwmWrap7,
 
-        dreq_i2c0_tx,
-        dreq_i2c0_rx,
+        DReqI2c0Tx,
+        DReqI2c0Rx,
 
-        dreq_i2c1_tx,
-        dreq_i2c1_rx,
+        DReqI2c1Tx,
+        DReqI2c1Rx,
 
-        dreq_adc,
+        DReqAdc,
 
-        dreq_xip_stream,
-        dreq_xip_ssitx,
-        dreq_xip_ssirx,
+        DReqXipStream,
+        DReqXipSsitx,
+        DReqXipSsirx,
 
-        timer_0,
-        timer_1,
-        timer_2,
-        timer_3,
+        Timer0,
+        Timer1,
+        Timer2,
+        Timer3,
 
-        permanent,
+        Permanent,
     };
 
     pub const DataSize = enum(u2) {
-        byte,
-        halfword,
-        word,
+        Byte,
+        Halfword,
+        Word,
     };
 
     pub const ahb_error = RegisterField(bool, 31);
@@ -130,12 +130,12 @@ pub const sniff_ctrl = struct {
     pub usingnamespace PeripheralRegister(base_address + 0x434);
 
     pub const Calc = enum(u4) {
-        crc32 = 0x0,
-        crc32_rev = 0x1,
-        crc16_ccitt = 0x2,
-        crc16_ccitt_rev = 0x3,
-        xor = 0xe,
-        sum = 0xf,
+        Crc32 = 0x0,
+        Crc32Rev = 0x1,
+        Crc16Ccitt = 0x2,
+        Crc16CcittRev = 0x3,
+        Xor = 0xe,
+        Sum = 0xf,
     };
 
     pub const out_inv = RegisterField(bool, 11);

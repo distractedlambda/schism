@@ -2,13 +2,16 @@ const std = @import("std");
 
 const arm = @import("../arm.zig");
 const config = @import("config.zig");
-
-const HardwareSpinLock = @import("HardwareSpinLock.zig");
+const hardware_spinlock = @import("hardware_spinlock.zig");
 
 pub const Continuation = struct {
     frame: anyframe,
     next: *Continuation = undefined,
     prior: *Continuation = undefined,
+
+    pub fn init(frame: anyframe) @This() {
+        return .{ .frame = frame };
+    }
 };
 
 pub const ContinuationQueue = struct {
@@ -49,15 +52,14 @@ pub const ContinuationQueue = struct {
     }
 };
 
-const ready_continuations_lock = HardwareSpinLock.init(0);
 var ready_continuations = ContinuationQueue.init();
 
 pub fn submit(continuation: *Continuation) void {
     arm.disableInterrupts();
     defer arm.enableInterrupts();
 
-    ready_continuations_lock.lock();
-    defer ready_continuations_lock.unlock();
+    hardware_spinlock.lock(config.executor_spinlock);
+    defer hardware_spinlock.unlock(config.executor_spinlock);
 
     ready_continuations.add(continuation);
 }
@@ -69,8 +71,8 @@ pub fn run() noreturn {
                 arm.disableInterrupts();
                 defer arm.enableInterrupts();
 
-                ready_continuations_lock.lock();
-                defer ready_continuations_lock.unlock();
+                hardware_spinlock.lock(config.executor_spinlock);
+                defer hardware_spinlock.unlock(config.executor_spinlock);
 
                 break :blk ready_continuations.removePrioritized();
             }) |cont| {

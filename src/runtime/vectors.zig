@@ -65,6 +65,7 @@ fn handleReset() callconv(.C) noreturn {
     // Link library routines from bootrom
     bootrom.link();
 
+    // Start running user code
     executor.run();
 }
 
