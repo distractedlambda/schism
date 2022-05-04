@@ -36,20 +36,19 @@ pub const ContinuationQueue = struct {
 
     // FIXME: scribble over next and prior pointers after pop?
     pub fn popFront(self: *@This()) ?*Continuation {
-        if (self.head) |head| {
-            if (self.head.next == self.head) {
-                defer self.head = null;
-                return self.head;
-            } else {
-                defer self.head = self.head.next;
-                self.head.next.prior = self.head.prior;
-                return self.head;
-            }
+        const head = self.head orelse return null;
+        if (head.next == self.head) {
+            defer self.head = null;
+            return self.head;
+        } else {
+            defer self.head = head.next;
+            head.next.prior = head.prior;
+            return head;
         }
     }
 };
 
-var ready_continuations = ContinuationQueue.init();
+var ready_continuations = ContinuationQueue{};
 
 pub fn submit(continuation: *Continuation) void {
     arm.disableInterrupts();
@@ -87,20 +86,22 @@ pub fn submitAll(queue: *ContinuationQueue) void {
 
 pub fn run() noreturn {
     while (true) {
-        const continuation = while (true) {
-            if (blk: {
-                arm.disableInterrupts();
-                defer arm.enableInterrupts();
+        const continuation = get_continuation: {
+            while (true) {
+                if (blk: {
+                    arm.disableInterrupts();
+                    defer arm.enableInterrupts();
 
-                hardware_spinlock.lock(config.executor_spinlock);
-                defer hardware_spinlock.unlock(config.executor_spinlock);
+                    hardware_spinlock.lock(config.executor_spinlock);
+                    defer hardware_spinlock.unlock(config.executor_spinlock);
 
-                break :blk ready_continuations.removePrioritized();
-            }) |cont| {
-                break cont;
+                    break :blk ready_continuations.popFront();
+                }) |cont| {
+                    break :get_continuation cont;
+                }
+
+                arm.waitForEvent();
             }
-
-            arm.waitForEvent();
         };
 
         resume continuation.frame;

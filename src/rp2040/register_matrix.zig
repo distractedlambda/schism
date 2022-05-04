@@ -14,14 +14,14 @@ pub fn RegisterMatrix(
 
         pub const Col = std.math.IntFittingRange(0, cols - 1);
 
-        fn address(row: Row, col: Col) u32 {
+        pub fn address(row: Row, col: Col) u32 {
             std.debug.assert(row >= 0 and row < rows);
             std.debug.assert(col >= 0 and col < cols);
             return base_address + row * row_stride + col * col_stride;
         }
 
         pub fn read(row: Row, col: Col) u32 {
-            return @intToPtr(*volatile u32, address(row, col));
+            return @intToPtr(*volatile u32, address(row, col)).*;
         }
 
         pub fn write(row: Row, col: Col, value: u32) void {

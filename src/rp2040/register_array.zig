@@ -12,7 +12,7 @@ pub fn RegisterArray(comptime len: comptime_int, comptime base_address: u32, com
         }
 
         pub fn read(index: Index) u32 {
-            return @intToPtr(*volatile u32, address(index));
+            return @intToPtr(*volatile u32, address(index)).*;
         }
 
         pub fn write(index: Index, value: u32) void {

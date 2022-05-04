@@ -1,16 +1,19 @@
 const std = @import("std");
 
+const arm = @import("../arm.zig");
 const bits = @import("../bits.zig");
 const bootrom = @import("bootrom.zig");
+const config = @import("config.zig");
 const executor = @import("executor.zig");
 const gpio = @import("gpio.zig");
+const rp2040 = @import("../rp2040.zig");
 
 comptime {
-    @export(vector_table, .{ .name = "__vectors", .section = "vectors" });
-    @export(vector_table, .{ .name = "__VECTOR_TABLE", .section = "vectors" });
+    @export(vector_table, .{ .name = "__vectors", .section = ".vectors" });
+    @export(vector_table, .{ .name = "__VECTOR_TABLE", .section = ".vectors" });
 }
 
-const vector_table = VectorTable{
+pub var vector_table = VectorTable{
     .stack_top = config.core0_stack_top,
     .reset = handleReset,
     .nmi = handleNmi,
@@ -75,8 +78,8 @@ fn handleReset() callconv(.C) noreturn {
     while (rp2040.resets.reset_done.read() & reset_mask != reset_mask) {}
 
     // Initialize GPIOs
-    inline for (config.gpio) |gpio_config, gpio| {
-        rp2040.pads_bank0.gpio.writeFields(gpio, .{
+    inline for (config.gpio) |gpio_config, gpio_num| {
+        rp2040.pads_bank0.gpio.writeFields(gpio_num, comptime .{
             .{ rp2040.pads_bank0.od, gpio_config.output_enabled },
             .{ rp2040.pads_bank0.ie, gpio_config.input_enabled },
             .{ rp2040.pads_bank0.drive, gpio_config.drive_strength },
@@ -86,7 +89,7 @@ fn handleReset() callconv(.C) noreturn {
             .{ rp2040.pads_bank0.slewfast, gpio_config.slew_rate },
         });
 
-        rp2040.io_bank0.gpio_ctrl.writeFields(gpio, .{
+        rp2040.io_bank0.gpio_ctrl.writeFields(gpio_num, comptime .{
             .{ rp2040.io_bank0.gpio_ctrl.irqover, .None },
             .{ rp2040.io_bank0.gpio_ctrl.inover, gpio_config.input_override },
             .{ rp2040.io_bank0.gpio_ctrl.oeover, gpio_config.output_enable_override },
@@ -97,7 +100,7 @@ fn handleReset() callconv(.C) noreturn {
 
     // FIXME: unmask IRQs
     const irq_mask = bits.maskFromPositions(u32, rp2040.Irq, .{.IoBank0});
-    rp2040.nvic_iser.write(irq_mask);
+    rp2040.ppb.nvic_iser.write(irq_mask);
 
     // Start running user code
     arm.enableInterrupts();

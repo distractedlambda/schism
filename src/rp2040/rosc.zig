@@ -34,7 +34,7 @@ pub const freqa = struct {
 
     pub const passwd_value = 0x9696;
 
-    pub const passwd = RegisterField(Passwd, 16);
+    pub const passwd = RegisterField(u16, 16);
     pub const ds3 = RegisterField(DriveStrength, 12);
     pub const ds2 = RegisterField(DriveStrength, 8);
     pub const ds1 = RegisterField(DriveStrength, 4);
@@ -46,7 +46,7 @@ pub const freqb = struct {
 
     pub const passwd_value = 0x9696;
 
-    pub const passwd = RegisterField(Passwd, 16);
+    pub const passwd = RegisterField(u16, 16);
     pub const ds7 = RegisterField(DriveStrength, 12);
     pub const ds6 = RegisterField(DriveStrength, 8);
     pub const ds5 = RegisterField(DriveStrength, 4);
@@ -72,7 +72,7 @@ pub const phase = struct {
 
     pub const passwd_value = 0xaa;
 
-    pub const passwd = RegisterField(Passwd, 4);
+    pub const passwd = RegisterField(u8, 4);
     pub const enable = RegisterField(bool, 3);
     pub const flip = RegisterField(bool, 2);
     pub const shift = RegisterField(u2, 0);

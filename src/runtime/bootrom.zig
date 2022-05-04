@@ -1,3 +1,5 @@
+const rp2040 = @import("../rp2040.zig");
+
 pub var _popcount32: fn (u32) callconv(.C) u32 = undefined;
 pub var _reverse32: fn (u32) callconv(.C) u32 = undefined;
 pub var _clz32: fn (u32) callconv(.C) u32 = undefined;
@@ -37,9 +39,9 @@ fn tableCode(code: *const [2]u8) u32 {
 }
 
 fn tableLookupFn() (fn (*const u16, u32) callconv(.C) ?*const u8) {
-    return @intToPtr(fn (*const u16, u32) callconv(.C) ?*const u8, table_lookup.*);
+    return @intToPtr(fn (*const u16, u32) callconv(.C) ?*const u8, rp2040.bootrom.table_lookup.*);
 }
 
 fn lookUpFunction(code: *const [2]u8, dst: anytype) void {
-    dst.* = @ptrCast(@typeInfo(@TypeOf(dst)).Pointer.child, tableLookupFn()(@intToPtr(*const u16, func_table.*), tableCode(code)));
+    dst.* = @ptrCast(@typeInfo(@TypeOf(dst)).Pointer.child, tableLookupFn()(@intToPtr(*const u16, rp2040.bootrom.func_table.*), tableCode(code)));
 }

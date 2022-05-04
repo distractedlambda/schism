@@ -116,23 +116,23 @@ pub const Config = struct {
                 };
             }
 
-            pub fn isValidFor(gpio: u5) bool {
-                std.debug.assert(gpio < 30);
+            pub fn isValidFor(comptime self: @This(), gpio_num: u5) bool {
+                std.debug.assert(gpio_num < 30);
                 return switch (self) {
-                    .Spi => |spi| spi.controller == gpio / 8 % 2 and @enumToInt(spi.signal) == gpio % 4,
-                    .Uart => |uart| uart.controller == (gpio +% 4) / 8 % 2 and @enumToInt(uart.signal) == gpio % 4,
-                    .I2c => |i2c| i2c.controller == gpio / 2 % 2 and @enumToInt(i2c.signal) == gpio % 2,
-                    .Pwm => |pwm| pwm.controller == gpio / 2 % 8 and @enumToInt(pwm.channel) == gpio % 2,
+                    .Spi => |spi| spi.controller == gpio_num / 8 % 2 and @enumToInt(spi.signal) == gpio_num % 4,
+                    .Uart => |uart| uart.controller == (gpio_num +% 4) / 8 % 2 and @enumToInt(uart.signal) == gpio_num % 4,
+                    .I2c => |i2c| i2c.controller == gpio_num / 2 % 2 and @enumToInt(i2c.signal) == gpio_num % 2,
+                    .Pwm => |pwm| pwm.controller == gpio_num / 2 % 8 and @enumToInt(pwm.channel) == gpio_num % 2,
                     .Sio => true,
                     .Pio => true,
                     .Clock => |clock| switch (clock) {
-                        .Gpin => |gpin| gpio == 20 + @as(u5, gpin) * 2,
+                        .Gpin => |gpin| gpio_num == 20 + @as(u5, gpin) * 2,
                         .Gpout => |gpout| switch (gpout) {
-                            0 => gpio == 21,
-                            else => gpio == 22 + @as(u5, gpout),
+                            0 => gpio_num == 21,
+                            else => gpio_num == 22 + @as(u5, gpout),
                         },
                     },
-                    .Usb => |usb| gpio % 3 == @enumToInt(usb),
+                    .Usb => |usb| gpio_num % 3 == @enumToInt(usb),
                     .Null => true,
                 };
             }
@@ -152,9 +152,9 @@ pub const gpio = resolved.gpio;
 const resolved: Config = blk: {
     const config = @as(Config, @import("root").runtime_config);
 
-    inline for (config.gpio) |gpio_config, gpio| {
-        if (!gpio_config.function.isValidFor(gpio)) {
-            @compileError(std.format.comptimePrint("GPIO {} cannot be used with function {}", .{ gpio, gpio_config.function }));
+    inline for (config.gpio) |gpio_config, gpio_num| {
+        if (!gpio_config.function.isValidFor(gpio_num)) {
+            @compileError(std.format.comptimePrint("GPIO {} cannot be used with function {}", .{ gpio_num, gpio_config.function }));
         }
     }
 

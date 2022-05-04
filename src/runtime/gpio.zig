@@ -5,7 +5,7 @@ const config = @import("config.zig");
 const core_local = @import("core_local.zig");
 const executor = @import("executor.zig");
 const hardware_spinlock = @import("hardware_spinlock.zig");
-const rp2040 = @import("rp2040.zig");
+const rp2040 = @import("../rp2040.zig");
 
 const Continuation = executor.Continuation;
 const ContinuationQueue = executor.ContinuationQueue;
@@ -50,12 +50,14 @@ pub fn read(comptime gpio: u5) u1 {
 }
 
 fn yieldUntilLowWaiters(comptime gpio: u5) *ContinuationQueue {
+    _ = gpio;
     return struct {
         var waiters = CoreLocal(ContinuationQueue).init(.{});
     }.waiters.ptr();
 }
 
 fn yieldUntilHighWaiters(comptime gpio: u5) *ContinuationQueue {
+    _ = gpio;
     return struct {
         var waiters = CoreLocal(ContinuationQueue).init(.{});
     }.waiters.ptr();
@@ -102,8 +104,8 @@ pub fn processInterrupt() void {
     var interrupt_status: [rp2040.io_bank0.intr.len]u32 = undefined;
 
     for (interrupt_status) |*status, i| {
-        status.* = rp2040.io_bank0.proc_ints.read(core_local.currentCore(), i);
-        rp2040.io_bank0.proc_inte.clear(core_local.currentCore(), i, status.*);
+        status.* = rp2040.io_bank0.proc_ints.read(core_local.currentCore(), @intCast(u2, i));
+        rp2040.io_bank0.proc_inte.clear(core_local.currentCore(), @intCast(u2, i), status.*);
     }
 
     inline for (config.gpio) |gpio_config, gpio| {
