@@ -13,3 +13,32 @@ pub const sio = @import("rp2040/sio.zig");
 pub const syscfg = @import("rp2040/syscfg.zig");
 pub const vreg_and_chip_reset = @import("rp2040/vreg_and_chip_reset.zig");
 pub const xosc = @import("rp2040/xosc.zig");
+
+pub const Irq = enum(u5) {
+    TimerIrq0,
+    TimerIrq1,
+    TimerIrq2,
+    TimerIrq3,
+    PwmWrap,
+    Usbctrl,
+    Xip,
+    Pio0Irq0,
+    Pio0Irq1,
+    Pio1Irq0,
+    Pio1Irq1,
+    DmaIrq0,
+    DmaIrq1,
+    IoBank0,
+    IoQspi,
+    SioProc0,
+    SioProc1,
+    Clocks,
+    Spi0,
+    Spi1,
+    Uart0,
+    Uart1,
+    AdcFifo,
+    I2c0,
+    I2c1,
+    Rtc,
+};

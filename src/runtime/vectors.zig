@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const bits = @import("../bits.zig");
 const bootrom = @import("bootrom.zig");
 const executor = @import("executor.zig");
 const gpio = @import("gpio.zig");
@@ -69,8 +70,9 @@ fn handleReset() callconv(.C) noreturn {
     bootrom.link();
 
     // Bring basic peripherals out of reset
-    rp2040.resets.reset.clear(config.initial_reset_deassert);
-    while (rp2040.resets.reset_done.read() & config.initial_reset_deassert != config.initial_reset_deassert) {}
+    const reset_mask = bits.maskFromPositions(u32, rp2040.resets.Target, .{ .PadsBank0, .IoBank0 });
+    rp2040.resets.reset.clear(reset_mask);
+    while (rp2040.resets.reset_done.read() & reset_mask != reset_mask) {}
 
     // Initialize GPIOs
     inline for (config.gpio) |gpio_config, gpio| {
@@ -94,6 +96,8 @@ fn handleReset() callconv(.C) noreturn {
     }
 
     // FIXME: unmask IRQs
+    const irq_mask = bits.maskFromPositions(u32, rp2040.Irq, .{.IoBank0});
+    rp2040.nvic_iser.write(irq_mask);
 
     // Start running user code
     arm.enableInterrupts();
@@ -178,7 +182,7 @@ fn handleDmaIrq1() callconv(.C) void {
 }
 
 fn handleIoIrqBank0() callconv(.C) void {
-    return;
+    gpio.processInterrupt();
 }
 
 fn handleIoIrqQspi() callconv(.C) void {
@@ -186,11 +190,11 @@ fn handleIoIrqQspi() callconv(.C) void {
 }
 
 fn handleSioIrqProc0() callconv(.C) void {
-    gpio.processInterrupt();
+    return;
 }
 
 fn handleSioIrqProc1() callconv(.C) void {
-    gpio.processInterrupt();
+    return;
 }
 
 fn handleClocksIrq() callconv(.C) void {

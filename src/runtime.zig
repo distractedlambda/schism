@@ -1,6 +1,6 @@
 const executor = @import("runtime/executor.zig");
 
-pub const config = @import("runtime/config.zig");
+pub const Config = @import("runtime/config.zig").Config;
 
 comptime {
     _ = @import("runtime/vectors.zig");
