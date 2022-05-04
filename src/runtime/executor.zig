@@ -15,11 +15,7 @@ pub const Continuation = struct {
 };
 
 pub const ContinuationQueue = struct {
-    head: ?*Continuation,
-
-    pub fn init() @This() {
-        return .{ .head = null };
-    }
+    head: ?*Continuation = null,
 
     pub fn isEmpty(self: @This()) bool {
         return self.head == null;

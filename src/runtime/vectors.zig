@@ -2,6 +2,7 @@ const std = @import("std");
 
 const bootrom = @import("bootrom.zig");
 const executor = @import("executor.zig");
+const gpio = @import("gpio.zig");
 
 comptime {
     @export(vector_table, .{ .name = "__vectors", .section = "vectors" });
@@ -51,6 +52,8 @@ const vector_table = VectorTable{
 };
 
 fn handleReset() callconv(.C) noreturn {
+    arm.disableInterrupts();
+
     // Zero out .bss
     const bss_start = @extern([*]volatile u32, .{ .name = "__bss_start__" });
     const bss_end = @extern([*]volatile u32, .{ .name = "__bss_end__" });
@@ -65,7 +68,33 @@ fn handleReset() callconv(.C) noreturn {
     // Link library routines from bootrom
     bootrom.link();
 
+    // Bring basic peripherals out of reset
+    rp2040.resets.reset.clear(config.initial_reset_deassert);
+    while (rp2040.resets.reset_done.read() & config.initial_reset_deassert != config.initial_reset_deassert) {}
+
+    // Initialize GPIOs
+    inline for (config.gpio) |gpio_config, gpio| {
+        rp2040.pads_bank0.gpio.writeFields(gpio, .{
+            .{ rp2040.pads_bank0.od, gpio_config.output_enabled },
+            .{ rp2040.pads_bank0.ie, gpio_config.input_enabled },
+            .{ rp2040.pads_bank0.drive, gpio_config.drive_strength },
+            .{ rp2040.pads_bank0.pue, gpio_config.pull_up_enabled },
+            .{ rp2040.pads_bank0.pde, gpio_config.pull_down_enabled },
+            .{ rp2040.pads_bank0.schmitt, gpio_config.schmitt_trigger_enabled },
+            .{ rp2040.pads_bank0.slewfast, gpio_config.slew_rate },
+        });
+
+        rp2040.io_bank0.gpio_ctrl.writeFields(gpio, .{
+            .{ rp2040.io_bank0.gpio_ctrl.irqover, .None },
+            .{ rp2040.io_bank0.gpio_ctrl.inover, gpio_config.input_override },
+            .{ rp2040.io_bank0.gpio_ctrl.oeover, gpio_config.output_enable_override },
+            .{ rp2040.io_bank0.gpio_ctrl.outover, gpio_config.output_override },
+            .{ rp2040.io_bank0.gpio_ctrl.funcsel, gpio_config.function.funcsel() },
+        });
+    }
+
     // Start running user code
+    arm.enableInterrupts();
     executor.run();
 }
 

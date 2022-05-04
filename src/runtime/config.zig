@@ -7,10 +7,10 @@ pub const Config = struct {
     core0_stack_size: usize = 0x1000,
     core1_stack_top: usize = 0x20041000,
     core1_stack_size: usize = 0x1000,
-    executor_spinlock: rp2040.sio.spinlock.Index = 0,
-    shared_spinlock_start: rp2040.sio.spinlock.Index = 8,
-    shared_spinlock_count: rp2040.sio.spinlock.Index = 24,
+    executor_spinlock: SpinlockIndex = 0,
     gpio: [30]Gpio = [1]Gpio{.{}} ** 30,
+
+    pub const SpinlockIndex = rp2040.sio.spinlock.Index;
 
     pub const Gpio = struct {
         input_enabled: bool = true,
@@ -36,7 +36,7 @@ pub const Config = struct {
             Uart: Uart,
             I2c: I2c,
             Pwm: Pwm,
-            Sio: void,
+            Sio: Sio,
             Pio: u1,
             Clock: Clock,
             Usb: Usb,
@@ -84,6 +84,13 @@ pub const Config = struct {
                     A,
                     B,
                 };
+            };
+
+            pub const Sio = struct {
+                yield_until_low_spinlock: ?SpinlockIndex = null,
+                yield_until_high_spinlock: ?SpinlockIndex = null,
+                yield_until_falling_edge_spinlock: ?SpinlockIndex = false,
+                yield_until_rising_edge_spinlock: ?SpinlockIndex = false,
             };
 
             pub const Clock = union(enum) {
@@ -145,10 +152,13 @@ pub const shared_spinlock_count = resolved.shared_spinlock_count;
 pub const gpio = resolved.gpio;
 
 const resolved: Config = blk: {
-    const root = @import("root");
-    if (@hasDecl(root, "runtime_config")) {
-        break :blk root.runtime_config;
-    } else {
-        break :blk .{};
+    const config = @as(Config, @import("root").runtime_config);
+
+    inline for (config.gpio) |gpio_config, gpio| {
+        if (!gpio_config.function.isValidFor(gpio)) {
+            @compileError(std.format.comptimePrint("GPIO {} cannot be used with function {}", .{ gpio, gpio_config.function }));
+        }
     }
+
+    break :blk config;
 };
