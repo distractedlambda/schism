@@ -87,10 +87,8 @@ pub const Config = struct {
             };
 
             pub const Sio = struct {
-                yield_until_low_spinlock: ?SpinlockIndex = null,
-                yield_until_high_spinlock: ?SpinlockIndex = null,
-                yield_until_falling_edge_spinlock: ?SpinlockIndex = false,
-                yield_until_rising_edge_spinlock: ?SpinlockIndex = false,
+                allow_yield_until_low: bool = false,
+                allow_yield_until_high: bool = false,
             };
 
             pub const Clock = union(enum) {

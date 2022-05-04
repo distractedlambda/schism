@@ -23,9 +23,10 @@ pub const ContinuationQueue = struct {
 
     pub fn pushBack(self: *@This(), continuation: *Continuation) void {
         if (self.head) |head| {
-            continuation.next = self.head;
-            continuation.prior = self.head.prior;
-            self.head.prior = continuation;
+            continuation.next = head;
+            continuation.prior = head.prior;
+            head.prior.next = continuation;
+            head.prior = continuation;
         } else {
             continuation.next = continuation;
             continuation.prior = continuation;
@@ -57,7 +58,31 @@ pub fn submit(continuation: *Continuation) void {
     hardware_spinlock.lock(config.executor_spinlock);
     defer hardware_spinlock.unlock(config.executor_spinlock);
 
-    ready_continuations.add(continuation);
+    ready_continuations.pushBack(continuation);
+}
+
+pub fn submitAll(queue: *ContinuationQueue) void {
+    const queue_head = queue.head orelse return;
+    queue.head = null;
+
+    arm.disableInterrupts();
+    defer arm.enableInterrupts();
+
+    hardware_spinlock.lock(config.executor_spinlock);
+    defer hardware_spinlock.unlock(config.executor_spinlock);
+
+    if (ready_continuations.head) |ready_continuations_head| {
+        const queue_tail = queue_head.prior;
+        const ready_continuations_tail = ready_continuations_head.prior;
+
+        ready_continuations_tail.next = queue_head;
+        queue_head.prior = ready_continuations_tail;
+
+        queue_tail.next = ready_continuations_head;
+        ready_continuations_head.prior = queue_tail;
+    } else {
+        ready_continuations.head = queue_head;
+    }
 }
 
 pub fn run() noreturn {

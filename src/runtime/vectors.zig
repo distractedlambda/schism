@@ -93,6 +93,8 @@ fn handleReset() callconv(.C) noreturn {
         });
     }
 
+    // FIXME: unmask IRQs
+
     // Start running user code
     arm.enableInterrupts();
     executor.run();
@@ -184,11 +186,11 @@ fn handleIoIrqQspi() callconv(.C) void {
 }
 
 fn handleSioIrqProc0() callconv(.C) void {
-    return;
+    gpio.processInterrupt();
 }
 
 fn handleSioIrqProc1() callconv(.C) void {
-    return;
+    gpio.processInterrupt();
 }
 
 fn handleClocksIrq() callconv(.C) void {
