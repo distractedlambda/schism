@@ -1,5 +1,7 @@
 const executor = @import("runtime/executor.zig");
 
+pub const gpio = @import("runtime/gpio.zig");
+
 pub const Config = @import("runtime/config.zig").Config;
 
 comptime {

@@ -2,7 +2,6 @@ const std = @import("std");
 
 const arm = @import("../arm.zig");
 const config = @import("config.zig");
-const hardware_spinlock = @import("hardware_spinlock.zig");
 
 pub const Continuation = struct {
     frame: anyframe,
@@ -53,10 +52,6 @@ var ready_continuations = ContinuationQueue{};
 pub fn submit(continuation: *Continuation) void {
     arm.disableInterrupts();
     defer arm.enableInterrupts();
-
-    hardware_spinlock.lock(config.executor_spinlock);
-    defer hardware_spinlock.unlock(config.executor_spinlock);
-
     ready_continuations.pushBack(continuation);
 }
 
@@ -66,9 +61,6 @@ pub fn submitAll(queue: *ContinuationQueue) void {
 
     arm.disableInterrupts();
     defer arm.enableInterrupts();
-
-    hardware_spinlock.lock(config.executor_spinlock);
-    defer hardware_spinlock.unlock(config.executor_spinlock);
 
     if (ready_continuations.head) |ready_continuations_head| {
         const queue_tail = queue_head.prior;
@@ -84,17 +76,19 @@ pub fn submitAll(queue: *ContinuationQueue) void {
     }
 }
 
+var root_frame: @Frame(@import("root").main) = undefined;
+
 pub fn run() noreturn {
+    root_frame = async @import("root").main();
+    var root_continuation = Continuation.init(&root_frame);
+    submit(&root_continuation);
+
     while (true) {
         const continuation = get_continuation: {
             while (true) {
                 if (blk: {
                     arm.disableInterrupts();
                     defer arm.enableInterrupts();
-
-                    hardware_spinlock.lock(config.executor_spinlock);
-                    defer hardware_spinlock.unlock(config.executor_spinlock);
-
                     break :blk ready_continuations.popFront();
                 }) |cont| {
                     break :get_continuation cont;

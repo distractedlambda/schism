@@ -11,6 +11,7 @@ pub fn build(builder: *std.build.Builder) void {
     const build_mode = builder.standardReleaseOptions();
 
     const exe = builder.addExecutable("schism.elf", "src/main.zig");
+    exe.single_threaded = true;
     exe.setTarget(rp2040_target);
     exe.setBuildMode(build_mode);
     exe.setLinkerScriptPath(std.build.FileSource.relative("src/picosystem/lscript.ld"));

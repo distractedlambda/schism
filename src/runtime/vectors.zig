@@ -4,8 +4,9 @@ const arm = @import("../arm.zig");
 const bits = @import("../bits.zig");
 const bootrom = @import("bootrom.zig");
 const config = @import("config.zig");
+const core_local = @import("core_local.zig");
 const executor = @import("executor.zig");
-const gpio = @import("gpio.zig");
+const gpio_waiters = @import("gpio/waiters.zig");
 const rp2040 = @import("../rp2040.zig");
 
 comptime {
@@ -185,7 +186,31 @@ fn handleDmaIrq1() callconv(.C) void {
 }
 
 fn handleIoIrqBank0() callconv(.C) void {
-    gpio.processInterrupt();
+    // FIXME: don't load all status registers unless we need all of them
+    var interrupt_status: [rp2040.io_bank0.intr.len]u32 = undefined;
+
+    for (interrupt_status) |*status, i| {
+        status.* = rp2040.io_bank0.proc_ints.read(core_local.currentCore(), @intCast(u2, i));
+        rp2040.io_bank0.proc_inte.clear(core_local.currentCore(), @intCast(u2, i), status.*);
+    }
+
+    inline for (config.gpio) |gpio_config, gpio_num| {
+        if (gpio_config.function != .Sio) {
+            continue;
+        }
+
+        if (gpio_config.function.Sio.allow_yield_until_low) {
+            if (@truncate(u1, interrupt_status[gpio_num / 8] >> (gpio_num % 8 * 4)) != 0) {
+                executor.submitAll(gpio_waiters.yieldUntilLow(gpio_num));
+            }
+        }
+
+        if (gpio_config.function.Sio.allow_yield_until_high) {
+            if (@truncate(u1, interrupt_status[gpio_num / 8] >> (gpio_num % 8 * 4 + 1)) != 0) {
+                executor.submitAll(gpio_waiters.yieldUntilHigh(gpio_num));
+            }
+        }
+    }
 }
 
 fn handleIoIrqQspi() callconv(.C) void {

@@ -7,10 +7,7 @@ pub const Config = struct {
     core0_stack_size: usize = 0x1000,
     core1_stack_top: usize = 0x20041000,
     core1_stack_size: usize = 0x1000,
-    executor_spinlock: SpinlockIndex = 0,
     gpio: [30]Gpio = [1]Gpio{.{}} ** 30,
-
-    pub const SpinlockIndex = rp2040.sio.spinlock.Index;
 
     pub const Gpio = struct {
         input_enabled: bool = true,
@@ -144,9 +141,6 @@ pub const core0_stack_top = resolved.core0_stack_top;
 pub const core0_stack_size = resolved.core0_stack_size;
 pub const core1_stack_top = resolved.core1_stack_top;
 pub const core1_stack_size = resolved.core1_stack_size;
-pub const executor_spinlock = resolved.executor_spinlock;
-pub const shared_spinlock_start = resolved.shared_spinlock_start;
-pub const shared_spinlock_count = resolved.shared_spinlock_count;
 pub const gpio = resolved.gpio;
 
 const resolved: Config = blk: {
