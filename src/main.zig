@@ -31,8 +31,6 @@ pub noinline fn main() void {
         runtime.gpio.set(led_pin);
         runtime.gpio.yieldUntilHigh(button_pin);
     }
-
-    runtime.gpio.set(led_pin);
 }
 
 pub fn panic(message: []const u8, error_return_trace: ?*std.builtin.StackTrace) noreturn {

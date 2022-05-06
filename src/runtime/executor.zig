@@ -102,7 +102,7 @@ pub fn run() noreturn {
                     break :get_continuation cont;
                 }
 
-                // arm.waitForEvent();
+                arm.waitForEvent();
             }
         };
 
