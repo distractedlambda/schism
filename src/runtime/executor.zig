@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const root = @import("root");
+
 const arm = @import("../arm.zig");
 const config = @import("config.zig");
 
@@ -33,17 +35,21 @@ pub const ContinuationQueue = struct {
         }
     }
 
-    // FIXME: scribble over next and prior pointers after pop?
     pub fn popFront(self: *@This()) ?*Continuation {
         const head = self.head orelse return null;
+
         if (head.next == self.head) {
-            defer self.head = null;
-            return self.head;
+            self.head = null;
         } else {
-            defer self.head = head.next;
+            self.head = head.next;
             head.next.prior = head.prior;
-            return head;
+            head.prior.next = head.next;
         }
+
+        head.next = undefined;
+        head.prior = undefined;
+
+        return head;
     }
 };
 
@@ -76,11 +82,13 @@ pub fn submitAll(queue: *ContinuationQueue) void {
     }
 }
 
-var root_frame: @Frame(@import("root").main) = undefined;
+const RootFrame = @Frame(root.main);
+
+var root_frame_buffer: [@sizeOf(RootFrame)]u8 align(@alignOf(RootFrame)) = undefined;
 
 pub fn run() noreturn {
-    root_frame = async @import("root").main();
-    var root_continuation = Continuation.init(&root_frame);
+    const root_frame = @asyncCall(&root_frame_buffer, {}, root.main, .{});
+    var root_continuation = Continuation.init(root_frame);
     submit(&root_continuation);
 
     while (true) {
@@ -94,10 +102,11 @@ pub fn run() noreturn {
                     break :get_continuation cont;
                 }
 
-                arm.waitForEvent();
+                // arm.waitForEvent();
             }
         };
 
-        resume continuation.frame;
+        const frame = continuation.frame;
+        resume frame;
     }
 }

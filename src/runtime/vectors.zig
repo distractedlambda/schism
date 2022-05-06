@@ -81,7 +81,7 @@ fn handleReset() callconv(.C) noreturn {
     // Initialize GPIOs
     inline for (config.gpio) |gpio_config, gpio_num| {
         rp2040.pads_bank0.gpio.writeFields(gpio_num, comptime .{
-            .{ rp2040.pads_bank0.od, gpio_config.output_enabled },
+            .{ rp2040.pads_bank0.od, !gpio_config.output_enabled },
             .{ rp2040.pads_bank0.ie, gpio_config.input_enabled },
             .{ rp2040.pads_bank0.drive, gpio_config.drive_strength },
             .{ rp2040.pads_bank0.pue, gpio_config.pull_up_enabled },
@@ -99,7 +99,6 @@ fn handleReset() callconv(.C) noreturn {
         });
     }
 
-    // FIXME: unmask IRQs
     const irq_mask = bits.maskFromPositions(u32, rp2040.Irq, .{.IoBank0});
     rp2040.ppb.nvic_iser.write(irq_mask);
 

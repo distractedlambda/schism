@@ -19,15 +19,13 @@ pub const runtime_config = blk: {
     break :blk config;
 };
 
-pub fn main() void {
+pub noinline fn main() void {
     runtime.gpio.enableOutput(led_pin);
-
-    while (true) {
-        runtime.gpio.clear(led_pin);
-        runtime.gpio.yieldUntilHigh(button_pin);
-        runtime.gpio.set(led_pin);
-        runtime.gpio.yieldUntilLow(button_pin);
-    }
+    runtime.gpio.clear(led_pin);
+    runtime.gpio.yieldUntilHigh(button_pin);
+    runtime.gpio.yieldUntilLow(button_pin);
+    runtime.gpio.yieldUntilHigh(button_pin);
+    runtime.gpio.set(led_pin);
 }
 
 pub fn panic(message: []const u8, error_return_trace: ?*std.builtin.StackTrace) noreturn {

@@ -56,13 +56,12 @@ pub fn yieldUntilLow(comptime gpio: u5) void {
         comptime @compileError(std.fmt.comptimePrint("yieldUntilLow is not enabled for GPIO {}", .{gpio}));
     }
 
+    var continuation = Continuation.init(@frame());
+
     suspend {
         arm.disableInterrupts();
         defer arm.enableInterrupts();
-
-        var continuation = Continuation.init(@frame());
         waiters.yieldUntilLow(gpio).pushBack(&continuation);
-
         rp2040.io_bank0.proc_inte.set(core_local.currentCore(), gpio / 8, @as(u32, 1) << (gpio % 8 * 4));
     }
 }
@@ -74,13 +73,12 @@ pub fn yieldUntilHigh(comptime gpio: u5) void {
         comptime @compileError(std.fmt.comptimePrint("yieldUntilHigh is not enabled for GPIO {}", .{gpio}));
     }
 
+    var continuation = Continuation.init(@frame());
+
     suspend {
         arm.disableInterrupts();
         defer arm.enableInterrupts();
-
-        var continuation = Continuation.init(@frame());
         waiters.yieldUntilHigh(gpio).pushBack(&continuation);
-
         rp2040.io_bank0.proc_inte.set(core_local.currentCore(), gpio / 8, @as(u32, 1) << (gpio % 8 * 4 + 1));
     }
 }
