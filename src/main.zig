@@ -10,7 +10,7 @@ comptime {
 }
 
 const led_pin = picosystem.pins.user_led.blue;
-const button_pin = picosystem.pins.buttons.a;
+const button_pin = picosystem.pins.buttons.down;
 
 pub const runtime_config = blk: {
     var config = runtime.Config{};
@@ -21,10 +21,17 @@ pub const runtime_config = blk: {
 
 pub noinline fn main() void {
     runtime.gpio.enableOutput(led_pin);
-    runtime.gpio.clear(led_pin);
-    runtime.gpio.yieldUntilHigh(button_pin);
-    runtime.gpio.yieldUntilLow(button_pin);
-    runtime.gpio.yieldUntilHigh(button_pin);
+
+    // runtime.gpio.yieldUntilLow(button_pin);
+    // runtime.gpio.yieldUntilHigh(button_pin);
+
+    while (true) {
+        runtime.gpio.clear(led_pin);
+        runtime.gpio.yieldUntilLow(button_pin);
+        runtime.gpio.set(led_pin);
+        runtime.gpio.yieldUntilHigh(button_pin);
+    }
+
     runtime.gpio.set(led_pin);
 }
 

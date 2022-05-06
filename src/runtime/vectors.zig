@@ -190,6 +190,7 @@ fn handleIoIrqBank0() callconv(.C) void {
 
     for (interrupt_status) |*status, i| {
         status.* = rp2040.io_bank0.proc_ints.read(core_local.currentCore(), @intCast(u2, i));
+        // rp2040.io_bank0.proc_ints.write(core_local.currentCore(), @intCast(u2, i), status.*);
         rp2040.io_bank0.proc_inte.clear(core_local.currentCore(), @intCast(u2, i), status.*);
     }
 
@@ -199,13 +200,13 @@ fn handleIoIrqBank0() callconv(.C) void {
         }
 
         if (gpio_config.function.Sio.allow_yield_until_low) {
-            if (@truncate(u1, interrupt_status[gpio_num / 8] >> (gpio_num % 8 * 4)) != 0) {
+            if (@truncate(u1, interrupt_status[gpio_num / 8] >> ((gpio_num % 8) * 4)) != 0) {
                 executor.submitAll(gpio_waiters.yieldUntilLow(gpio_num));
             }
         }
 
         if (gpio_config.function.Sio.allow_yield_until_high) {
-            if (@truncate(u1, interrupt_status[gpio_num / 8] >> (gpio_num % 8 * 4 + 1)) != 0) {
+            if (@truncate(u1, interrupt_status[gpio_num / 8] >> ((gpio_num % 8) * 4 + 1)) != 0) {
                 executor.submitAll(gpio_waiters.yieldUntilHigh(gpio_num));
             }
         }
