@@ -9,7 +9,7 @@ comptime {
     _ = @import("runtime/vectors.zig");
 }
 
-pub noinline fn yield() void {
+pub fn yield() void {
     var continuation = executor.Continuation.init(@frame());
     suspend {
         executor.submit(&continuation);

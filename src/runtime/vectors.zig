@@ -6,7 +6,7 @@ const bootrom = @import("bootrom.zig");
 const config = @import("config.zig");
 const core_local = @import("core_local.zig");
 const executor = @import("executor.zig");
-const gpio_waiters = @import("gpio/waiters.zig");
+const gpio_waiters = @import("gpio_waiters.zig");
 const rp2040 = @import("../rp2040.zig");
 
 comptime {
@@ -201,13 +201,13 @@ fn handleIoIrqBank0() callconv(.C) void {
 
         if (gpio_config.function.Sio.allow_yield_until_low) {
             if (@truncate(u1, interrupt_status[gpio_num / 8] >> ((gpio_num % 8) * 4)) != 0) {
-                executor.submitAll(gpio_waiters.yieldUntilLow(gpio_num));
+                executor.submitAll(gpio_waiters.yield_until_low[gpio_num].ptr());
             }
         }
 
         if (gpio_config.function.Sio.allow_yield_until_high) {
             if (@truncate(u1, interrupt_status[gpio_num / 8] >> ((gpio_num % 8) * 4 + 1)) != 0) {
-                executor.submitAll(gpio_waiters.yieldUntilHigh(gpio_num));
+                executor.submitAll(gpio_waiters.yield_until_high[gpio_num].ptr());
             }
         }
     }

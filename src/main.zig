@@ -19,12 +19,8 @@ pub const runtime_config = blk: {
     break :blk config;
 };
 
-pub noinline fn main() void {
+pub fn main() void {
     runtime.gpio.enableOutput(led_pin);
-
-    // runtime.gpio.yieldUntilLow(button_pin);
-    // runtime.gpio.yieldUntilHigh(button_pin);
-
     while (true) {
         runtime.gpio.clear(led_pin);
         runtime.gpio.yieldUntilLow(button_pin);

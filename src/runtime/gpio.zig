@@ -4,8 +4,8 @@ const arm = @import("../arm.zig");
 const config = @import("config.zig");
 const core_local = @import("core_local.zig");
 const executor = @import("executor.zig");
+const gpio_waiters = @import("gpio_waiters.zig");
 const rp2040 = @import("../rp2040.zig");
-const waiters = @import("gpio/waiters.zig");
 
 const Continuation = executor.Continuation;
 const ContinuationQueue = executor.ContinuationQueue;
@@ -61,7 +61,7 @@ pub fn yieldUntilLow(comptime gpio: u5) void {
     suspend {
         arm.disableInterrupts();
         defer arm.enableInterrupts();
-        waiters.yieldUntilLow(gpio).pushBack(&continuation);
+        gpio_waiters.yield_until_low[gpio].ptr().pushBack(&continuation);
         // rp2040.io_bank0.proc_ints.write(core_local.currentCore(), gpio / 8, @as(u32, 1) << (gpio % 8 * 4));
         rp2040.io_bank0.proc_inte.set(core_local.currentCore(), gpio / 8, @as(u32, 1) << (gpio % 8 * 4));
     }
@@ -79,7 +79,7 @@ pub fn yieldUntilHigh(comptime gpio: u5) void {
     suspend {
         arm.disableInterrupts();
         defer arm.enableInterrupts();
-        waiters.yieldUntilHigh(gpio).pushBack(&continuation);
+        gpio_waiters.yield_until_high[gpio].ptr().pushBack(&continuation);
         // rp2040.io_bank0.proc_ints.write(core_local.currentCore(), gpio / 8, @as(u32, 1) << (gpio % 8 * 4 + 1));
         rp2040.io_bank0.proc_inte.set(core_local.currentCore(), gpio / 8, @as(u32, 1) << (gpio % 8 * 4 + 1));
     }
