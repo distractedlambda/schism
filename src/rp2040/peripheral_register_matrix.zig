@@ -11,27 +11,27 @@ pub fn PeripheralRegisterMatrix(
     return struct {
         pub usingnamespace RegisterMatrix(rows, cols, base_address, row_stride, col_stride, spec);
 
-        pub fn toggleRaw(row: usize, col: usize, mask: u32) void {
+        pub inline fn toggleRaw(row: usize, col: usize, mask: u32) void {
             @intToPtr(*volatile u32, @This().address(row, col) + 0x1000).* = mask;
         }
 
-        pub fn setRaw(row: usize, col: usize, mask: u32) void {
+        pub inline fn setRaw(row: usize, col: usize, mask: u32) void {
             @intToPtr(*volatile u32, @This().address(row, col) + 0x2000).* = mask;
         }
 
-        pub fn clearRaw(row: usize, col: usize, mask: u32) void {
+        pub inline fn clearRaw(row: usize, col: usize, mask: u32) void {
             @intToPtr(*volatile u32, @This().address(row, col) + 0x3000).* = mask;
         }
 
-        pub fn toggle(row: usize, col: usize, mask: anytype) void {
+        pub inline fn toggle(row: usize, col: usize, mask: anytype) void {
             toggleRaw(row, col, @This().Bits.mask(mask));
         }
 
-        pub fn set(row: usize, col: usize, mask: anytype) void {
+        pub inline fn set(row: usize, col: usize, mask: anytype) void {
             setRaw(row, col, @This().Bits.mask(mask));
         }
 
-        pub fn clear(row: usize, col: usize, mask: anytype) void {
+        pub inline fn clear(row: usize, col: usize, mask: anytype) void {
             clearRaw(row, col, @This().Bits.mask(mask));
         }
     };

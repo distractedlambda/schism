@@ -2,7 +2,6 @@ const std = @import("std");
 
 const arm = @import("../arm.zig");
 const bits = @import("../bits.zig");
-const bootrom = @import("bootrom.zig");
 const config = @import("config.zig");
 const core_local = @import("core_local.zig");
 const executor = @import("executor.zig");
@@ -70,9 +69,6 @@ fn handleReset() callconv(.C) noreturn {
     const data_end = @extern([*]volatile u32, .{ .name = "__data_end__" });
     for (data_start[0 .. (@ptrToInt(data_end) - @ptrToInt(data_start)) / @sizeOf(u32)]) |*word, i| word.* = data_source[i];
 
-    // Link library routines from bootrom
-    bootrom.link();
-
     // Bring basic peripherals out of reset
     const reset_mask = rp2040.resets.Bits.mask(.{ .pads_bank0, .io_bank0 });
     rp2040.resets.reset.clearRaw(reset_mask);
@@ -80,7 +76,7 @@ fn handleReset() callconv(.C) noreturn {
 
     // Initialize GPIOs
     inline for (config.gpio) |gpio_config, gpio_num| {
-        rp2040.pads_bank0.gpio.write(gpio_num, .{
+        const pads_gpio = rp2040.pads_bank0.gpio.Bits.Fields{
             .od = !gpio_config.output_enabled,
             .ie = gpio_config.input_enabled,
             .drive = gpio_config.drive_strength,
@@ -88,15 +84,23 @@ fn handleReset() callconv(.C) noreturn {
             .pde = gpio_config.pull_down_enabled,
             .schmitt = gpio_config.schmitt_trigger_enabled,
             .slewfast = gpio_config.slew_rate,
-        });
+        };
 
-        rp2040.io_bank0.gpio_ctrl.write(gpio_num, .{
+        if (comptime !std.meta.eql(pads_gpio, .{})) {
+            rp2040.pads_bank0.gpio.write(gpio_num, pads_gpio);
+        }
+
+        const gpio_ctrl = rp2040.io_bank0.gpio_ctrl.Bits.Fields{
             .irqover = .None,
             .inover = gpio_config.input_override,
             .oeover = gpio_config.output_enable_override,
             .outover = gpio_config.output_override,
-            .funcsel = gpio_config.function.funcsel(),
-        });
+            .funcsel = comptime gpio_config.function.funcsel(),
+        };
+
+        if (comptime !std.meta.eql(gpio_ctrl, .{})) {
+            rp2040.io_bank0.gpio_ctrl.write(gpio_num, gpio_ctrl);
+        }
     }
 
     rp2040.ppb.nvic_iser.write(.{ .io_bank0 = true });
@@ -188,8 +192,8 @@ fn handleIoIrqBank0() callconv(.C) void {
     var interrupt_status: [rp2040.io_bank0.intr.len]u32 = undefined;
 
     for (interrupt_status) |*status, i| {
-        status.* = rp2040.io_bank0.proc_ints.read(core_local.currentCore(), @intCast(u2, i));
-        rp2040.io_bank0.proc_inte.clearRaw(core_local.currentCore(), @intCast(u2, i), status.*);
+        status.* = rp2040.io_bank0.proc_ints.read(core_local.currentCore(), i);
+        rp2040.io_bank0.proc_inte.clearRaw(core_local.currentCore(), i, status.*);
     }
 
     inline for (config.gpio) |gpio_config, gpio_num| {

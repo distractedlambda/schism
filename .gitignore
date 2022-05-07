@@ -1,2 +1,4 @@
 **/zig-cache/
 **/zig-out/
+*.uf2
+.DS_Store

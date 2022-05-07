@@ -39,7 +39,7 @@ fn driveLed(comptime led_gpio: u5, comptime button_gpio: u5) void {
 
 pub fn main() void {
     var drive_red = async driveLed(picosystem.pins.user_led.red, picosystem.pins.buttons.a);
-    var drive_green = async driveLed(picosystem.pins.user_led.green, picosystem.pins.buttons.b);
+    var drive_green = async driveLed(picosystem.pins.user_led.green, picosystem.pins.buttons.a);
     var drive_blue = async driveLed(picosystem.pins.user_led.blue, picosystem.pins.buttons.x);
 
     await drive_red;

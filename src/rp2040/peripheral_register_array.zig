@@ -11,27 +11,27 @@ pub fn PeripheralRegisterArray(
 
         pub const len = len;
 
-        pub fn toggleRaw(index: usize, mask: u32) void {
+        pub inline fn toggleRaw(index: usize, mask: u32) void {
             @intToPtr(*volatile u32, @This().address(index) + 0x1000).* = mask;
         }
 
-        pub fn setRaw(index: usize, mask: u32) void {
+        pub inline fn setRaw(index: usize, mask: u32) void {
             @intToPtr(*volatile u32, @This().address(index) + 0x2000).* = mask;
         }
 
-        pub fn clearRaw(index: usize, mask: u32) void {
+        pub inline fn clearRaw(index: usize, mask: u32) void {
             @intToPtr(*volatile u32, @This().address(index) + 0x3000).* = mask;
         }
 
-        pub fn toggle(index: usize, mask: anytype) void {
+        pub inline fn toggle(index: usize, mask: anytype) void {
             toggleRaw(index, @This().Bits.mask(mask));
         }
 
-        pub fn set(index: usize, mask: anytype) void {
+        pub inline fn set(index: usize, mask: anytype) void {
             setRaw(index, @This().Bits.mask(mask));
         }
 
-        pub fn clear(index: usize, mask: anytype) void {
+        pub inline fn clear(index: usize, mask: anytype) void {
             clearRaw(index, @This().Bits.mask(mask));
         }
     };

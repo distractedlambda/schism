@@ -8,27 +8,27 @@ pub fn Register(comptime address: usize, comptime spec: anytype) type {
 
         pub const address = address;
 
-        pub fn readNonVolatileRaw() u32 {
+        pub inline fn readNonVolatileRaw() u32 {
             return @intToPtr(*const u32, address).*;
         }
 
-        pub fn readRaw() u32 {
+        pub inline fn readRaw() u32 {
             return @intToPtr(*volatile u32, address).*;
         }
 
-        pub fn writeRaw(value: u32) void {
+        pub inline fn writeRaw(value: u32) void {
             @intToPtr(*volatile u32, address).* = value;
         }
 
-        pub fn readNonVolatile() Bits.Fields {
+        pub inline fn readNonVolatile() Bits.Fields {
             return Bits.unpack(readNonVolatileRaw());
         }
 
-        pub fn read() Bits.Fields {
+        pub inline fn read() Bits.Fields {
             return Bits.unpack(readRaw());
         }
 
-        pub fn write(fields: Bits.Fields) void {
+        pub inline fn write(fields: Bits.Fields) void {
             writeRaw(Bits.pack(fields));
         }
     };

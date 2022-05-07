@@ -81,7 +81,7 @@ pub fn BitStruct(comptime Int: type, comptime spec: anytype) type {
             } });
         };
 
-        pub fn pack(fields: Fields) Int {
+        pub inline fn pack(fields: Fields) Int {
             if (@TypeOf(spec) == type) {
                 return asBits(fields);
             } else {
@@ -93,7 +93,7 @@ pub fn BitStruct(comptime Int: type, comptime spec: anytype) type {
             }
         }
 
-        pub fn unpack(int: Int) Fields {
+        pub inline fn unpack(int: Int) Fields {
             if (@TypeOf(spec) == type) {
                 return @truncate(spec, int);
             } else {
@@ -108,7 +108,7 @@ pub fn BitStruct(comptime Int: type, comptime spec: anytype) type {
             }
         }
 
-        pub fn mask(bits: anytype) Int {
+        pub inline fn mask(bits: anytype) Int {
             var int: Int = 0;
             inline for (bits) |bit| {
                 int |= @enumToInt(@as(MaskBit, bit));
@@ -122,7 +122,7 @@ pub fn BitsOf(comptime T: type) type {
     return std.meta.Int(.unsigned, @bitSizeOf(T));
 }
 
-pub fn asBits(value: anytype) BitsOf(@TypeOf(value)) {
+pub inline fn asBits(value: anytype) BitsOf(@TypeOf(value)) {
     const Bits = BitsOf(@TypeOf(value));
     return switch (@typeInfo(@TypeOf(value))) {
         .Bool => @boolToInt(value),
@@ -133,7 +133,7 @@ pub fn asBits(value: anytype) BitsOf(@TypeOf(value)) {
     };
 }
 
-pub fn fromBits(comptime T: type, bits: BitsOf(T)) T {
+pub inline fn fromBits(comptime T: type, bits: BitsOf(T)) T {
     return switch (@typeInfo(T)) {
         .Bool => bits != 0,
         .Float => @bitCast(T, bits),
