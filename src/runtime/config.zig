@@ -8,6 +8,7 @@ pub const Config = struct {
     core1_stack_top: usize = 0x20041000,
     core1_stack_size: usize = 0x1000,
     gpio: [30]Gpio = [1]Gpio{.{}} ** 30,
+    pessimistic_init: bool = true,
 
     pub const Gpio = struct {
         input_enabled: bool = true,
@@ -145,6 +146,7 @@ pub const core0_stack_size = resolved.core0_stack_size;
 pub const core1_stack_top = resolved.core1_stack_top;
 pub const core1_stack_size = resolved.core1_stack_size;
 pub const gpio = resolved.gpio;
+pub const pessimistic_init = resolved.pessimistic_init;
 
 const resolved: Config = blk: {
     const config = @as(Config, @import("root").runtime_config);

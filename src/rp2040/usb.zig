@@ -372,7 +372,7 @@ pub const usb_muxing = Register(base_address + 0x74, .{
         .name = "to_phy",
         .type = bool,
         .lsb = 0,
-        .default = true,
+        .default = false,
     },
 });
 

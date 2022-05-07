@@ -1,6 +1,7 @@
 pub const bootrom = @import("rp2040/bootrom.zig");
 pub const dma = @import("rp2040/dma.zig");
 pub const io_bank0 = @import("rp2040/io_bank0.zig");
+pub const memories = @import("rp2040/memories.zig");
 pub const pads_bank0 = @import("rp2040/pads_bank0.zig");
 pub const pll_sys = @import("rp2040/pll_sys.zig");
 pub const pll_usb = @import("rp2040/pll_usb.zig");
@@ -11,5 +12,6 @@ pub const resets = @import("rp2040/resets.zig");
 pub const rosc = @import("rp2040/rosc.zig");
 pub const sio = @import("rp2040/sio.zig");
 pub const syscfg = @import("rp2040/syscfg.zig");
+pub const usb = @import("rp2040/usb.zig");
 pub const vreg_and_chip_reset = @import("rp2040/vreg_and_chip_reset.zig");
 pub const xosc = @import("rp2040/xosc.zig");

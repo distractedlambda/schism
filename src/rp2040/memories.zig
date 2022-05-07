@@ -1,0 +1,10 @@
+pub const rom = @ptrCast([*]allowzero const u8, 0x00000000)[0..0x4000];
+pub const xip_sram = @ptrCast([*]u8, 0x15000000)[0..0x4000];
+pub const sram_striped = @ptrCast([*]u8, 0x20000000)[0..0x40000];
+pub const sram0 = @ptrCast([*]u8, 0x21000000)[0..0x10000];
+pub const sram1 = @ptrCast([*]u8, 0x21010000)[0..0x10000];
+pub const sram2 = @ptrCast([*]u8, 0x21020000)[0..0x10000];
+pub const sram3 = @ptrCast([*]u8, 0x21030000)[0..0x10000];
+pub const sram4 = @ptrCast([*]u8, 0x20040000)[0..0x1000];
+pub const sram5 = @ptrCast([*]u8, 0x20041000)[0..0x1000];
+pub const usbctrl_dpram = @ptrCast([*]u8, 0x50100000)[0..0x1000];
