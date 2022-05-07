@@ -1,44 +1,38 @@
 const PeripheralRegister = @import("peripheral_register.zig").PeripheralRegister;
-const RegisterField = @import("register_field.zig").RegisterField;
 
 const base_address = 0x40024000;
 
-pub const ctrl = struct {
-    pub usingnamespace PeripheralRegister(base_address + 0x00);
+pub const ctrl = PeripheralRegister(base_address + 0x00, .{
+    .{
+        .name = "enable",
+        .type = enum(u12) {
+            Disable = 0xd1e,
+            Enable = 0xfab,
+        },
+        .default = .Enable,
+    },
+    .{
+        .name = "freq_range",
+        .type = enum(u12) { @"1_15MHz" = 0xaa0 },
+        .default = .@"1_15MHz",
+    },
+});
 
-    pub const Enable = enum(u12) {
-        Disable = 0xd1e,
-        Enable = 0xfab,
-    };
+pub const status = PeripheralRegister(base_address + 0x04, .{
+    .{ .name = "stable", .type = bool, .lsb = 31 },
+    .{ .name = "badwrite", .type = bool, .lsb = 24 },
+    .{ .name = "enabled", .type = bool, .lsb = 12 },
+    .{ .name = "freq_range", .type = enum(u2) { @"1_15MHz" }, .lsb = 0 },
+});
 
-    pub const FreqRange = enum(u12) {
-        @"1_15mhz" = 0xaa0,
-    };
+pub const dormant = PeripheralRegister(base_address + 0x08, enum(u32) {
+    Dormant = 0x636f6d61,
+    Wake = 0x77616b65,
+});
 
-    pub const enable = RegisterField(Enable, 12);
-    pub const freq_range = RegisterField(FreqRange, 0);
-};
+pub const startup = PeripheralRegister(base_address + 0x0c, .{
+    .{ .name = "x4", .type = bool, .lsb = 20, .default = false },
+    .{ .name = "delay", .type = u14, .lsb = 0, .default = 0x00c4 },
+});
 
-pub const status = struct {
-    pub usingnamespace PeripheralRegister(base_address + 0x04);
-
-    pub const stable = RegisterField(bool, 31);
-    pub const badwrite = RegisterField(bool, 24);
-    pub const enabled = RegisterField(bool, 12);
-};
-
-pub const dormant = struct {
-    pub usingnamespace PeripheralRegister(base_address + 0x08);
-
-    pub const dormant = 0x636f6d61;
-    pub const wake = 0x77616b65;
-};
-
-pub const startup = struct {
-    pub usingnamespace PeripheralRegister(base_address + 0x0c);
-
-    pub const x4 = RegisterField(bool, 20);
-    pub const delay = RegisterField(u14, 0);
-};
-
-pub const count = PeripheralRegister(base_address + 0x1c);
+pub const count = PeripheralRegister(base_address + 0x1c, u8);

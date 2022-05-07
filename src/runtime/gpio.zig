@@ -62,7 +62,7 @@ pub fn yieldUntilLow(comptime gpio: u5) void {
         arm.disableInterrupts();
         defer arm.enableInterrupts();
         gpio_waiters.yield_until_low[gpio].ptr().pushBack(&continuation);
-        rp2040.io_bank0.proc_inte.set(core_local.currentCore(), gpio / 8, @as(u32, 1) << (gpio % 8 * 4));
+        rp2040.io_bank0.proc_inte.setRaw(core_local.currentCore(), gpio / 8, @as(u32, 1) << (gpio % 8 * 4));
     }
 }
 
@@ -79,6 +79,6 @@ pub fn yieldUntilHigh(comptime gpio: u5) void {
         arm.disableInterrupts();
         defer arm.enableInterrupts();
         gpio_waiters.yield_until_high[gpio].ptr().pushBack(&continuation);
-        rp2040.io_bank0.proc_inte.set(core_local.currentCore(), gpio / 8, @as(u32, 1) << (gpio % 8 * 4 + 1));
+        rp2040.io_bank0.proc_inte.setRaw(core_local.currentCore(), gpio / 8, @as(u32, 1) << (gpio % 8 * 4 + 1));
     }
 }

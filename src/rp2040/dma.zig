@@ -1,6 +1,5 @@
 const PeripheralRegister = @import("peripheral_register.zig").PeripheralRegister;
 const PeripheralRegisterArray = @import("peripheral_register_array.zig").PeripheralRegisterArray;
-const RegisterField = @import("register_field.zig").RegisterField;
 
 const base_address = 0x50000000;
 
@@ -73,22 +72,22 @@ pub const ctrl = struct {
         Word,
     };
 
-    pub const ahb_error = RegisterField(bool, 31);
-    pub const read_error = RegisterField(bool, 30);
-    pub const write_error = RegisterField(bool, 29);
-    pub const busy = RegisterField(bool, 24);
-    pub const sniff_en = RegisterField(bool, 23);
-    pub const bswap = RegisterField(bool, 22);
-    pub const irq_quiet = RegisterField(bool, 21);
-    pub const treq_sel = RegisterField(TreqSel, 15);
-    pub const chain_to = RegisterField(u4, 11);
-    pub const ring_sel = RegisterField(bool, 10);
-    pub const ring_size = RegisterField(u4, 6);
-    pub const incr_write = RegisterField(bool, 5);
-    pub const incr_read = RegisterField(bool, 4);
-    pub const data_size = RegisterField(DataSize, 2);
-    pub const high_priority = RegisterField(bool, 1);
-    pub const en = RegisterField(bool, 0);
+    // pub const ahb_error = RegisterField(bool, 31);
+    // pub const read_error = RegisterField(bool, 30);
+    // pub const write_error = RegisterField(bool, 29);
+    // pub const busy = RegisterField(bool, 24);
+    // pub const sniff_en = RegisterField(bool, 23);
+    // pub const bswap = RegisterField(bool, 22);
+    // pub const irq_quiet = RegisterField(bool, 21);
+    // pub const treq_sel = RegisterField(TreqSel, 15);
+    // pub const chain_to = RegisterField(u4, 11);
+    // pub const ring_sel = RegisterField(bool, 10);
+    // pub const ring_size = RegisterField(u4, 6);
+    // pub const incr_write = RegisterField(bool, 5);
+    // pub const incr_read = RegisterField(bool, 4);
+    // pub const data_size = RegisterField(DataSize, 2);
+    // pub const high_priority = RegisterField(bool, 1);
+    // pub const en = RegisterField(bool, 0);
 };
 
 pub const read_addr = PeripheralRegisterArray(12, base_address + 0x000, 0x40);
@@ -120,8 +119,8 @@ pub const ints = PeripheralRegisterArray(2, base_address + 0x40c, 0x10);
 pub const timer = struct {
     pub usingnamespace PeripheralRegisterArray(4, base_address + 0x420, 0x04);
 
-    pub const x = RegisterField(u16, 16);
-    pub const y = RegisterField(u16, 0);
+    // pub const x = RegisterField(u16, 16);
+    // pub const y = RegisterField(u16, 0);
 };
 
 pub const multi_chan_trigger = PeripheralRegister(base_address + 0x430);
@@ -138,12 +137,12 @@ pub const sniff_ctrl = struct {
         Sum = 0xf,
     };
 
-    pub const out_inv = RegisterField(bool, 11);
-    pub const out_rev = RegisterField(bool, 10);
-    pub const bswap = RegisterField(bool, 9);
-    pub const calc = RegisterField(Calc, 5);
-    pub const dmach = RegisterField(u4, 1);
-    pub const en = RegisterField(bool, 0);
+    // pub const out_inv = RegisterField(bool, 11);
+    // pub const out_rev = RegisterField(bool, 10);
+    // pub const bswap = RegisterField(bool, 9);
+    // pub const calc = RegisterField(Calc, 5);
+    // pub const dmach = RegisterField(u4, 1);
+    // pub const en = RegisterField(bool, 0);
 };
 
 pub const sniff_data = PeripheralRegister(base_address + 0x438);
@@ -151,9 +150,9 @@ pub const sniff_data = PeripheralRegister(base_address + 0x438);
 pub const fifo_levels = struct {
     pub usingnamespace PeripheralRegister(base_address + 0x440);
 
-    pub const raf_lvl = RegisterField(u8, 16);
-    pub const waf_lvl = RegisterField(u8, 8);
-    pub const tdf_lvl = RegisterField(u8, 0);
+    // pub const raf_lvl = RegisterField(u8, 16);
+    // pub const waf_lvl = RegisterField(u8, 8);
+    // pub const tdf_lvl = RegisterField(u8, 0);
 };
 
 pub const chan_abort = PeripheralRegister(base_address + 0x444);

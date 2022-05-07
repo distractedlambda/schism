@@ -1,28 +1,125 @@
 const std = @import("std");
 
-pub fn BitsOf(comptime T: type) type {
-    return std.meta.Int(.unsigned, @bitSizeOf(T));
-}
+pub fn BitStruct(comptime Int: type, comptime spec: anytype) type {
+    if (@typeInfo(Int) != .Int or @typeInfo(Int).Int.signedness != .unsigned) {
+        @compileError("expected an unsigned integer type, got " ++ @typeName(Int));
+    }
 
-pub fn BitField(comptime T: type, comptime Word: type, comptime lsb: u16) type {
-    comptime {
-        std.debug.assert(@typeInfo(Word).Int.signedness == .unsigned);
-        std.debug.assert(@typeInfo(Word).Int.bits >= lsb + @bitSizeOf(T));
+    if (@TypeOf(spec) == type) {
+        if (@bitSizeOf(spec) > @bitSizeOf(Int)) {
+            @compileError(@typeName(spec) ++ " does not fit in " ++ @typeName(Int));
+        }
+    } else {
+        comptime var population: Int = 0;
+        inline for (spec) |field_spec| {
+            if (field_spec.lsb + @bitSizeOf(field_spec.type) > @bitSizeOf(Int)) {
+                @compileError("field '" ++ field_spec.name ++ "' does not fit in " ++ @typeName(Int));
+            }
+
+            if (@truncate(std.meta.Int(.unsigned, @bitSizeOf(field_spec.type)), population >> field_spec.lsb) != 0) {
+                @compileError("field '" ++ field_spec.name ++ "' overlaps another field");
+            }
+
+            population |= ((1 << @bitSizeOf(field_spec.type)) - 1) << field_spec.lsb;
+        }
     }
 
     return struct {
-        pub const T = T;
-        pub const Word = Word;
-        pub const lsb = lsb;
+        pub const Int: type = Int;
 
-        pub fn extract(word: Word) T {
-            return fromBits(T, @truncate(BitsOf(T), word >> lsb));
+        pub const Fields: type = blk: {
+            if (@TypeOf(spec) == type) {
+                break :blk spec;
+            } else {
+                comptime var struct_fields: [spec.len]std.builtin.Type.StructField = undefined;
+
+                inline for (spec) |field_spec, i| {
+                    struct_fields[i] = .{
+                        .name = field_spec.name,
+                        .field_type = field_spec.type,
+                        .is_comptime = false,
+                        .alignment = @alignOf(field_spec.type),
+                        .default_value = default_blk: {
+                            if (@hasField(@TypeOf(field_spec), "default")) {
+                                break :default_blk &@as(field_spec.type, field_spec.default);
+                            } else {
+                                break :default_blk null;
+                            }
+                        },
+                    };
+                }
+
+                break :blk @Type(.{ .Struct = .{
+                    .layout = .Auto,
+                    .fields = &struct_fields,
+                    .decls = &[0]std.builtin.Type.Declaration{},
+                    .is_tuple = false,
+                } });
+            }
+        };
+
+        pub const MaskBit: type = blk: {
+            comptime var enum_fields: [spec.len]std.builtin.Type.EnumField = undefined;
+            comptime var num_enum_fields = 0;
+
+            inline for (spec) |field_spec| {
+                if (field_spec.type == bool) {
+                    enum_fields[num_enum_fields] = .{
+                        .name = field_spec.name,
+                        .value = 1 << field_spec.lsb,
+                    };
+                    num_enum_fields += 1;
+                }
+            }
+
+            break :blk @Type(.{ .Enum = .{
+                .layout = .Auto,
+                .tag_type = u32,
+                .fields = enum_fields[0..num_enum_fields],
+                .decls = &[0]std.builtin.Type.Declaration{},
+                .is_exhaustive = true,
+            } });
+        };
+
+        pub fn pack(fields: Fields) Int {
+            if (@TypeOf(spec) == type) {
+                return asBits(fields);
+            } else {
+                var int: Int = 0;
+                inline for (spec) |field_spec| {
+                    int |= @as(Int, asBits(@field(fields, field_spec.name))) << field_spec.lsb;
+                }
+                return int;
+            }
         }
 
-        pub fn insert(word: Word, value: T) Word {
-            return (word & ~@as(Word, ((1 << @bitSizeOf(T)) - 1) << lsb)) | (@as(Word, asBits(value)) << lsb);
+        pub fn unpack(int: Int) Fields {
+            if (@TypeOf(spec) == type) {
+                return @truncate(spec, int);
+            } else {
+                var fields: Fields = undefined;
+                inline for (spec) |field_spec| {
+                    @field(fields, field_spec.name) = fromBits(
+                        field_spec.type,
+                        @truncate(@bitSizeOf(field_spec.type), int >> field_spec.lsb),
+                    );
+                }
+                return fields;
+            }
+        }
+
+        pub fn mask(bits: anytype) Int {
+            var int: Int = 0;
+            inline for (bits) |bit| {
+                int |= @enumToInt(@as(MaskBit, bit));
+            }
+            return int;
         }
     };
+}
+
+pub fn BitsOf(comptime T: type) type {
+    return std.meta.Int(.unsigned, @bitSizeOf(T));
 }
 
 pub fn asBits(value: anytype) BitsOf(@TypeOf(value)) {
@@ -44,36 +141,4 @@ pub fn fromBits(comptime T: type, bits: BitsOf(T)) T {
         .Int => |int| if (int.signedness == .unsigned) bits else @bitCast(T, bits),
         else => @compileError("unsupported type '" ++ @typeName(T) ++ "' for fromBits"),
     };
-}
-
-pub fn insert(word: anytype, fields: anytype) @TypeOf(word) {
-    var result = word;
-
-    inline for (fields) |type_and_value| {
-        comptime std.debug.assert(type_and_value.len == 2 and type_and_value[0].Word == @TypeOf(word));
-        result = type_and_value[0].insert(result, type_and_value[1]);
-    }
-
-    return result;
-}
-
-pub fn make(fields: anytype) fields[0][0].Word {
-    return insert(@as(fields[0][0].Word, 0), fields);
-}
-
-pub fn get(value: anytype, index: std.math.Log2Int(BitsOf(@TypeOf(value)))) bool {
-    std.debug.assert(index < @bitSizeOf(@TypeOf(value)));
-    return @truncate(u1, asBits(value) >> index) != 0;
-}
-
-pub fn maskFromPositions(comptime Mask: type, comptime Position: type, positions: anytype) Mask {
-    comptime std.debug.assert(@typeInfo(Mask).Int.signedness == .unsigned);
-
-    var mask: Mask = 0;
-
-    inline for (positions) |position| {
-        mask |= @as(Mask, 1) << @enumToInt(@as(Position, position));
-    }
-
-    return mask;
 }

@@ -26,7 +26,7 @@ pub const Config = struct {
 
         pub const SlewRate = rp2040.pads_bank0.SlewRate;
 
-        pub const Override = rp2040.io_bank0.gpio_ctrl.Override;
+        pub const Override = rp2040.io_bank0.Override;
 
         pub const Function = union(enum) {
             Spi: Spi,
@@ -99,17 +99,20 @@ pub const Config = struct {
                 VbusEn,
             };
 
-            pub fn funcsel(self: @This()) u5 {
+            pub fn funcsel(self: @This()) rp2040.io_bank0.Funcsel {
                 return switch (self) {
-                    .Spi => 1,
-                    .Uart => 2,
-                    .I2c => 3,
-                    .Pwm => 4,
-                    .Sio => 5,
-                    .Pio => |pio| @as(u4, 6) + pio,
-                    .Clock => 8,
-                    .Usb => 9,
-                    .Null => 31,
+                    .Spi => .Spi,
+                    .Uart => .Uart,
+                    .I2c => .I2c,
+                    .Pwm => .Pwm,
+                    .Sio => .Sio,
+                    .Clock => .Clock,
+                    .Usb => .Usb,
+                    .Null => .Null,
+                    .Pio => |pio| switch (pio) {
+                        0 => rp2040.io_bank0.Funcsel.Pio0,
+                        1 => .Pio1,
+                    },
                 };
             }
 

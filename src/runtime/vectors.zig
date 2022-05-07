@@ -74,33 +74,32 @@ fn handleReset() callconv(.C) noreturn {
     bootrom.link();
 
     // Bring basic peripherals out of reset
-    const reset_mask = bits.maskFromPositions(u32, rp2040.resets.Target, .{ .PadsBank0, .IoBank0 });
-    rp2040.resets.reset.clear(reset_mask);
-    while (rp2040.resets.reset_done.read() & reset_mask != reset_mask) {}
+    const reset_mask = rp2040.resets.Bits.mask(.{ .pads_bank0, .io_bank0 });
+    rp2040.resets.reset.clearRaw(reset_mask);
+    while (rp2040.resets.reset_done.readRaw() & reset_mask != reset_mask) {}
 
     // Initialize GPIOs
     inline for (config.gpio) |gpio_config, gpio_num| {
-        rp2040.pads_bank0.gpio.writeFields(gpio_num, comptime .{
-            .{ rp2040.pads_bank0.od, !gpio_config.output_enabled },
-            .{ rp2040.pads_bank0.ie, gpio_config.input_enabled },
-            .{ rp2040.pads_bank0.drive, gpio_config.drive_strength },
-            .{ rp2040.pads_bank0.pue, gpio_config.pull_up_enabled },
-            .{ rp2040.pads_bank0.pde, gpio_config.pull_down_enabled },
-            .{ rp2040.pads_bank0.schmitt, gpio_config.schmitt_trigger_enabled },
-            .{ rp2040.pads_bank0.slewfast, gpio_config.slew_rate },
+        rp2040.pads_bank0.gpio.write(gpio_num, .{
+            .od = !gpio_config.output_enabled,
+            .ie = gpio_config.input_enabled,
+            .drive = gpio_config.drive_strength,
+            .pue = gpio_config.pull_up_enabled,
+            .pde = gpio_config.pull_down_enabled,
+            .schmitt = gpio_config.schmitt_trigger_enabled,
+            .slewfast = gpio_config.slew_rate,
         });
 
-        rp2040.io_bank0.gpio_ctrl.writeFields(gpio_num, comptime .{
-            .{ rp2040.io_bank0.gpio_ctrl.irqover, .None },
-            .{ rp2040.io_bank0.gpio_ctrl.inover, gpio_config.input_override },
-            .{ rp2040.io_bank0.gpio_ctrl.oeover, gpio_config.output_enable_override },
-            .{ rp2040.io_bank0.gpio_ctrl.outover, gpio_config.output_override },
-            .{ rp2040.io_bank0.gpio_ctrl.funcsel, gpio_config.function.funcsel() },
+        rp2040.io_bank0.gpio_ctrl.write(gpio_num, .{
+            .irqover = .None,
+            .inover = gpio_config.input_override,
+            .oeover = gpio_config.output_enable_override,
+            .outover = gpio_config.output_override,
+            .funcsel = gpio_config.function.funcsel(),
         });
     }
 
-    const irq_mask = bits.maskFromPositions(u32, rp2040.Irq, .{.IoBank0});
-    rp2040.ppb.nvic_iser.write(irq_mask);
+    rp2040.ppb.nvic_iser.write(.{ .io_bank0 = true });
 
     // Start running user code
     arm.enableInterrupts();
@@ -190,8 +189,7 @@ fn handleIoIrqBank0() callconv(.C) void {
 
     for (interrupt_status) |*status, i| {
         status.* = rp2040.io_bank0.proc_ints.read(core_local.currentCore(), @intCast(u2, i));
-        // rp2040.io_bank0.proc_ints.write(core_local.currentCore(), @intCast(u2, i), status.*);
-        rp2040.io_bank0.proc_inte.clear(core_local.currentCore(), @intCast(u2, i), status.*);
+        rp2040.io_bank0.proc_inte.clearRaw(core_local.currentCore(), @intCast(u2, i), status.*);
     }
 
     inline for (config.gpio) |gpio_config, gpio_num| {

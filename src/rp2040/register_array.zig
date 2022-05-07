@@ -2,25 +2,34 @@ const std = @import("std");
 
 const bits = @import("../bits.zig");
 
-pub fn RegisterArray(comptime len: comptime_int, comptime base_address: u32, comptime stride: u32) type {
+pub fn RegisterArray(
+    comptime len: usize,
+    comptime base_address: usize,
+    comptime stride: usize,
+    comptime spec: anytype,
+) type {
     return struct {
-        pub const Index = std.math.IntFittingRange(0, len - 1);
+        pub const Bits = bits.BitStruct(u32, spec);
 
-        fn address(index: Index) u32 {
+        fn address(index: usize) usize {
             std.debug.assert(index >= 0 and index < len);
             return base_address + index * stride;
         }
 
-        pub fn read(index: Index) u32 {
+        pub fn readRaw(index: usize) u32 {
             return @intToPtr(*volatile u32, address(index)).*;
         }
 
-        pub fn write(index: Index, value: u32) void {
+        pub fn writeRaw(index: usize, value: u32) void {
             @intToPtr(*volatile u32, address(index)).* = value;
         }
 
-        pub fn writeFields(index: Index, fields: anytype) void {
-            write(index, bits.make(fields));
+        pub fn read(index: usize) Bits.Fields {
+            return Bits.pack(readRaw(index));
+        }
+
+        pub fn write(index: usize, fields: Bits.Fields) void {
+            writeRaw(index, Bits.pack(fields));
         }
     };
 }
