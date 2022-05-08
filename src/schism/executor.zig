@@ -1,9 +1,10 @@
 const std = @import("std");
 
-const root = @import("root");
-
 const arm = @import("../arm.zig");
 const config = @import("config.zig");
+const core_local = @import("core_local.zig");
+
+const CoreLocal = core_local.CoreLocal;
 
 pub const Continuation = struct {
     frame: anyframe,
@@ -71,32 +72,28 @@ pub const ContinuationQueue = struct {
     }
 };
 
-var ready_continuations = ContinuationQueue{};
+var ready_continuations = CoreLocal(ContinuationQueue).init(.{});
 
 pub fn submit(continuation: *Continuation) void {
     arm.disableInterrupts();
     defer arm.enableInterrupts();
-    ready_continuations.pushBack(continuation);
+    ready_continuations.ptr().pushBack(continuation);
 }
 
 pub fn submitAll(queue: *ContinuationQueue) void {
     arm.disableInterrupts();
     defer arm.enableInterrupts();
-    ready_continuations.spliceBack(queue);
+    ready_continuations.ptr().spliceBack(queue);
 }
 
-var root_frame: @Frame(root.main) = undefined;
-
 pub fn run() noreturn {
-    root_frame = async root.main();
-
     while (true) {
         const continuation = get_continuation: {
             while (true) {
                 if (blk: {
                     arm.disableInterrupts();
                     defer arm.enableInterrupts();
-                    break :blk ready_continuations.popFront();
+                    break :blk ready_continuations.ptr().popFront();
                 }) |cont| {
                     break :get_continuation cont;
                 }
@@ -107,5 +104,12 @@ pub fn run() noreturn {
 
         const frame = continuation.frame;
         resume frame;
+    }
+}
+
+pub fn yield() void {
+    var continuation = Continuation.init(@frame());
+    suspend {
+        submit(&continuation);
     }
 }

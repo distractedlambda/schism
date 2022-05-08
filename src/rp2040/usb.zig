@@ -1,7 +1,10 @@
+const PeripheralRegister = @import("peripheral_register.zig").PeripheralRegister;
 const Register = @import("register.zig").Register;
 const RegisterArray = @import("register_array.zig").RegisterArray;
 
 const base_address = 0x50110000;
+
+pub const dpram_base_address = 0x50100000;
 
 pub const addr_endp = RegisterArray(16, base_address, 0x04, .{
     .{
@@ -55,7 +58,7 @@ pub const sof_wr = Register(base_address + 0x44, u11);
 
 pub const sof_rd = Register(base_address + 0x48, u11);
 
-pub const sie_ctrl = Register(base_address + 0x4c, .{
+pub const sie_ctrl = PeripheralRegister(base_address + 0x4c, .{
     .{
         .name = "ep0_int_stall",
         .type = bool,
@@ -202,7 +205,7 @@ pub const sie_ctrl = Register(base_address + 0x4c, .{
     },
 });
 
-pub const sie_status = Register(base_address + 0x50, .{
+pub const sie_status = PeripheralRegister(base_address + 0x50, .{
     .{
         .name = "data_seq_error",
         .type = bool,
@@ -545,3 +548,135 @@ pub const inte = Register(base_address + 0x90, interrupt_spec);
 pub const intf = Register(base_address + 0x94, interrupt_spec);
 
 pub const ints = Register(base_address + 0x98, interrupt_spec);
+
+pub const device_ep_ctrl = RegisterArray(30, dpram_base_address + 0x08, 0x04, .{
+    .{
+        .name = "en",
+        .type = bool,
+        .lsb = 31,
+        .default = false,
+    },
+    .{
+        .name = "double_buf",
+        .type = bool,
+        .lsb = 30,
+        .default = false,
+    },
+    .{
+        .name = "int_1buf",
+        .type = bool,
+        .lsb = 29,
+        .default = false,
+    },
+    .{
+        .name = "int_2buf",
+        .type = bool,
+        .lsb = 28,
+        .default = false,
+    },
+    .{
+        .name = "type",
+        .type = enum(u2) { Control, Isochronous, Bulk, Interrupt },
+        .lsb = 26,
+        .default = .Control,
+    },
+    .{
+        .name = "int_stall",
+        .type = bool,
+        .lsb = 17,
+        .default = false,
+    },
+    .{
+        .name = "int_nak",
+        .type = bool,
+        .lsb = 16,
+        .default = false,
+    },
+    .{
+        .name = "buf_address",
+        .type = u10,
+        .lsb = 6,
+        .default = 0,
+    },
+});
+
+pub const device_ep_buf_ctrl = RegisterArray(32, dpram_base_address + 0x80, 0x04, .{
+    .{
+        .name = "buf1_full",
+        .type = .bool,
+        .lsb = 31,
+        .default = false,
+    },
+    .{
+        .name = "buf1_last_in_transfer",
+        .type = bool,
+        .lsb = 30,
+        .default = false,
+    },
+    .{
+        .name = "buf1_data_pid",
+        .type = u1,
+        .lsb = 29,
+        .default = 0,
+    },
+    .{
+        .name = "buf1_isochronous_offset",
+        .type = enum(u2) { @"128", @"256", @"512", @"1024" },
+        .lsb = 27,
+        .default = .@"128",
+    },
+    .{
+        .name = "buf1_available",
+        .type = bool,
+        .lsb = 26,
+        .default = false,
+    },
+    .{
+        .name = "buf1_len",
+        .type = u10,
+        .lsb = 16,
+        .default = 0,
+    },
+    .{
+        .name = "buf0_full",
+        .type = bool,
+        .lsb = 15,
+        .default = false,
+    },
+    .{
+        .name = "buf0_last_in_transfer",
+        .type = bool,
+        .lsb = 14,
+        .default = false,
+    },
+    .{
+        .name = "buf0_data_pid",
+        .type = u1,
+        .lsb = 13,
+        .default = 0,
+    },
+    .{
+        .name = "reset_buffer_select",
+        .type = bool,
+        .lsb = 12,
+        .default = false,
+    },
+    .{
+        .name = "stall",
+        .type = bool,
+        .lsb = 11,
+        .default = false,
+    },
+    .{
+        .name = "buf0_available",
+        .type = bool,
+        .lsb = 10,
+        .default = false,
+    },
+    .{
+        .name = "buf0_len",
+        .type = u10,
+        .lsb = 0,
+        .default = 0,
+    },
+});

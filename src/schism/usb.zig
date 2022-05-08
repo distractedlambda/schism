@@ -3,7 +3,7 @@ const std = @import("std");
 const arm = @import("../arm.zig");
 const config = @import("config.zig");
 const resets = @import("resets.zig");
-const rp2040 = @import("../rp2040.zig");
+const rp2040 = @import("../rp2040/rp2040.zig");
 
 comptime {
     std.debug.assert(std.builtin.target.arch.cpu.endian() == .Little);
@@ -203,18 +203,9 @@ pub inline fn stringDescriptor(string: anytype) StringDescriptor(string.len) {
     return .{ .string = string };
 }
 
-fn init() void {
-    if (config.pessimistic_init) {
-        resets.reset(.{.usbctrl});
-    }
+const setup_packet = @intToPtr(*const volatile [8]u8, rp2040.usb.dpram_base_address);
 
-    resets.unreset(.Async, .{.usbctrl});
-
-    if (config.pessimistic_init) {
-        std.mem.set(u8, rp2040.memories.usbctrl_dpram, 0);
-        arm.dataSynchronizationBarrier();
-    }
-
+fn initDevice() void {
     rp2040.usb.usb_muxing.write(.{
         .softcon = true,
         .to_phy = true,
@@ -239,6 +230,54 @@ fn init() void {
         .setup_req = true,
     });
 
+    comptime var next_endpoint_in = 1;
+    comptime var next_endpoint_out = 1;
+    comptime var next_buffer = 1;
+    inline for (config.usb.?.Device.interfaces) |interface, interface_num| {
+        inline for (interface.endpoints) |endpoint| {
+            const reg_index = blk: {
+                switch (endpoint.direction) {
+                    .In => {
+                        if (next_endpoint_in == 16) {
+                            @compileError("exceeded maximum number of IN endpoints");
+                        }
+
+                        defer next_endpoint_in += 1;
+                        break :blk (next_endpoint_in - 1) * 2;
+                    },
+
+                    .Out => {
+                        if (next_endpoint_out == 16) {
+                            @compileError("exceeded maximum number of OUT endpoints");
+                        }
+
+                        defer next_endpoint_out += 1;
+                        break :blk (next_endpoint_out - 1) * 2 + 1;
+                    },
+                }
+            };
+
+            const buffer_count = if (endpoint.double_buffer) 2 else 1;
+
+            if (next_buffer + buffer_count > 60) {
+                @compileError("exceeded maximum endpoint buffer count");
+            }
+
+            defer next_buffer += buffer_count;
+
+            rp2040.usb.device_ep_ctrl.write(reg_index - 2, .{
+                .en = true,
+                .double_buf = endpoint.double_buffer,
+                .int_1buf = true,
+                .buf_address = next_buffer,
+                .type = switch (endpoint.transfer_type) {
+                    .Control => .Control,
+                    .Bulk => .Bulk,
+                },
+            });
+        }
+    }
+
     rp2040.usb.sie_ctrl.write(.{
         .pullup_en = true,
     });
@@ -246,4 +285,16 @@ fn init() void {
     rp2040.ppb.nvic_iser.write(.{
         .usbctrl = true,
     });
+}
+
+pub fn handleIrq() void {
+    const usb_config = config.usb orelse @panic("USB IRQ received, but USB not enabled");
+
+    const ints = rp2040.usb.ints.read();
+
+    if (ints.setup_req) {
+        rp2040.usb.sie_status.clear(.{.setup_rec});
+        const setup_packet = @bitCast(SetupPacket, @intToPtr(*const volatile [8]u8, rp2040.usb.dpram_base_address).*);
+
+    }
 }

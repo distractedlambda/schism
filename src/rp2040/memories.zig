@@ -7,4 +7,3 @@ pub const sram2 = @ptrCast([*]u8, 0x21020000)[0..0x10000];
 pub const sram3 = @ptrCast([*]u8, 0x21030000)[0..0x10000];
 pub const sram4 = @ptrCast([*]u8, 0x20040000)[0..0x1000];
 pub const sram5 = @ptrCast([*]u8, 0x20041000)[0..0x1000];
-pub const usbctrl_dpram = @ptrCast([*]u8, 0x50100000)[0..0x1000];

@@ -1,0 +1,17 @@
+pub const bootrom = @import("bootrom.zig");
+pub const dma = @import("dma.zig");
+pub const io_bank0 = @import("io_bank0.zig");
+pub const memories = @import("memories.zig");
+pub const pads_bank0 = @import("pads_bank0.zig");
+pub const pll_sys = @import("pll_sys.zig");
+pub const pll_usb = @import("pll_usb.zig");
+pub const ppb = @import("ppb.zig");
+pub const psm = @import("psm.zig");
+pub const pwm = @import("pwm.zig");
+pub const resets = @import("resets.zig");
+pub const rosc = @import("rosc.zig");
+pub const sio = @import("sio.zig");
+pub const syscfg = @import("syscfg.zig");
+pub const usb = @import("usb.zig");
+pub const vreg_and_chip_reset = @import("vreg_and_chip_reset.zig");
+pub const xosc = @import("xosc.zig");

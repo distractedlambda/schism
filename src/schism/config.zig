@@ -1,14 +1,12 @@
 const std = @import("std");
 
-const rp2040 = @import("../rp2040.zig");
+const rp2040 = @import("../rp2040/rp2040.zig");
 
 pub const Config = struct {
-    core0_stack_top: usize = 0x20042000,
-    core0_stack_size: usize = 0x1000,
-    core1_stack_top: usize = 0x20041000,
-    core1_stack_size: usize = 0x1000,
+    core0_stack: []u8 = rp2040.memories.sram4,
+    core1_stack: []u8 = rp2040.memories.sram5,
     gpio: [30]Gpio = [1]Gpio{.{}} ** 30,
-    pessimistic_init: bool = true,
+    usb: ?Usb = null,
 
     pub const Gpio = struct {
         input_enabled: bool = true,
@@ -139,17 +137,54 @@ pub const Config = struct {
             }
         };
     };
+
+    pub const Usb = enum {
+        Device: Device,
+
+        pub const Device = struct {
+            language_id: u16 = 0x0409,
+            vendor_id: u16 = 0,
+            product_id: u16 = 0,
+            bcd_device: u16 = 0,
+            manufacturer: ?[]const u8 = null,
+            product: ?[]const u8 = null,
+            serial_number: ?[]const u8 = null,
+            interfaces: []const Interface,
+        };
+
+        pub const Interface = struct {
+            name: ?[]const u8 = null,
+            class: u8,
+            subclass: u8,
+            protocol: u8,
+            endpoints: []const Endpoint,
+        };
+
+        pub const Endpoint = struct {
+            direction: Direction,
+            transfer_type: TransferType,
+            double_buffer: bool = false,
+
+            pub const Direction = enum {
+                Out,
+                In,
+            };
+
+            pub const TransferType = enum {
+                Control,
+                Bulk,
+            };
+        };
+    };
 };
 
-pub const core0_stack_top = resolved.core0_stack_top;
-pub const core0_stack_size = resolved.core0_stack_size;
-pub const core1_stack_top = resolved.core1_stack_top;
-pub const core1_stack_size = resolved.core1_stack_size;
+pub const core0_stack = resolved.core0_stack;
+pub const core1_stack = resolved.core1_stack;
 pub const gpio = resolved.gpio;
-pub const pessimistic_init = resolved.pessimistic_init;
+pub const usb = resolved.usb;
 
 const resolved: Config = blk: {
-    const config = @as(Config, @import("root").runtime_config);
+    const config = @as(Config, @import("root").schism_config);
 
     inline for (config.gpio) |gpio_config, gpio_num| {
         if (!gpio_config.function.isValidFor(gpio_num)) {

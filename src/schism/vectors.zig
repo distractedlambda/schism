@@ -5,8 +5,10 @@ const bits = @import("../bits.zig");
 const config = @import("config.zig");
 const core_local = @import("core_local.zig");
 const executor = @import("executor.zig");
-const gpio_waiters = @import("gpio_waiters.zig");
-const rp2040 = @import("../rp2040.zig");
+const gpio = @import("gpio.zig");
+const usb = @import("usb.zig");
+const rp2040 = @import("../rp2040/rp2040.zig");
+const schism = @import("schism.zig");
 
 comptime {
     @export(vector_table, .{ .name = "__vectors", .section = ".vectors" });
@@ -14,7 +16,7 @@ comptime {
 }
 
 pub var vector_table = VectorTable{
-    .stack_top = config.core0_stack_top,
+    .stack_top = @ptrToInt(config.core0_stack.ptr + config.core0_stack.len),
     .reset = handleReset,
     .nmi = handleNmi,
     .hardfault = handleHardfault,
@@ -26,7 +28,7 @@ pub var vector_table = VectorTable{
     .irq2 = handleTimerIrq2,
     .irq3 = handleTimerIrq3,
     .irq4 = handlePwmIrqWrap,
-    .irq5 = handleUsbctrlIrq,
+    .irq5 = usb.handleIrq,
     .irq6 = handleXipIrq,
     .irq7 = handlePio0Irq0,
     .irq8 = handlePio0Irq1,
@@ -34,7 +36,7 @@ pub var vector_table = VectorTable{
     .irq10 = handlePio1Irq1,
     .irq11 = handleDmaIrq0,
     .irq12 = handleDmaIrq1,
-    .irq13 = handleIoIrqBank0,
+    .irq13 = gpio.handleIrq,
     .irq14 = handleIoIrqQspi,
     .irq15 = handleSioIrqProc0,
     .irq16 = handleSioIrqProc1,
@@ -54,6 +56,8 @@ pub var vector_table = VectorTable{
     .irq30 = handleUnconnectedIrq,
     .irq31 = handleUnconnectedIrq,
 };
+
+var core0_frame: @Frame(@import("root").main) = undefined;
 
 fn handleReset() callconv(.C) noreturn {
     arm.disableInterrupts();
@@ -107,6 +111,7 @@ fn handleReset() callconv(.C) noreturn {
 
     // Start running user code
     arm.enableInterrupts();
+    core0_frame = async @import("root").main();
     executor.run();
 }
 
@@ -155,10 +160,6 @@ fn handlePwmIrqWrap() callconv(.C) void {
     return;
 }
 
-fn handleUsbctrlIrq() callconv(.C) void {
-    return;
-}
-
 fn handleXipIrq() callconv(.C) void {
     return;
 }
@@ -185,34 +186,6 @@ fn handleDmaIrq0() callconv(.C) void {
 
 fn handleDmaIrq1() callconv(.C) void {
     return;
-}
-
-fn handleIoIrqBank0() callconv(.C) void {
-    // FIXME: don't load all status registers unless we need all of them
-    var interrupt_status: [rp2040.io_bank0.intr.len]u32 = undefined;
-
-    for (interrupt_status) |*status, i| {
-        status.* = rp2040.io_bank0.proc_ints.read(core_local.currentCore(), i);
-        rp2040.io_bank0.proc_inte.clearRaw(core_local.currentCore(), i, status.*);
-    }
-
-    inline for (config.gpio) |gpio_config, gpio_num| {
-        if (gpio_config.function != .Sio) {
-            continue;
-        }
-
-        if (gpio_config.function.Sio.allow_yield_until_low) {
-            if (@truncate(u1, interrupt_status[gpio_num / 8] >> ((gpio_num % 8) * 4)) != 0) {
-                executor.submitAll(gpio_waiters.yield_until_low[gpio_num].ptr());
-            }
-        }
-
-        if (gpio_config.function.Sio.allow_yield_until_high) {
-            if (@truncate(u1, interrupt_status[gpio_num / 8] >> ((gpio_num % 8) * 4 + 1)) != 0) {
-                executor.submitAll(gpio_waiters.yield_until_high[gpio_num].ptr());
-            }
-        }
-    }
 }
 
 fn handleIoIrqQspi() callconv(.C) void {
