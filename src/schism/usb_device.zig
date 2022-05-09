@@ -2,11 +2,116 @@ const std = @import("std");
 
 const arm = @import("../arm.zig");
 const config = @import("config.zig");
+const executor = @import("executor.zig");
 const resets = @import("resets.zig");
 const rp2040 = @import("../rp2040/rp2040.zig");
 
+const Continuation = executor.Continuation;
+const ContinuationQueue = executor.ContinuationQueue;
+
 comptime {
     std.debug.assert(std.builtin.target.arch.cpu.endian() == .Little);
+}
+
+var next_pid = std.StaticBitSet(32).initEmpty();
+var device_address_to_set: ?u7 = null;
+var configured = false;
+
+pub fn handleIrq() void {
+    if (config.usb == null) {
+        @panic("USB IRQ received, but USB not enabled");
+    }
+
+    const ints = rp2040.usb.ints.read();
+
+    if (ints.setup_req) {
+        const setup_packet = @bitCast(SetupPacket, @intToPtr(*const volatile [8]u8, rp2040.usb.dpram_base_address).*);
+        rp2040.usb.sie_status.clear(.{.setup_rec});
+        handleSetupPacket(setup_packet);
+    }
+
+    if (ints.buff_status) {
+        const buff_status = rp2040.usb.buff_status.read();
+        rp2040.usb.buff_status.write(buff_status);
+
+        if (@truncate(u1, buff_status) != 0) {
+            if (device_address_to_set) |address| {
+                rp2040.usb.addr_endp.write(0, .{ .address = address });
+                device_address_to_set = null;
+            } else {
+                startTransfer(1, 0);
+            }
+        }
+    }
+
+    if (ints.bus_reset) {
+        rp2040.usb.sie_status.clear(.{.bus_reset});
+        device_address_to_set = null;
+        configured = false;
+        rp2040.usb.addr_endp.write(0, .{ .address = 0 });
+    }
+}
+
+fn startTransfer(bufctrl_idx: u5, len: u10) void {
+    std.debug.assert(len <= 64);
+
+    rp2040.usb.device_ep_buf_ctrl.write(bufctrl_idx, .{
+        .buf0_full = @truncate(u1, bufctrl_idx) == 0,
+        .buf0_data_pid = @boolToInt(next_pid.isSet(bufctrl_idx)),
+        .buf0_len = len,
+    });
+
+    // FIXME: do we really need this dsb?
+    arm.dataSynchronizationBarrier();
+
+    // FIXME: choose the number of noops based on clock frequency bounds
+    arm.nop();
+    arm.nop();
+    arm.nop();
+    arm.nop();
+    arm.nop();
+    arm.nop();
+    arm.nop();
+    arm.nop();
+
+    rp2040.usb.device_ep_buf_ctrl.write(bufctrl_idx, .{
+        .buf0_full = @truncate(u1, bufctrl_idx) == 0,
+        .buf0_data_pid = @boolToInt(next_pid.isSet(bufctrl_idx)),
+        .buf0_len = len,
+        .buf0_available = true,
+    });
+
+    next_pid.toggle(bufctrl_idx);
+}
+
+fn handleSetupPacket(setup_packet: SetupPacket) void {
+    next_pid.set(0);
+
+    if (setup_packet.request_type.recipient != .Device or setup_packet.request_type.type != .Standard) {
+        return;
+    }
+
+    switch (setup_packet.request_type.direction) {
+        .Out => {
+            switch (setup_packet.request) {
+                .SetAddress => device_address_to_set = @truncate(u7, setup_packet.value),
+                .SetConfiguation => configured = true,
+                else => {},
+            }
+
+            startTransfer(0, 0);
+        },
+
+        .In => switch (setup_packet.request) {
+            .GetDescriptor => switch (@intToEnum(DescriptorType, setup_packet.value >> 8)) {
+                .Device => {},
+                .Configuration => {},
+                .String => {},
+                else => {}, // FIXME panic?
+            },
+            else => {},
+        },
+    }
 }
 
 pub const SetupPacket = packed struct {
@@ -31,9 +136,8 @@ pub const SetupPacket = packed struct {
             Reserved,
         },
         direction: enum(u1) {
-            HostToDevice,
-            DeviceToHost,
-            _,
+            Out,
+            In,
         },
     };
 
@@ -203,8 +307,6 @@ pub inline fn stringDescriptor(string: anytype) StringDescriptor(string.len) {
     return .{ .string = string };
 }
 
-const setup_packet = @intToPtr(*const volatile [8]u8, rp2040.usb.dpram_base_address);
-
 fn initDevice() void {
     rp2040.usb.usb_muxing.write(.{
         .softcon = true,
@@ -232,7 +334,6 @@ fn initDevice() void {
 
     comptime var next_endpoint_in = 1;
     comptime var next_endpoint_out = 1;
-    comptime var next_buffer = 1;
     inline for (config.usb.?.Device.interfaces) |interface, interface_num| {
         inline for (interface.endpoints) |endpoint| {
             const reg_index = blk: {
@@ -257,19 +358,10 @@ fn initDevice() void {
                 }
             };
 
-            const buffer_count = if (endpoint.double_buffer) 2 else 1;
-
-            if (next_buffer + buffer_count > 60) {
-                @compileError("exceeded maximum endpoint buffer count");
-            }
-
-            defer next_buffer += buffer_count;
-
-            rp2040.usb.device_ep_ctrl.write(reg_index - 2, .{
+            rp2040.usb.device_ep_ctrl.write(reg_index, .{
                 .en = true,
-                .double_buf = endpoint.double_buffer,
                 .int_1buf = true,
-                .buf_address = next_buffer,
+                .buf_address = reg_index + 6,
                 .type = switch (endpoint.transfer_type) {
                     .Control => .Control,
                     .Bulk => .Bulk,
@@ -285,16 +377,4 @@ fn initDevice() void {
     rp2040.ppb.nvic_iser.write(.{
         .usbctrl = true,
     });
-}
-
-pub fn handleIrq() void {
-    const usb_config = config.usb orelse @panic("USB IRQ received, but USB not enabled");
-
-    const ints = rp2040.usb.ints.read();
-
-    if (ints.setup_req) {
-        rp2040.usb.sie_status.clear(.{.setup_rec});
-        const setup_packet = @bitCast(SetupPacket, @intToPtr(*const volatile [8]u8, rp2040.usb.dpram_base_address).*);
-
-    }
 }

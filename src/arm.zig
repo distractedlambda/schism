@@ -1,27 +1,31 @@
-pub fn dataMemoryBarrier() void {
+pub inline fn dataMemoryBarrier() void {
     asm volatile ("dmb" ::: "memory");
 }
 
-pub fn dataSynchronizationBarrier() void {
+pub inline fn dataSynchronizationBarrier() void {
     asm volatile ("dsb" ::: "memory");
 }
 
-pub fn instructionSynchronizationBarrier() void {
+pub inline fn instructionSynchronizationBarrier() void {
     asm volatile ("isb");
 }
 
-pub fn disableInterrupts() void {
-    asm volatile ("cpsid i");
+pub inline fn disableInterrupts() void {
+    asm volatile ("cpsid i" ::: "memory");
 }
 
-pub fn enableInterrupts() void {
-    asm volatile ("cpsie i");
+pub inline fn enableInterrupts() void {
+    asm volatile ("cpsie i" ::: "memory");
 }
 
-pub fn waitForEvent() void {
+pub inline fn waitForEvent() void {
     asm volatile ("wfe" ::: "memory");
 }
 
-pub fn waitForInterrupt() void {
+pub inline fn waitForInterrupt() void {
     asm volatile ("wfi" ::: "memory");
+}
+
+pub inline fn nop() void {
+    asm volatile ("nop");
 }

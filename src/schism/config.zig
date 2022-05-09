@@ -163,7 +163,6 @@ pub const Config = struct {
         pub const Endpoint = struct {
             direction: Direction,
             transfer_type: TransferType,
-            double_buffer: bool = false,
 
             pub const Direction = enum {
                 Out,

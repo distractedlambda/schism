@@ -11,7 +11,7 @@ pub const Continuation = struct {
     next: ?*Continuation = null,
     prior: ?*Continuation = null,
 
-    pub fn init(frame: anyframe) @This() {
+    pub inline fn init(frame: anyframe) @This() {
         return .{ .frame = frame };
     }
 };
@@ -19,7 +19,7 @@ pub const Continuation = struct {
 pub const ContinuationQueue = struct {
     head: ?*Continuation = null,
 
-    pub fn isEmpty(self: @This()) bool {
+    pub inline fn isEmpty(self: @This()) bool {
         return self.head == null;
     }
 
@@ -75,14 +75,24 @@ pub const ContinuationQueue = struct {
 var ready_continuations = CoreLocal(ContinuationQueue).init(.{});
 
 pub fn submit(continuation: *Continuation) void {
+    // FIXME: save and restore interrupt status
     arm.disableInterrupts();
     defer arm.enableInterrupts();
+    submitUnsafe(continuation);
+}
+
+pub fn submitUnsafe(continuation: *Continuation) void {
     ready_continuations.ptr().pushBack(continuation);
 }
 
 pub fn submitAll(queue: *ContinuationQueue) void {
+    // FIXME: save and restore interrupt status
     arm.disableInterrupts();
     defer arm.enableInterrupts();
+    submitAllUnsafe(queue);
+}
+
+pub fn submitAllUnsafe(queue: *ContinuationQueue) void {
     ready_continuations.ptr().spliceBack(queue);
 }
 
