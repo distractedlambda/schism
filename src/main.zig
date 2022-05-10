@@ -1,11 +1,11 @@
 const std = @import("std");
 
 const llvmintrin = @import("llvmintrin.zig");
-const runtime = @import("runtime.zig");
-const picosystem = @import("picosystem.zig");
+const picosystem = @import("picosystem/picosystem.zig");
+const schism = @import("schism/schism.zig");
 
 comptime {
-    _ = runtime;
+    _ = schism;
     _ = picosystem;
 }
 
@@ -13,7 +13,7 @@ const led_pin = picosystem.pins.user_led.blue;
 const button_pin = picosystem.pins.buttons.down;
 
 pub const runtime_config = blk: {
-    var config = runtime.Config{};
+    var config = schism.Config{};
 
     config.gpio[picosystem.pins.user_led.red].function = .{ .Sio = .{} };
     config.gpio[picosystem.pins.user_led.green].function = .{ .Sio = .{} };
@@ -28,12 +28,12 @@ pub const runtime_config = blk: {
 };
 
 fn driveLed(comptime led_gpio: u5, comptime button_gpio: u5) void {
-    runtime.gpio.enableOutput(led_gpio);
+    schism.enableGpioOutput(led_gpio);
     while (true) {
-        runtime.gpio.clear(led_gpio);
-        runtime.gpio.yieldUntilLow(button_gpio);
-        runtime.gpio.set(led_gpio);
-        runtime.gpio.yieldUntilHigh(button_gpio);
+        schism.clearGpio(led_gpio);
+        schism.yieldUntilGpioLow(button_gpio);
+        schism.setGpio(led_gpio);
+        schism.yieldUntilGpioHigh(button_gpio);
     }
 }
 

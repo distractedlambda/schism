@@ -70,6 +70,10 @@ pub const ContinuationQueue = struct {
 
         return head;
     }
+
+    pub fn peekFront(self: *@This()) ?*Continuation {
+        return self.head;
+    }
 };
 
 var ready_continuations = CoreLocal(ContinuationQueue).init(.{});

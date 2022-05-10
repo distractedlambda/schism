@@ -9,3 +9,9 @@ pub fn handleIrq() void {
         else => @panic("got USB IRQ, but USB is not configured"),
     }
 }
+
+pub fn init() void {
+    switch (comptime config.usb) {
+        .Device => device.init(),
+    }
+}

@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const rp2040 = @import("../rp2040/rp2040.zig");
+const usb = @import("usb/usb.zig");
 
 pub const Config = struct {
     core0_stack: []u8 = rp2040.memories.sram4,
@@ -142,7 +143,7 @@ pub const Config = struct {
         Device: Device,
 
         pub const Device = struct {
-            language_id: u16 = 0x0409,
+            language_id: usb.protocol.LanguageId = .EnglishUnitedStates,
             vendor_id: u16 = 0,
             product_id: u16 = 0,
             bcd_device: u16 = 0,
@@ -161,18 +162,7 @@ pub const Config = struct {
         };
 
         pub const Endpoint = struct {
-            direction: Direction,
-            transfer_type: TransferType,
-
-            pub const Direction = enum {
-                Out,
-                In,
-            };
-
-            pub const TransferType = enum {
-                Control,
-                Bulk,
-            };
+            direction: usb.protocol.EndpointDescriptor.EndpointAddress.Direction,
         };
     };
 };

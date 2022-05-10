@@ -4,7 +4,6 @@ const arm = @import("../arm.zig");
 const config = @import("config.zig");
 const executor = @import("executor.zig");
 const gpio = @import("gpio.zig");
-const rp2040 = @import("../rp2040/rp2040.zig");
 const usb = @import("usb/usb.zig");
 
 comptime {
@@ -70,41 +69,9 @@ fn handleReset() callconv(.C) noreturn {
     const data_end = @extern([*]volatile u32, .{ .name = "__data_end__" });
     for (data_start[0 .. (@ptrToInt(data_end) - @ptrToInt(data_start)) / @sizeOf(u32)]) |*word, i| word.* = data_source[i];
 
-    // Bring basic peripherals out of reset
-    const reset_mask = rp2040.resets.Bits.mask(.{ .pads_bank0, .io_bank0 });
-    rp2040.resets.reset.clearRaw(reset_mask);
-    while (rp2040.resets.reset_done.readRaw() & reset_mask != reset_mask) {}
-
-    // Initialize GPIOs
-    inline for (config.gpio) |gpio_config, gpio_num| {
-        const pads_gpio = rp2040.pads_bank0.gpio.Bits.Fields{
-            .od = !gpio_config.output_enabled,
-            .ie = gpio_config.input_enabled,
-            .drive = gpio_config.drive_strength,
-            .pue = gpio_config.pull_up_enabled,
-            .pde = gpio_config.pull_down_enabled,
-            .schmitt = gpio_config.schmitt_trigger_enabled,
-            .slewfast = gpio_config.slew_rate,
-        };
-
-        if (comptime !std.meta.eql(pads_gpio, .{})) {
-            rp2040.pads_bank0.gpio.write(gpio_num, pads_gpio);
-        }
-
-        const gpio_ctrl = rp2040.io_bank0.gpio_ctrl.Bits.Fields{
-            .irqover = .None,
-            .inover = gpio_config.input_override,
-            .oeover = gpio_config.output_enable_override,
-            .outover = gpio_config.output_override,
-            .funcsel = comptime gpio_config.function.funcsel(),
-        };
-
-        if (comptime !std.meta.eql(gpio_ctrl, .{})) {
-            rp2040.io_bank0.gpio_ctrl.write(gpio_num, gpio_ctrl);
-        }
-    }
-
-    rp2040.ppb.nvic_iser.write(.{ .io_bank0 = true });
+    // Initialize peripherals
+    gpio.init();
+    usb.init();
 
     // Start running user code
     arm.enableInterrupts();
