@@ -12,7 +12,7 @@ comptime {
 const led_pin = picosystem.pins.user_led.blue;
 const button_pin = picosystem.pins.buttons.down;
 
-pub const runtime_config = blk: {
+pub const schism_config = blk: {
     var config = schism.Config{};
 
     config.gpio[picosystem.pins.user_led.red].function = .{ .Sio = .{} };

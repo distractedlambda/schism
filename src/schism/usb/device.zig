@@ -32,7 +32,7 @@ const derived_config: struct {
         fn addString(comptime self: *@This(), comptime string_or_null: ?[]const u8) u8 {
             comptime {
                 const string = string_or_null orelse return 0;
-                self.descriptors = self.descriptors ++ &[_][]const u8{&std.mem.toBytes(protocol.StringDescriptor(string_or_null))};
+                self.descriptors = self.descriptors ++ &[_][]const u8{&std.mem.toBytes(protocol.StringDescriptor(string))};
                 return self.descriptors.len - 1;
             }
         }
@@ -129,13 +129,6 @@ const derived_config: struct {
     };
 };
 
-const device_descriptor = derived_config.device_descriptor;
-const configuration_descriptor = derived_config.configuration_descriptor;
-const string_descriptors = derived_config.string_descriptors;
-const channel_assignments = derived_config.channel_assignments;
-const num_tx_channels = derived_config.num_tx_channels;
-const num_rx_channels = derived_config.num_rx_channels;
-
 pub const Error = error{ BusReset, ConnectionLost };
 
 pub const ConnectionId = enum(usize) { _ };
@@ -167,20 +160,20 @@ const RxWaiter = struct {
     destination_and_result: union { destination: []u8, result: Error!u6 },
 };
 
-const RxChannelIndex = std.math.IntFittingRange(0, num_rx_channels - 1);
+const RxChannelIndex = std.math.IntFittingRange(0, derived_config.num_rx_channels - 1);
 
 const channel_buffers_base_address = rp2040.usb.dpram_base_address + 0x180;
 
-const rx_buffers = @intToPtr(*const [num_rx_channels][64]u8, channel_buffers_base_address);
-var rx_waiters = [1]ContinuationQueue{.{}} ** num_rx_channels;
-var rx_in_flight = std.StaticBitSet(num_rx_channels).initEmpty();
+const rx_buffers = @intToPtr(*const [derived_config.num_rx_channels][64]u8, channel_buffers_base_address);
+var rx_waiters = [1]ContinuationQueue{.{}} ** derived_config.num_rx_channels;
+var rx_in_flight = std.StaticBitSet(derived_config.num_rx_channels).initEmpty();
 
 inline fn rxBufCtrlIndex(channel: RxChannelIndex) u5 {
     return @as(u5, channel) * 2 + 3;
 }
 
 fn receiveImpl(connection: ConnectionId, channel: RxChannelIndex, destination: []u8) Error!u6 {
-    std.debug.assert(channel < num_rx_channels);
+    std.debug.assert(channel < derived_config.num_rx_channels);
 
     arm.disableInterrupts();
 
@@ -212,18 +205,18 @@ const TxWaiter = struct {
     source_and_result: union { source: []const u8, result: Error!void },
 };
 
-const TxChannelIndex = std.math.IntFittingRange(0, num_tx_channels - 1);
+const TxChannelIndex = std.math.IntFittingRange(0, derived_config.num_tx_channels - 1);
 
-const tx_buffers = @intToPtr(*[num_tx_channels][64]u8, channel_buffers_base_address + num_rx_channels * 64);
-var tx_waiters = [1]ContinuationQueue{.{}} ** num_tx_channels;
-var tx_in_flight = std.StaticBitSet(num_tx_channels).initEmpty();
+const tx_buffers = @intToPtr(*[derived_config.num_tx_channels][64]u8, channel_buffers_base_address + derived_config.num_rx_channels * 64);
+var tx_waiters = [1]ContinuationQueue{.{}} ** derived_config.num_tx_channels;
+var tx_in_flight = std.StaticBitSet(derived_config.num_tx_channels).initEmpty();
 
 inline fn txBufCtrlIndex(channel: TxChannelIndex) u5 {
     return @as(u5, channel) * 2 + 2;
 }
 
 fn sendImpl(connection: ConnectionId, channel: TxChannelIndex, source: []const u8) Error!void {
-    std.debug.assert(channel < num_tx_channels);
+    std.debug.assert(channel < derived_config.num_tx_channels);
 
     arm.disableInterrupts();
 
@@ -260,7 +253,7 @@ pub fn handleIrq() void {
     const ints = rp2040.usb.ints.read();
 
     if (ints.setup_req) {
-        const setup_packet = @bitCast(SetupPacket, @intToPtr(*const volatile [8]u8, rp2040.usb.dpram_base_address).*);
+        const setup_packet = @bitCast(protocol.SetupPacket, @intToPtr(*const volatile [8]u8, rp2040.usb.dpram_base_address).*);
         rp2040.usb.sie_status.clear(.{.setup_rec});
         handleSetupPacket(setup_packet);
     }
@@ -406,23 +399,23 @@ fn handleSetupPacket(setup_packet: protocol.SetupPacket) void {
         },
 
         .In => switch (setup_packet.request) {
-            .GetDescriptor => switch (@intToEnum(DescriptorType, setup_packet.value >> 8)) {
+            .GetDescriptor => switch (@intToEnum(protocol.DescriptorType, setup_packet.value >> 8)) {
                 .Device => {
                     next_pid.set(0);
-                    std.mem.copy(u8, &ep0_buffer, device_descriptor);
-                    startTransfer(0, device_descriptor.len);
+                    std.mem.copy(u8, &ep0_buffer, derived_config.device_descriptor);
+                    startTransfer(0, derived_config.device_descriptor.len);
                 },
 
                 .Configuration => {
-                    const len = @minimum(setup_packet.length, configuration_descriptor.len);
-                    std.mem.copy(u8, &ep0_buffer, configuration_descriptor[0..len]);
+                    const len = @minimum(setup_packet.length, derived_config.configuration_descriptor.len);
+                    std.mem.copy(u8, &ep0_buffer, derived_config.configuration_descriptor[0..len]);
                     startTransfer(0, len);
                 },
 
                 .String => {
                     const index = @truncate(u8, setup_packet.value);
-                    std.mem.copy(u8, &ep0_buffer, string_descriptors[index]);
-                    startTransfer(0, string_descriptors[index].len);
+                    std.mem.copy(u8, &ep0_buffer, derived_config.string_descriptors[index]);
+                    startTransfer(0, derived_config.string_descriptors[index].len);
                 },
 
                 else => {}, // FIXME panic?
@@ -461,7 +454,7 @@ pub fn init() void {
     });
 
     var tx_channel: u4 = 0;
-    while (tx_channel < num_tx_channels) : (tx_channel += 1) {
+    while (tx_channel < derived_config.num_tx_channels) : (tx_channel += 1) {
         rp2040.usb.device_ep_ctrl.write(@as(u5, tx_channel) * 2, .{
             .en = true,
             .int_1buf = true,
@@ -471,7 +464,7 @@ pub fn init() void {
     }
 
     var rx_channel: u4 = 0;
-    while (rx_channel < num_rx_channels) : (rx_channel += 1) {
+    while (rx_channel < derived_config.num_rx_channels) : (rx_channel += 1) {
         rp2040.usb.device_ep_ctrl.write(@as(u5, rx_channel) * 2 + 1, .{
             .en = true,
             .int_1buf = true,
@@ -491,10 +484,10 @@ pub fn init() void {
 
 pub inline fn send(connection: ConnectionId, comptime interface: usize, comptime endpoint_of_interface: usize, data: []const u8) Error!void {
     comptime std.debug.assert(config.usb.?.Device.interfaces[interface].endpoints[endpoint_of_interface].direction == .In);
-    return sendImpl(connection, comptime channel_assignments[interface][endpoint_of_interface], data);
+    return sendImpl(connection, comptime derived_config.channel_assignments[interface][endpoint_of_interface], data);
 }
 
 pub inline fn receive(connection: ConnectionId, comptime interface: usize, comptime endpoint_of_interface: usize, destination: []u8) Error!void {
     comptime std.debug.assert(config.usb.?.Device.interfaces[interface].endpoints[endpoint_of_interface].direction == .Out);
-    return receiveImpl(connection, comptime channel_assignments[interface][endpoint_of_interface], destination);
+    return receiveImpl(connection, comptime derived_config.channel_assignments[interface][endpoint_of_interface], destination);
 }

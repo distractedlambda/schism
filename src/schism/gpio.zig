@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const arm = @import("../arm.zig");
-const config = @import("config.zig");
+const config = @import("config.zig").resolved;
 const core_local = @import("core_local.zig");
 const executor = @import("executor.zig");
 const gpio_waiters = @import("gpio_waiters.zig");
@@ -84,7 +84,7 @@ pub fn yieldUntilHigh(comptime gpio: u5) void {
     }
 }
 
-pub fn handleIrq() void {
+pub fn handleIrq() callconv(.C) void {
     // FIXME: don't load all status registers unless we need all of them
     var interrupt_status: [rp2040.io_bank0.intr.len]u32 = undefined;
 

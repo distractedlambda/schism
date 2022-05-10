@@ -4,10 +4,10 @@ const rp2040 = @import("../rp2040/rp2040.zig");
 const usb = @import("usb/usb.zig");
 
 pub const Config = struct {
-    core0_stack: []u8 = rp2040.memories.sram4,
-    core1_stack: []u8 = rp2040.memories.sram5,
+    core0_stack_top: usize = 0x20041000,
+    core1_stack_top: usize = 0x20042000,
     gpio: [30]Gpio = [1]Gpio{.{}} ** 30,
-    usb: ?Usb = null,
+    usb: ?UsbConfig = null,
 
     pub const Gpio = struct {
         input_enabled: bool = true,
@@ -36,7 +36,7 @@ pub const Config = struct {
             Sio: Sio,
             Pio: u1,
             Clock: Clock,
-            Usb: Usb,
+            Usb: UsbFunction,
             Null: void,
 
             pub const Spi = struct {
@@ -93,7 +93,7 @@ pub const Config = struct {
                 Gpout: u2,
             };
 
-            pub const Usb = enum {
+            pub const UsbFunction = enum {
                 OvcurDet,
                 VbusDet,
                 VbusEn,
@@ -132,14 +132,14 @@ pub const Config = struct {
                             else => gpio_num == 22 + @as(u5, gpout),
                         },
                     },
-                    .Usb => |usb| gpio_num % 3 == @enumToInt(usb),
+                    .Usb => |func| gpio_num % 3 == @enumToInt(func),
                     .Null => true,
                 };
             }
         };
     };
 
-    pub const Usb = enum {
+    pub const UsbConfig = union(enum) {
         Device: Device,
 
         pub const Device = struct {
@@ -167,12 +167,7 @@ pub const Config = struct {
     };
 };
 
-pub const core0_stack = resolved.core0_stack;
-pub const core1_stack = resolved.core1_stack;
-pub const gpio = resolved.gpio;
-pub const usb = resolved.usb;
-
-const resolved: Config = blk: {
+pub const resolved: Config = blk: {
     const config = @as(Config, @import("root").schism_config);
 
     inline for (config.gpio) |gpio_config, gpio_num| {

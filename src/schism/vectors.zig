@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const arm = @import("../arm.zig");
-const config = @import("config.zig");
+const config = @import("config.zig").resolved;
 const executor = @import("executor.zig");
 const gpio = @import("gpio.zig");
 const usb = @import("usb/usb.zig");
@@ -12,7 +12,7 @@ comptime {
 }
 
 pub var vector_table = VectorTable{
-    .stack_top = @ptrToInt(config.core0_stack.ptr + config.core0_stack.len),
+    .stack_top = config.core0_stack_top,
     .reset = handleReset,
     .nmi = handleNmi,
     .hardfault = handleHardfault,
