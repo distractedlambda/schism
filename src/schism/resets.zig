@@ -6,6 +6,7 @@ pub inline fn reset(comptime blocks: anytype) void {
 
 pub inline fn unreset(comptime blocks: anytype) void {
     const mask = rp2040.resets.Bits.mask(blocks);
+    rp2040.resets.reset.clear(blocks);
     while (rp2040.resets.reset_done.readRaw() & mask != mask) {}
 }
 
