@@ -1,14 +1,11 @@
 const std = @import("std");
 
 const arm = @import("../arm.zig");
-const bits = @import("../bits.zig");
 const config = @import("config.zig");
-const core_local = @import("core_local.zig");
 const executor = @import("executor.zig");
 const gpio = @import("gpio.zig");
-const usb = @import("usb.zig");
 const rp2040 = @import("../rp2040/rp2040.zig");
-const schism = @import("schism.zig");
+const usb = @import("usb/usb.zig");
 
 comptime {
     @export(vector_table, .{ .name = "__vectors", .section = ".vectors" });

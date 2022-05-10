@@ -1,6 +1,7 @@
 const config = @import("config.zig");
 const executor = @import("executor.zig");
 const gpio = @import("gpio.zig");
+const usb = @import("usb.zig");
 
 comptime {
     _ = @import("vectors.zig");
