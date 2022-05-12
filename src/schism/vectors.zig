@@ -4,6 +4,7 @@ const arm = @import("../arm.zig");
 const config = @import("config.zig").resolved;
 const executor = @import("executor.zig");
 const gpio = @import("gpio.zig");
+const resets = @import("resets.zig");
 const rp2040 = @import("../rp2040/rp2040.zig");
 const usb = @import("usb/usb.zig");
 
@@ -64,23 +65,24 @@ fn handleReset() callconv(.C) noreturn {
     rp2040.xosc.ctrl.write(.{ .enable = .Enable });
     while (!rp2040.xosc.status.read().stable) {}
 
-    // // Switch reference clock to external oscillator
-    // rp2040.clocks.clk_ref_ctrl.write(.{ .src = .XoscClksrc });
-    // while (!rp2040.clocks.clk_ref_selected.read().xosc_clksrc) {}
+    // Switch reference clock to external oscillator
+    rp2040.clocks.clk_ref_ctrl.write(.{ .src = .XoscClksrc });
+    while (!rp2040.clocks.clk_ref_selected.read().xosc_clksrc) {}
 
-    // // Start up system PLL, targeting 125 MHz
-    // rp2040.pll_sys.fbdiv_int.write(125);
-    // rp2040.pll_sys.pwr.clear(.{ .pd, .vcopd });
-    // while (!rp2040.pll_sys.cs.read().lock) {}
-    // rp2040.pll_sys.prim.write(.{ .postdiv1 = 6, .postdiv2 = 2 });
-    // rp2040.pll_sys.pwr.clear(.{.postdivpd});
+    // Start up system PLL, targeting 125 MHz
+    resets.unreset(.{.pll_sys});
+    rp2040.pll_sys.fbdiv_int.write(125);
+    rp2040.pll_sys.pwr.clear(.{ .pd, .vcopd });
+    while (!rp2040.pll_sys.cs.read().lock) {}
+    rp2040.pll_sys.prim.write(.{ .postdiv1 = 6, .postdiv2 = 2 });
+    rp2040.pll_sys.pwr.clear(.{.postdivpd});
 
-    // // Switch system clock to PLL
-    // rp2040.clocks.clk_sys_control.write(.{ .src = .ClksrcClkSysAux });
-    // while (!rp2040.clocks.clk_sys_selected.read().clksrc_clk_sys_aux) {}
+    // Switch system clock to PLL
+    rp2040.clocks.clk_sys_control.write(.{ .src = .ClksrcClkSysAux });
+    while (!rp2040.clocks.clk_sys_selected.read().clksrc_clk_sys_aux) {}
 
-    // // Power down ring oscillator
-    // rp2040.rosc.ctrl.write(.{ .enable = .Disable });
+    // Power down ring oscillator
+    rp2040.rosc.ctrl.write(.{ .enable = .Disable });
 
     // Zero out .bss
     const bss_start = @extern([*]volatile u32, .{ .name = "__bss_start__" });
