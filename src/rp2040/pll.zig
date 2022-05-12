@@ -2,34 +2,24 @@ const PeripheralRegister = @import("peripheral_register.zig").PeripheralRegister
 
 pub fn Pll(comptime base_address: u32) type {
     return struct {
-        pub const cs = struct {
-            pub usingnamespace PeripheralRegister(base_address + 0x0);
+        pub const cs = PeripheralRegister(base_address + 0x0, .{
+            .{ .name = "lock", .type = bool, .lsb = 31, .default = false },
+            .{ .name = "bypass", .type = bool, .lsb = 8, .default = false },
+            .{ .name = "refdiv", .type = u6, .lsb = 0, .default = 1 },
+        });
 
-            // pub const lock = RegisterField(bool, 31);
-            // pub const bypass = RegisterField(bool, 8);
-            // pub const refdiv = RegisterField(u6, 0);
-        };
+        pub const pwr = PeripheralRegister(base_address + 0x4, .{
+            .{ .name = "vcopd", .type = bool, .lsb = 5, .default = true },
+            .{ .name = "postdivpd", .type = bool, .lsb = 3, .default = true },
+            .{ .name = "dsmpd", .type = bool, .lsb = 2, .default = true },
+            .{ .name = "pd", .type = bool, .lsb = 0, .default = true },
+        });
 
-        pub const pwr = struct {
-            pub usingnamespace PeripheralRegister(base_address + 0x4);
+        pub const fbdiv_int = PeripheralRegister(base_address + 0x8, u12);
 
-            // pub const vcopd = RegisterField(bool, 5);
-            // pub const postdivpd = RegisterField(bool, 3);
-            // pub const dsmpd = RegisterField(bool, 2);
-            // pub const pd = RegisterField(bool, 0);
-        };
-
-        pub const fbdiv_int = struct {
-            pub usingnamespace PeripheralRegister(base_address + 0x8);
-
-            // pub const value = RegisterField(u12, 0);
-        };
-
-        pub const prim = struct {
-            pub usingnamespace PeripheralRegister(base_address + 0xc);
-
-            // pub const postdiv1 = RegisterField(u3, 16);
-            // pub const postdiv2 = RegisterField(u3, 12);
-        };
+        pub const prim = PeripheralRegister(base_address + 0xc, .{
+            .{ .name = "postdiv1", .type = u3, .lsb = 16, .default = 0x7 },
+            .{ .name = "postdiv2", .type = u3, .lsb = 12, .default = 0x7 },
+        });
     };
 }

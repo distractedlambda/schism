@@ -6,7 +6,7 @@ pub const SetupPacket = packed struct {
     length: u16,
 
     pub const RequestType = packed struct {
-        recipient: enum(u4) {
+        recipient: enum(u5) {
             Device,
             Interface,
             Endpoint,
@@ -179,7 +179,7 @@ pub fn StringDescriptor(comptime len: usize) type {
     return packed struct {
         length: u8 = @sizeOf(@This()),
         descriptor_type: DescriptorType = .String,
-        string: [len:0]u8,
+        string: [len]u8,
     };
 }
 

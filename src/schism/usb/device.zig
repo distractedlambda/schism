@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const arm = @import("../../arm.zig");
-const config = @import("../config.zig");
+const config = @import("../config.zig").resolved;
 const executor = @import("../executor.zig");
 const resets = @import("../resets.zig");
 const rp2040 = @import("../../rp2040/rp2040.zig");
@@ -9,10 +9,6 @@ const protocol = @import("protocol.zig");
 
 const Continuation = executor.Continuation;
 const ContinuationQueue = executor.ContinuationQueue;
-
-comptime {
-    std.debug.assert(std.builtin.target.arch.cpu.endian() == .Little);
-}
 
 const derived_config: struct {
     device_descriptor: []const u8,
@@ -25,14 +21,14 @@ const derived_config: struct {
     const StringDescriptorTable = struct {
         descriptors: []const []const u8,
 
-        fn init(comptime languages: []const protocol.LanguageId) @This() {
-            return comptime .{ .descriptors = &[_][]const u8{std.mem.toBytes(protocol.stringDescriptor0(languages))} };
+        fn init(comptime languages: anytype) @This() {
+            return comptime .{ .descriptors = &[_][]const u8{&std.mem.toBytes(protocol.stringDescriptor0(languages))} };
         }
 
         fn addString(comptime self: *@This(), comptime string_or_null: ?[]const u8) u8 {
             comptime {
                 const string = string_or_null orelse return 0;
-                self.descriptors = self.descriptors ++ &[_][]const u8{&std.mem.toBytes(protocol.StringDescriptor(string))};
+                self.descriptors = self.descriptors ++ &[_][]const u8{&std.mem.toBytes(protocol.stringDescriptor(string[0..string.len].*))};
                 return self.descriptors.len - 1;
             }
         }
@@ -40,7 +36,7 @@ const derived_config: struct {
 
     const usb_device_config = config.usb.?.Device;
 
-    var string_descriptor_table = StringDescriptorTable.init(&usb_device_config.language_id);
+    var string_descriptor_table = StringDescriptorTable.init([_]protocol.LanguageId{usb_device_config.language_id});
     var interface_and_endpoint_descriptors: []const u8 = &[_]u8{};
     var channel_assignments: []const []const u4 = &[_][]const u4{};
     var num_tx_channels: u4 = 0;
@@ -72,7 +68,7 @@ const derived_config: struct {
                         .direction = endpoint_config.direction,
                     },
                     .attributes = .{
-                        .transfer_type = endpoint_config.transfer_type,
+                        .transfer_type = .Bulk,
                     },
                     .max_packet_size = 64,
                     .interval = 0, // FIXME correct value?
@@ -95,7 +91,7 @@ const derived_config: struct {
         channel_assignments = channel_assignments ++ [_][]const u4{&endpoint_channel_assignments};
     }
 
-    const device_descriptor = std.mem.toBytes(protocol.DeviceDescriptor{
+    const device_descriptor = &std.mem.toBytes(protocol.DeviceDescriptor{
         .bcd_usb = .@"2.0",
         .device_class = .Device,
         .device_subclass = 0,
@@ -207,7 +203,7 @@ const TxWaiter = struct {
 
 const TxChannelIndex = std.math.IntFittingRange(0, derived_config.num_tx_channels - 1);
 
-const tx_buffers = @intToPtr(*[derived_config.num_tx_channels][64]u8, channel_buffers_base_address + derived_config.num_rx_channels * 64);
+const tx_buffers = @intToPtr(*[derived_config.num_tx_channels][64]u8, channel_buffers_base_address + @as(usize, derived_config.num_rx_channels) * 64);
 var tx_waiters = [1]ContinuationQueue{.{}} ** derived_config.num_tx_channels;
 var tx_in_flight = std.StaticBitSet(derived_config.num_tx_channels).initEmpty();
 
@@ -271,37 +267,37 @@ pub fn handleIrq() void {
             }
         }
 
-        for (tx_waiters) |*queue, channel| {
+        inline for (tx_waiters) |*queue, channel| {
             if (@truncate(u1, buff_status >> txBufCtrlIndex(channel)) != 0) {
                 if (queue.popFront()) |continuation| {
-                    const waiter = @fieldParentPtr(TxWaiter, continuation, "continuation");
+                    const waiter = @fieldParentPtr(TxWaiter, "continuation", continuation);
                     std.mem.copy(u8, &tx_buffers[channel], waiter.source_and_result.source);
-                    startTransfer(txBufCtrlIndex(channel), waiter.source_and_result.source.len);
+                    startTransfer(txBufCtrlIndex(channel), @intCast(u10, waiter.source_and_result.source.len));
                     waiter.source_and_result.result = {};
                     executor.submit(&waiter.continuation);
                 } else {
                     std.debug.assert(tx_in_flight.isSet(channel));
-                    tx_in_flight.clear(channel);
+                    tx_in_flight.unset(channel);
                 }
             }
         }
 
-        for (rx_waiters) |*queue, channel| {
+        inline for (rx_waiters) |*queue, channel| {
             if (@truncate(u1, buff_status >> rxBufCtrlIndex(channel)) != 0) {
                 {
                     const len = rp2040.usb.device_ep_buf_ctrl.read(rxBufCtrlIndex(channel)).buf0_len;
-                    const waiter = @fieldParentPtr(RxWaiter, queue.popFront().?, "continuation");
+                    const waiter = @fieldParentPtr(RxWaiter, "continuation", queue.popFront().?);
                     std.mem.copy(u8, waiter.destination_and_result.destination, rx_buffers[channel][0..len]);
                     waiter.destination_and_result.result = @intCast(u6, len);
                     executor.submit(&waiter.continuation);
                 }
 
                 if (queue.peekFront()) |continuation| {
-                    const waiter = @fieldParentPtr(RxWaiter, continuation, "continuation");
-                    startTransfer(rxBufCtrlIndex(channel), waiter.destination_and_result.destination.len);
+                    const waiter = @fieldParentPtr(RxWaiter, "continuation", continuation);
+                    startTransfer(rxBufCtrlIndex(channel), @intCast(u10, waiter.destination_and_result.destination.len));
                 } else {
                     std.debug.assert(rx_in_flight.isSet(channel));
-                    rx_in_flight.clear(channel);
+                    rx_in_flight.unset(channel);
                 }
             }
         }
@@ -318,19 +314,19 @@ pub fn handleIrq() void {
 
         // FIXME: do we need to reset any buffer control stuff?
 
-        tx_in_flight.clearAll();
+        tx_in_flight = @TypeOf(tx_in_flight).initEmpty();
         for (tx_waiters) |*queue| {
             while (queue.popFront()) |continuation| {
-                const waiter = @fieldParentPtr(TxWaiter, continuation, "continuation");
+                const waiter = @fieldParentPtr(TxWaiter, "continuation", continuation);
                 waiter.source_and_result.result = error.BusReset;
                 executor.submit(&waiter.continuation);
             }
         }
 
-        rx_in_flight.clearAll();
+        rx_in_flight = @TypeOf(rx_in_flight).initEmpty();
         for (rx_waiters) |*queue| {
             while (queue.popFront()) |continuation| {
-                const waiter = @fieldParentPtr(RxWaiter, continuation, "continuation");
+                const waiter = @fieldParentPtr(RxWaiter, "continuation", continuation);
                 waiter.destination_and_result.result = error.BusReset;
             }
         }
@@ -387,7 +383,7 @@ fn handleSetupPacket(setup_packet: protocol.SetupPacket) void {
                     device_address_to_set = @truncate(u7, setup_packet.value);
                 },
 
-                .SetConfiguation => {
+                .SetConfiguration => {
                     configured = true;
                     executor.submitAll(&connection_waiters);
                 },
@@ -402,20 +398,20 @@ fn handleSetupPacket(setup_packet: protocol.SetupPacket) void {
             .GetDescriptor => switch (@intToEnum(protocol.DescriptorType, setup_packet.value >> 8)) {
                 .Device => {
                     next_pid.set(0);
-                    std.mem.copy(u8, &ep0_buffer, derived_config.device_descriptor);
+                    std.mem.copy(u8, ep0_buffer, derived_config.device_descriptor);
                     startTransfer(0, derived_config.device_descriptor.len);
                 },
 
                 .Configuration => {
                     const len = @minimum(setup_packet.length, derived_config.configuration_descriptor.len);
-                    std.mem.copy(u8, &ep0_buffer, derived_config.configuration_descriptor[0..len]);
-                    startTransfer(0, len);
+                    std.mem.copy(u8, ep0_buffer, derived_config.configuration_descriptor[0..len]);
+                    startTransfer(0, @intCast(u10, len));
                 },
 
                 .String => {
                     const index = @truncate(u8, setup_packet.value);
-                    std.mem.copy(u8, &ep0_buffer, derived_config.string_descriptors[index]);
-                    startTransfer(0, derived_config.string_descriptors[index].len);
+                    std.mem.copy(u8, ep0_buffer, derived_config.string_descriptors[index]);
+                    startTransfer(0, @intCast(u10, derived_config.string_descriptors[index].len));
                 },
 
                 else => {}, // FIXME panic?
@@ -429,57 +425,57 @@ fn handleSetupPacket(setup_packet: protocol.SetupPacket) void {
 pub fn init() void {
     resets.unreset(.{.usbctrl});
 
-    rp2040.usb.usb_muxing.write(.{
-        .softcon = true,
-        .to_phy = true,
-    });
+    // rp2040.usb.usb_muxing.write(.{
+    //     .softcon = true,
+    //     .to_phy = true,
+    // });
 
-    rp2040.usb.usb_pwr.write(.{
-        .vbus_detect = true,
-        .vbus_detect_override_en = true,
-    });
+    // rp2040.usb.usb_pwr.write(.{
+    //     .vbus_detect = true,
+    //     .vbus_detect_override_en = true,
+    // });
 
-    rp2040.usb.main_ctrl.write(.{
-        .controller_en = true,
-    });
+    // rp2040.usb.main_ctrl.write(.{
+    //     .controller_en = true,
+    // });
 
-    rp2040.usb.sie_ctrl.write(.{
-        .ep0_int_1buf = true,
-    });
+    // rp2040.usb.sie_ctrl.write(.{
+    //     .ep0_int_1buf = true,
+    // });
 
-    rp2040.usb.inte.write(.{
-        .buff_status = true,
-        .bus_reset = true,
-        .setup_req = true,
-    });
+    // rp2040.usb.inte.write(.{
+    //     .buff_status = true,
+    //     .bus_reset = true,
+    //     .setup_req = true,
+    // });
 
-    var tx_channel: u4 = 0;
-    while (tx_channel < derived_config.num_tx_channels) : (tx_channel += 1) {
-        rp2040.usb.device_ep_ctrl.write(@as(u5, tx_channel) * 2, .{
-            .en = true,
-            .int_1buf = true,
-            .buf_address = @ptrToInt(&tx_buffers[tx_channel]),
-            .type = .Bulk,
-        });
-    }
+    // comptime var tx_channel: u4 = 0;
+    // inline while (tx_channel < derived_config.num_tx_channels) : (tx_channel += 1) {
+    //     rp2040.usb.device_ep_ctrl.write(@as(u5, tx_channel) * 2, .{
+    //         .en = true,
+    //         .int_1buf = true,
+    //         .buf_address = comptime @intCast(u10, (@ptrToInt(&tx_buffers[tx_channel]) - rp2040.usb.dpram_base_address) / 64),
+    //         .type = .Bulk,
+    //     });
+    // }
 
-    var rx_channel: u4 = 0;
-    while (rx_channel < derived_config.num_rx_channels) : (rx_channel += 1) {
-        rp2040.usb.device_ep_ctrl.write(@as(u5, rx_channel) * 2 + 1, .{
-            .en = true,
-            .int_1buf = true,
-            .buf_address = @ptrToInt(&rx_buffers[rx_channel]),
-            .type = .Bulk,
-        });
-    }
+    // comptime var rx_channel: u4 = 0;
+    // inline while (rx_channel < derived_config.num_rx_channels) : (rx_channel += 1) {
+    //     rp2040.usb.device_ep_ctrl.write(@as(u5, rx_channel) * 2 + 1, .{
+    //         .en = true,
+    //         .int_1buf = true,
+    //         .buf_address = comptime @intCast(u10, (@ptrToInt(&rx_buffers[rx_channel]) - rp2040.usb.dpram_base_address) / 64),
+    //         .type = .Bulk,
+    //     });
+    // }
 
-    rp2040.usb.sie_ctrl.write(.{
-        .pullup_en = true,
-    });
+    // rp2040.usb.sie_ctrl.write(.{
+    //     .pullup_en = true,
+    // });
 
-    rp2040.ppb.nvic_iser.write(.{
-        .usbctrl = true,
-    });
+    // rp2040.ppb.nvic_iser.write(.{
+    //     .usbctrl = true,
+    // });
 }
 
 pub inline fn send(connection: ConnectionId, comptime interface: usize, comptime endpoint_of_interface: usize, data: []const u8) Error!void {

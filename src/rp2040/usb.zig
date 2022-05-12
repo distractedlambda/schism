@@ -11,7 +11,7 @@ pub const addr_endp = RegisterArray(16, base_address, 0x04, .{
         .name = "intep_preamble",
         .type = bool,
         .lsb = 26,
-        .default = 0,
+        .default = false,
     },
     .{
         .name = "intep_dir",
@@ -603,7 +603,7 @@ pub const device_ep_ctrl = RegisterArray(30, dpram_base_address + 0x08, 0x04, .{
 pub const device_ep_buf_ctrl = RegisterArray(32, dpram_base_address + 0x80, 0x04, .{
     .{
         .name = "buf1_full",
-        .type = .bool,
+        .type = bool,
         .lsb = 31,
         .default = false,
     },

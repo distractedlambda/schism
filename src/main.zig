@@ -24,6 +24,23 @@ pub const schism_config = blk: {
     config.gpio[picosystem.pins.buttons.x].function = .{ .Sio = .{ .allow_yield_until_low = true, .allow_yield_until_high = true } };
     config.gpio[picosystem.pins.buttons.y].function = .{ .Sio = .{ .allow_yield_until_low = true, .allow_yield_until_high = true } };
 
+    config.usb = .{ .Device = .{
+        .manufacturer = "lucascorp",
+        .product = "echoer2000",
+        .interfaces = &[_]schism.Config.UsbConfig.Interface{
+            .{
+                .name = "marcopolo",
+                .class = 0xFF,
+                .subclass = 0,
+                .protocol = 0,
+                .endpoints = &[_]schism.Config.UsbConfig.Endpoint{
+                    .{ .direction = .In },
+                    .{ .direction = .Out },
+                },
+            },
+        },
+    } };
+
     break :blk config;
 };
 

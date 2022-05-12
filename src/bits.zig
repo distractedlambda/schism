@@ -101,7 +101,7 @@ pub fn BitStruct(comptime Int: type, comptime spec: anytype) type {
                 inline for (spec) |field_spec| {
                     @field(fields, field_spec.name) = fromBits(
                         field_spec.type,
-                        @truncate(@bitSizeOf(field_spec.type), int >> field_spec.lsb),
+                        @truncate(std.meta.Int(.unsigned, @bitSizeOf(field_spec.type)), int >> field_spec.lsb),
                     );
                 }
                 return fields;

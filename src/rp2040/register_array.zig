@@ -25,7 +25,7 @@ pub fn RegisterArray(
         }
 
         pub inline fn read(index: usize) Bits.Fields {
-            return Bits.pack(readRaw(index));
+            return Bits.unpack(readRaw(index));
         }
 
         pub inline fn write(index: usize, fields: Bits.Fields) void {
