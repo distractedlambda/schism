@@ -423,7 +423,7 @@ fn handleSetupPacket(setup_packet: protocol.SetupPacket) void {
 }
 
 pub fn init() void {
-    resets.unreset(.{.usbctrl});
+    // resets.unreset(.{.usbctrl});
 
     // rp2040.usb.usb_muxing.write(.{
     //     .softcon = true,

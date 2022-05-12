@@ -1,4 +1,5 @@
 pub const bootrom = @import("bootrom.zig");
+pub const clocks = @import("clocks.zig");
 pub const dma = @import("dma.zig");
 pub const io_bank0 = @import("io_bank0.zig");
 pub const memories = @import("memories.zig");

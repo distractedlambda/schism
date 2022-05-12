@@ -163,7 +163,7 @@ pub const clk_sys_selected = PeripheralRegister(base_address + 0x44, .{
     },
 });
 
-pub const clk_peri_ctrl = PeripheralRegister(base_addresss + 0x48, .{
+pub const clk_peri_ctrl = PeripheralRegister(base_address + 0x48, .{
     .{
         .name = "enable",
         .type = bool,
