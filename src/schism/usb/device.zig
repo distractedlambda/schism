@@ -423,59 +423,70 @@ fn handleSetupPacket(setup_packet: protocol.SetupPacket) void {
 }
 
 pub fn init() void {
-    // resets.unreset(.{.usbctrl});
+    // Start up USB PLL
+    resets.unreset(.{.pll_usb});
+    rp2040.pll_usb.fbdiv_int.write(120);
+    rp2040.pll_usb.pwr.clear(.{ .pd, .vcopd });
+    while (!rp2040.pll_usb.cs.read().lock) {}
+    rp2040.pll_usb.prim.write(.{ .postdiv1 = 6, .postdiv2 = 5 });
+    rp2040.pll_usb.pwr.clear(.{.postdivpd});
 
-    // rp2040.usb.usb_muxing.write(.{
-    //     .softcon = true,
-    //     .to_phy = true,
-    // });
+    // Enable USB clock
+    rp2040.clocks.clk_usb_ctrl.write(.{ .enable = true });
 
-    // rp2040.usb.usb_pwr.write(.{
-    //     .vbus_detect = true,
-    //     .vbus_detect_override_en = true,
-    // });
+    resets.unreset(.{.usbctrl});
 
-    // rp2040.usb.main_ctrl.write(.{
-    //     .controller_en = true,
-    // });
+    rp2040.usb.usb_muxing.write(.{
+        .softcon = true,
+        .to_phy = true,
+    });
 
-    // rp2040.usb.sie_ctrl.write(.{
-    //     .ep0_int_1buf = true,
-    // });
+    rp2040.usb.usb_pwr.write(.{
+        .vbus_detect = true,
+        .vbus_detect_override_en = true,
+    });
 
-    // rp2040.usb.inte.write(.{
-    //     .buff_status = true,
-    //     .bus_reset = true,
-    //     .setup_req = true,
-    // });
+    rp2040.usb.main_ctrl.write(.{
+        .controller_en = true,
+    });
 
-    // comptime var tx_channel: u4 = 0;
-    // inline while (tx_channel < derived_config.num_tx_channels) : (tx_channel += 1) {
-    //     rp2040.usb.device_ep_ctrl.write(@as(u5, tx_channel) * 2, .{
-    //         .en = true,
-    //         .int_1buf = true,
-    //         .buf_address = comptime @intCast(u10, (@ptrToInt(&tx_buffers[tx_channel]) - rp2040.usb.dpram_base_address) / 64),
-    //         .type = .Bulk,
-    //     });
-    // }
+    rp2040.usb.sie_ctrl.write(.{
+        .ep0_int_1buf = true,
+    });
 
-    // comptime var rx_channel: u4 = 0;
-    // inline while (rx_channel < derived_config.num_rx_channels) : (rx_channel += 1) {
-    //     rp2040.usb.device_ep_ctrl.write(@as(u5, rx_channel) * 2 + 1, .{
-    //         .en = true,
-    //         .int_1buf = true,
-    //         .buf_address = comptime @intCast(u10, (@ptrToInt(&rx_buffers[rx_channel]) - rp2040.usb.dpram_base_address) / 64),
-    //         .type = .Bulk,
-    //     });
-    // }
+    rp2040.usb.inte.write(.{
+        .buff_status = true,
+        .bus_reset = true,
+        .setup_req = true,
+    });
 
-    // rp2040.usb.sie_ctrl.write(.{
-    //     .pullup_en = true,
-    // });
+    comptime var tx_channel: u4 = 0;
+    inline while (tx_channel < derived_config.num_tx_channels) : (tx_channel += 1) {
+        rp2040.usb.device_ep_ctrl.write(@as(u5, tx_channel) * 2, .{
+            .en = true,
+            .int_1buf = true,
+            .buf_address = comptime @intCast(u10, (@ptrToInt(&tx_buffers[tx_channel]) - rp2040.usb.dpram_base_address) / 64),
+            .type = .Bulk,
+        });
+    }
 
-    // rp2040.ppb.nvic_iser.write(.{
-    //     .usbctrl = true,
-    // });
+    comptime var rx_channel: u4 = 0;
+    inline while (rx_channel < derived_config.num_rx_channels) : (rx_channel += 1) {
+        rp2040.usb.device_ep_ctrl.write(@as(u5, rx_channel) * 2 + 1, .{
+            .en = true,
+            .int_1buf = true,
+            .buf_address = comptime @intCast(u10, (@ptrToInt(&rx_buffers[rx_channel]) - rp2040.usb.dpram_base_address) / 64),
+            .type = .Bulk,
+        });
+    }
+
+    rp2040.usb.sie_ctrl.write(.{
+        .pullup_en = true,
+    });
+
+    rp2040.ppb.nvic_iser.write(.{
+        .usbctrl = true,
+    });
 }
 
 pub inline fn send(connection: ConnectionId, comptime interface: usize, comptime endpoint_of_interface: usize, data: []const u8) Error!void {

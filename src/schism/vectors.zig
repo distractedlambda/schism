@@ -95,17 +95,7 @@ fn handleReset() callconv(.C) noreturn {
     const data_end = @extern([*]volatile u32, .{ .name = "__data_end__" });
     for (data_start[0 .. (@ptrToInt(data_end) - @ptrToInt(data_start)) / @sizeOf(u32)]) |*word, i| word.* = data_source[i];
 
-    // // Start up USB PLL
-    // rp2040.pll_usb.fbdiv_int.write(120);
-    // rp2040.pll_usb.pwr.clear(.{ .pd, .vcopd });
-    // while (!rp2040.pll_usb.cs.read().lock) {}
-    // rp2040.pll_usb.prim.write(.{ .postdiv1 = 6, .postdiv2 = 5 });
-    // rp2040.pll_usb.pwr.clear(.{.postdivpd});
-
-    // // Enable USB clock
-    // rp2040.clocks.clk_usb_ctrl.write(.{ .enable = true });
-
-    // // Enable ADC clock
+    // Enable ADC clock
     // rp2040.clocks.clk_adc_ctrl.write(.{ .enabled = true });
 
     // Initialize peripherals
