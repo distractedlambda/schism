@@ -279,7 +279,7 @@ var setup_packet_waiters = ContinuationQueue{};
 var next_setup_packet: ?protocol.SetupPacket = null;
 
 var ep0_transfer_waiters = ContinuationQueue{};
-var ep0_transfer_in_flight: enum { None, Tx, Rx } = .None;
+var ep0_transfer_in_flight = false;
 
 const ep0_buffer = @intToPtr(*[64]u8, rp2040.usb.dpram_base_address + 0x100);
 
@@ -317,9 +317,9 @@ fn receiveOnEp0(connection: ConnectionId, destination: []u8, pid: u1) Error!u10 
         return error.ConnectionLost;
     }
 
-    if (ep0_transfer_in_flight == .None) {
+    if (!ep0_transfer_in_flight) {
         startTransfer(1, @intCast(u10, destination.len), pid);
-        ep0_transfer_in_flight = .Rx;
+        ep0_transfer_in_flight = true;
     }
 
     var waiter = Ep0TransferWaiter{
@@ -348,10 +348,10 @@ fn sendOnEp0(connection: ConnectionId, source: []const u8, pid: u1) Error!void {
         return error.ConnectionLost;
     }
 
-    if (ep0_transfer_in_flight == .None) {
+    if (!ep0_transfer_in_flight) {
         std.mem.copy(u8, ep0_buffer, source);
         startTransfer(0, @intCast(u10, source.len), pid);
-        ep0_transfer_in_flight = .Tx;
+        ep0_transfer_in_flight = true;
     }
 
     var waiter = Ep0TransferWaiter{
@@ -392,24 +392,29 @@ pub fn handleIrq() void {
         const buff_status = rp2040.usb.buff_status.read();
         rp2040.usb.buff_status.write(buff_status);
 
-        if (@truncate(u1, buff_status) != 0) {
-            switch (ep0_transfer_in_flight) {
-                .Rx => {
-                    // FIXME: validate length against destination buffer?
-                    const len = rp2040.usb.device_ep_buf_ctrl.read(1).buf0_len;
-                    const waiter = @fieldParentPtr(Ep0TransferWaiter, "continuation", ep0_transfer_waiters.popFront().?);
-                    std.mem.copy(u8, waiter.state.pending.buffer.Rx, ep0_buffer[0..len]);
-                    waiter.state = .{ .result = .{ .rx = len } };
-                    executor.submit(&waiter.continuation);
-                },
+        if (@truncate(u2, buff_status) != 0) {
+            {
+                const waiter = @fieldParentPtr(Ep0TransferWaiter, "continuation", ep0_transfer_waiters.popFront().?);
+                switch (@truncate(u2, buff_status)) {
+                    // TX
+                    0b01 => {
+                        // FIXME: validate length sent?
+                        _ = waiter.state.pending.buffer.Tx;
+                        waiter.state = .{ .result = .{ .tx = {} } };
+                        executor.submit(&waiter.continuation);
+                    },
 
-                .Tx => {
-                    const waiter = @fieldParentPtr(Ep0TransferWaiter, "continuation", ep0_transfer_waiters.popFront().?);
-                    waiter.state = .{ .result = .{ .tx = {} } };
-                    executor.submit(&waiter.continuation);
-                },
+                    // RX
+                    0b10 => {
+                        // FIXME: validate length against destination buffer?
+                        const len = rp2040.usb.device_ep_buf_ctrl.read(1).buf0_len;
+                        std.mem.copy(u8, waiter.state.pending.buffer.Rx, ep0_buffer[0..len]);
+                        waiter.state = .{ .result = .{ .rx = len } };
+                        executor.submit(&waiter.continuation);
+                    },
 
-                .None => unreachable,
+                    else => unreachable,
+                }
             }
 
             if (ep0_transfer_waiters.peekFront()) |continuation| {
@@ -418,16 +423,14 @@ pub fn handleIrq() void {
                     .Tx => |source| {
                         std.mem.copy(u8, ep0_buffer, source);
                         startTransfer(0, @intCast(u10, source.len), waiter.state.pending.pid);
-                        ep0_transfer_in_flight = .Tx;
                     },
 
                     .Rx => |destination| {
                         startTransfer(1, @intCast(u10, destination.len), waiter.state.pending.pid);
-                        ep0_transfer_in_flight = .Rx;
                     },
                 }
             } else {
-                ep0_transfer_in_flight = .None;
+                ep0_transfer_in_flight = false;
             }
         }
 
@@ -485,7 +488,7 @@ pub fn handleIrq() void {
             executor.submit(continuation);
         }
 
-        ep0_transfer_in_flight = .None;
+        ep0_transfer_in_flight = false;
         while (ep0_transfer_waiters.popFront()) |continuation| {
             const waiter = @fieldParentPtr(Ep0TransferWaiter, "continuation", continuation);
             waiter.state = .{ .result = error.BusReset };
