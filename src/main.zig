@@ -27,6 +27,9 @@ pub const schism_config = blk: {
     config.usb = .{ .Device = .{
         .manufacturer = "lucascorp",
         .product = "echoer2000",
+        .product_id = 0x4004,
+        .vendor_id = 0xcafe,
+        .serial_number = "123456",
         .interfaces = &[_]schism.Config.UsbConfig.Interface{
             .{
                 .name = "marcopolo",
@@ -55,13 +58,7 @@ fn driveLed(comptime led_gpio: u5, comptime button_gpio: u5) void {
 }
 
 pub fn main() void {
-    var drive_red = async driveLed(picosystem.pins.user_led.red, picosystem.pins.buttons.a);
-    var drive_green = async driveLed(picosystem.pins.user_led.green, picosystem.pins.buttons.a);
-    var drive_blue = async driveLed(picosystem.pins.user_led.blue, picosystem.pins.buttons.x);
-
-    await drive_red;
-    await drive_green;
-    await drive_blue;
+    driveLed(picosystem.pins.user_led.blue, picosystem.pins.buttons.x);
 }
 
 pub fn panic(message: []const u8, error_return_trace: ?*std.builtin.StackTrace) noreturn {

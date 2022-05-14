@@ -5,13 +5,13 @@ const base_address = 0x40024000;
 pub const ctrl = PeripheralRegister(base_address + 0x00, .{
     .{
         .name = "enable",
-        .type = enum(u12) { Disable = 0xd1e, Enable = 0xfab },
+        .type = enum(u12) { Disable = 0xd1e, Enable = 0xfab, _ },
         .lsb = 12,
         .default = .Enable,
     },
     .{
         .name = "freq_range",
-        .type = enum(u12) { @"1_15MHz" = 0xaa0 },
+        .type = enum(u12) { @"1_15MHz" = 0xaa0, _ },
         .lsb = 0,
         .default = .@"1_15MHz",
     },

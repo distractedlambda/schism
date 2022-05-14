@@ -292,7 +292,7 @@ pub const sie_status = PeripheralRegister(base_address + 0x50, .{
     },
     .{
         .name = "speed",
-        .type = enum(u2) { Disconnected, LowSpeed, FullSpeed },
+        .type = enum(u2) { Disconnected, LowSpeed, FullSpeed, _ },
         .lsb = 8,
         .default = .Disconnected,
     },

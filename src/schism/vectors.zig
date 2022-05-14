@@ -95,9 +95,6 @@ fn handleReset() callconv(.C) noreturn {
     const data_end = @extern([*]volatile u32, .{ .name = "__data_end__" });
     for (data_start[0 .. (@ptrToInt(data_end) - @ptrToInt(data_start)) / @sizeOf(u32)]) |*word, i| word.* = data_source[i];
 
-    // Enable ADC clock
-    // rp2040.clocks.clk_adc_ctrl.write(.{ .enabled = true });
-
     // Initialize peripherals
     gpio.init();
     usb.init();

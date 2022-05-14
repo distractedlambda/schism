@@ -64,12 +64,15 @@ pub const ctrl = struct {
         Timer3,
 
         Permanent,
+
+        _,
     };
 
     pub const DataSize = enum(u2) {
         Byte,
         Halfword,
         Word,
+        _,
     };
 
     // pub const ahb_error = RegisterField(bool, 31);
@@ -135,6 +138,7 @@ pub const sniff_ctrl = struct {
         Crc16CcittRev = 0x3,
         Xor = 0xe,
         Sum = 0xf,
+        _,
     };
 
     // pub const out_inv = RegisterField(bool, 11);

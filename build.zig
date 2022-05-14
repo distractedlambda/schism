@@ -5,7 +5,7 @@ pub fn build(builder: *std.build.Builder) void {
         .cpu_arch = .thumb,
         .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_m0plus },
         .os_tag = .freestanding,
-        .abi = .eabi,
+        .abi = .gnueabi,
     };
 
     const build_mode = builder.standardReleaseOptions();

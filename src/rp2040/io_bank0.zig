@@ -23,6 +23,7 @@ pub const Funcsel = enum(u5) {
     Clock = 8,
     Usb = 9,
     Null = 31,
+    _,
 };
 
 pub const InterruptKind = enum(u2) {

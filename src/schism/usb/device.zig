@@ -3,9 +3,9 @@ const std = @import("std");
 const arm = @import("../../arm.zig");
 const config = @import("../config.zig").resolved;
 const executor = @import("../executor.zig");
+const protocol = @import("protocol.zig");
 const resets = @import("../resets.zig");
 const rp2040 = @import("../../rp2040/rp2040.zig");
-const protocol = @import("protocol.zig");
 
 const Continuation = executor.Continuation;
 const ContinuationQueue = executor.ContinuationQueue;
@@ -92,7 +92,7 @@ const derived_config: struct {
     }
 
     const device_descriptor = &std.mem.toBytes(protocol.DeviceDescriptor{
-        .bcd_usb = .@"2.0",
+        .bcd_usb = .@"1.1",
         .device_class = .Device,
         .device_subclass = 0,
         .device_protocol = 0,
@@ -131,29 +131,32 @@ pub const ConnectionId = enum(usize) { _ };
 
 var configured = false;
 var current_connection = @intToEnum(ConnectionId, 0);
-var connection_waiters = ContinuationQueue{};
+var connection_waiters = ContinuationQueue{}; // never mutated in ISRs
 
 pub fn connect() ConnectionId {
     arm.disableInterrupts();
+    defer arm.enableInterrupts();
 
     while (!configured) {
+        arm.enableInterrupts();
+        defer arm.disableInterrupts();
+
         var continuation = Continuation.init(@frame());
 
         suspend {
             connection_waiters.pushBack(&continuation);
-            arm.enableInterrupts();
         }
-
-        arm.disableInterrupts();
     }
 
-    defer arm.enableInterrupts();
     return current_connection;
 }
 
 const RxWaiter = struct {
     continuation: Continuation,
-    destination_and_result: union { destination: []u8, result: Error!u6 },
+    state: union {
+        destination: []u8,
+        result: Error!u6,
+    },
 };
 
 const RxChannelIndex = std.math.IntFittingRange(0, derived_config.num_rx_channels - 1);
@@ -163,6 +166,7 @@ const channel_buffers_base_address = rp2040.usb.dpram_base_address + 0x180;
 const rx_buffers = @intToPtr(*const [derived_config.num_rx_channels][64]u8, channel_buffers_base_address);
 var rx_waiters = [1]ContinuationQueue{.{}} ** derived_config.num_rx_channels;
 var rx_in_flight = std.StaticBitSet(derived_config.num_rx_channels).initEmpty();
+var next_rx_pid = std.StaticBitSet(derived_config.num_rx_channels).initEmpty();
 
 inline fn rxBufCtrlIndex(channel: RxChannelIndex) u5 {
     return @as(u5, channel) * 2 + 3;
@@ -179,8 +183,9 @@ fn receiveImpl(connection: ConnectionId, channel: RxChannelIndex, destination: [
     }
 
     if (!rx_in_flight.isSet(channel)) {
-        startTransfer(rxBufCtrlIndex(channel), destination.len);
+        startTransfer(rxBufCtrlIndex(channel), destination.len, next_rx_pid.isSet(channel));
         rx_in_flight.set(channel);
+        next_rx_pid.toggle(channel);
     }
 
     var waiter = RxWaiter{
@@ -198,7 +203,10 @@ fn receiveImpl(connection: ConnectionId, channel: RxChannelIndex, destination: [
 
 const TxWaiter = struct {
     continuation: Continuation,
-    source_and_result: union { source: []const u8, result: Error!void },
+    state: union {
+        source: []const u8,
+        result: Error!void,
+    },
 };
 
 const TxChannelIndex = std.math.IntFittingRange(0, derived_config.num_tx_channels - 1);
@@ -206,6 +214,7 @@ const TxChannelIndex = std.math.IntFittingRange(0, derived_config.num_tx_channel
 const tx_buffers = @intToPtr(*[derived_config.num_tx_channels][64]u8, channel_buffers_base_address + @as(usize, derived_config.num_rx_channels) * 64);
 var tx_waiters = [1]ContinuationQueue{.{}} ** derived_config.num_tx_channels;
 var tx_in_flight = std.StaticBitSet(derived_config.num_tx_channels).initEmpty();
+var next_tx_pid = std.StaticBitSet(derived_config.num_tx_channels).initEmpty();
 
 inline fn txBufCtrlIndex(channel: TxChannelIndex) u5 {
     return @as(u5, channel) * 2 + 2;
@@ -226,7 +235,8 @@ fn sendImpl(connection: ConnectionId, channel: TxChannelIndex, source: []const u
         arm.enableInterrupts();
         std.mem.copy(u8, &tx_buffers[channel], source);
         arm.disableInterrupts();
-        startTransfer(txBufCtrlIndex(channel), source.len);
+        startTransfer(txBufCtrlIndex(channel), source.len, next_tx_pid.isSet(channel));
+        next_tx_pid.toggle(channel);
         arm.enableInterrupts();
     } else {
         var waiter = TxWaiter{
@@ -243,7 +253,123 @@ fn sendImpl(connection: ConnectionId, channel: TxChannelIndex, source: []const u
     }
 }
 
-var device_address_to_set: ?u7 = null;
+const SetupPacketWaiter = struct {
+    continuation: Continuation,
+    packet: Error!protocol.SetupPacket = undefined,
+};
+
+const Ep0TransferWaiter = struct {
+    continuation: Continuation,
+    state: union {
+        pending: struct {
+            pid: u1,
+            buffer: union(enum) {
+                Tx: []const u8,
+                Rx: []u8,
+            },
+        },
+        result: Error!union {
+            tx: void,
+            rx: u10,
+        },
+    },
+};
+
+var setup_packet_waiters = ContinuationQueue{};
+var next_setup_packet: ?protocol.SetupPacket = null;
+
+var ep0_transfer_waiters = ContinuationQueue{};
+var ep0_transfer_in_flight: enum { None, Tx, Rx } = .None;
+
+const ep0_buffer = @intToPtr(*[64]u8, rp2040.usb.dpram_base_address + 0x100);
+
+fn receiveSetupPacket(connection: ConnectionId) Error!protocol.SetupPacket {
+    arm.disableInterrupts();
+
+    if (connection != current_connection) {
+        defer arm.enableInterrupts();
+        return error.ConnectionLost;
+    }
+
+    if (next_setup_packet) |setup_packet| {
+        defer arm.enableInterrupts();
+        next_setup_packet = null;
+        return setup_packet;
+    }
+
+    var waiter = SetupPacketWaiter{ .continuation = Continuation.init(@frame()) };
+
+    suspend {
+        setup_packet_waiters.pushBack(&waiter.continuation);
+        arm.enableInterrupts();
+    }
+
+    return waiter.packet;
+}
+
+fn receiveOnEp0(connection: ConnectionId, destination: []u8, pid: u1) Error!u10 {
+    // FIXME: don't suspend when receiving a zero-length packet?
+
+    arm.disableInterrupts();
+
+    if (connection != current_connection) {
+        defer arm.enableInterrupts();
+        return error.ConnectionLost;
+    }
+
+    if (ep0_transfer_in_flight == .None) {
+        startTransfer(1, destination.len, pid);
+        ep0_transfer_in_flight = .Rx;
+    }
+
+    var waiter = Ep0TransferWaiter{
+        .continuation = Continuation.init(@frame()),
+        .state = .{
+            .pending = .{
+                .pid = pid,
+                .buffer = .{ .Rx = destination },
+            },
+        },
+    };
+
+    suspend {
+        ep0_transfer_waiters.pushBack(&waiter.continuation);
+        arm.enableInterrupts();
+    }
+
+    return (try waiter.state.result).rx;
+}
+
+fn sendOnEp0(connection: ConnectionId, source: []const u8, pid: u1) Error!void {
+    arm.disableInterrupts();
+
+    if (connection != current_connection) {
+        defer arm.enableInterrupts;
+        return error.ConnectionLost;
+    }
+
+    if (ep0_transfer_in_flight == .None) {
+        std.mem.copy(u8, ep0_buffer, source);
+        startTransfer(0, source.len, pid);
+        ep0_transfer_in_flight = .Tx;
+        arm.enableInterrupts();
+        return;
+    }
+
+    var waiter = Ep0TransferWaiter{ .continuation = Continuation.init(@frame()), .state = .{
+        .pending = .{
+            .pid = pid,
+            .buffer = .{ .Tx = source },
+        },
+    } };
+
+    suspend {
+        ep0_transfer_waiters.pushBack(&waiter.continuation);
+        arm.enableInterrupts();
+    }
+
+    return (try waiter.state.result).Tx;
+}
 
 pub fn handleIrq() void {
     const ints = rp2040.usb.ints.read();
@@ -251,7 +377,14 @@ pub fn handleIrq() void {
     if (ints.setup_req) {
         const setup_packet = @bitCast(protocol.SetupPacket, @intToPtr(*const volatile [8]u8, rp2040.usb.dpram_base_address).*);
         rp2040.usb.sie_status.clear(.{.setup_rec});
-        handleSetupPacket(setup_packet);
+        if (setup_packet_waiters.popFront()) |continuation| {
+            const waiter = @fieldParentPtr(SetupPacketWaiter, "continuation", continuation);
+            waiter.packet = setup_packet;
+            executor.submit(continuation);
+        } else {
+            std.debug.assert(next_setup_packet == null);
+            next_setup_packet = setup_packet;
+        }
     }
 
     if (ints.buff_status) {
@@ -259,11 +392,38 @@ pub fn handleIrq() void {
         rp2040.usb.buff_status.write(buff_status);
 
         if (@truncate(u1, buff_status) != 0) {
-            if (device_address_to_set) |address| {
-                rp2040.usb.addr_endp.write(0, .{ .address = address });
-                device_address_to_set = null;
+            switch (ep0_transfer_in_flight) {
+                .Rx => {
+                    const waiter = @fieldParentPtr(Ep0TransferWaiter, "continuation", ep0_transfer_waiters.popFront().?);
+                    std.mem.copy(u8, waiter.state.pending.buffer.Rx, ep0_buffer[0..len]);
+                    waiter.state.result = .{ .rx = len };
+                    executor.submit(&waiter.continuation);
+                },
+
+                .Tx => {},
+
+                .None => unreachable,
+            }
+
+            if (ep0_transfer_waiters.peekFront()) |continuation| {
+                const waiter = @fieldParentPtr(Ep0TransferWaiter, "continuation", continuation);
+                switch (waiter.state.pending.buffer) {
+                    .Tx => |source| {
+                        _ = ep0_transfer_waiters.popFront().?;
+                        std.mem.copy(u8, ep0_buffer, source);
+                        startTransfer(0, source.len, waiter.state.pending.pid);
+                        waiter.state.result = .{ .tx = {} };
+                        ep0_transfer_in_flight = .Tx;
+                        executor.submit(continuation);
+                    },
+
+                    .Rx => |destination| {
+                        startTransfer(1, destination.len, waiter.state.pending.pid);
+                        ep0_transfer_in_flight = .Rx;
+                    },
+                }
             } else {
-                startTransfer(1, 0);
+                ep0_transfer_in_flight = .None;
             }
         }
 
@@ -271,9 +431,10 @@ pub fn handleIrq() void {
             if (@truncate(u1, buff_status >> txBufCtrlIndex(channel)) != 0) {
                 if (queue.popFront()) |continuation| {
                     const waiter = @fieldParentPtr(TxWaiter, "continuation", continuation);
-                    std.mem.copy(u8, &tx_buffers[channel], waiter.source_and_result.source);
-                    startTransfer(txBufCtrlIndex(channel), @intCast(u10, waiter.source_and_result.source.len));
-                    waiter.source_and_result.result = {};
+                    std.mem.copy(u8, &tx_buffers[channel], waiter.state.source);
+                    startTransfer(txBufCtrlIndex(channel), @intCast(u10, waiter.state.source.len), next_tx_pid.isSet(channel));
+                    next_tx_pid.toggle(channel);
+                    waiter.state.result = {};
                     executor.submit(&waiter.continuation);
                 } else {
                     std.debug.assert(tx_in_flight.isSet(channel));
@@ -287,14 +448,15 @@ pub fn handleIrq() void {
                 {
                     const len = rp2040.usb.device_ep_buf_ctrl.read(rxBufCtrlIndex(channel)).buf0_len;
                     const waiter = @fieldParentPtr(RxWaiter, "continuation", queue.popFront().?);
-                    std.mem.copy(u8, waiter.destination_and_result.destination, rx_buffers[channel][0..len]);
-                    waiter.destination_and_result.result = @intCast(u6, len);
+                    std.mem.copy(u8, waiter.state.destination, rx_buffers[channel][0..len]);
+                    waiter.state.result = @intCast(u6, len);
                     executor.submit(&waiter.continuation);
                 }
 
                 if (queue.peekFront()) |continuation| {
                     const waiter = @fieldParentPtr(RxWaiter, "continuation", continuation);
-                    startTransfer(rxBufCtrlIndex(channel), @intCast(u10, waiter.destination_and_result.destination.len));
+                    startTransfer(rxBufCtrlIndex(channel), @intCast(u10, waiter.state.destination.len), next_rx_pid.isSet(channel));
+                    next_rx_pid.toggle(channel);
                 } else {
                     std.debug.assert(rx_in_flight.isSet(channel));
                     rx_in_flight.unset(channel);
@@ -305,42 +467,56 @@ pub fn handleIrq() void {
 
     if (ints.bus_reset) {
         rp2040.usb.sie_status.clear(.{.bus_reset});
-
-        device_address_to_set = null;
-        configured = false;
-        current_connection = @intToEnum(ConnectionId, @enumToInt(current_connection) +% 1);
-
         rp2040.usb.addr_endp.write(0, .{ .address = 0 });
+
+        current_connection = @intToEnum(ConnectionId, @enumToInt(current_connection) +% 1);
+        configured = false;
 
         // FIXME: do we need to reset any buffer control stuff?
 
+        next_setup_packet = null;
+        while (setup_packet_waiters.popFront()) |continuation| {
+            const waiter = @fieldParentPtr(SetupPacketWaiter, "continuation", continuation);
+            waiter.packet = error.BusReset;
+            executor.submit(continuation);
+        }
+
+        ep0_transfer_in_flight = .None;
+        while (ep0_transfer_waiters.popFront()) |continuation| {
+            const waiter = @fieldParentPtr(Ep0TransferWaiter, "continuation", continuation);
+            waiter.state.result = error.BusReset;
+            executor.submit(continuation);
+        }
+
         tx_in_flight = @TypeOf(tx_in_flight).initEmpty();
+        next_tx_pid = @TypeOf(next_tx_pid).initEmpty();
         for (tx_waiters) |*queue| {
             while (queue.popFront()) |continuation| {
                 const waiter = @fieldParentPtr(TxWaiter, "continuation", continuation);
-                waiter.source_and_result.result = error.BusReset;
-                executor.submit(&waiter.continuation);
+                waiter.state.result = error.BusReset;
+                executor.submit(continuation);
             }
         }
 
         rx_in_flight = @TypeOf(rx_in_flight).initEmpty();
+        next_rx_pid = @TypeOf(next_rx_pid).initEmpty();
         for (rx_waiters) |*queue| {
             while (queue.popFront()) |continuation| {
                 const waiter = @fieldParentPtr(RxWaiter, "continuation", continuation);
-                waiter.destination_and_result.result = error.BusReset;
+                waiter.state.result = error.BusReset;
+                executor.submit(continuation);
             }
         }
     }
 }
 
-var next_pid = std.StaticBitSet(32).initEmpty();
-
-fn startTransfer(bufctrl_idx: u5, len: u10) void {
+fn startTransfer(bufctrl_idx: u5, len: u10, pid: u1) void {
     std.debug.assert(len <= 64);
 
     rp2040.usb.device_ep_buf_ctrl.write(bufctrl_idx, .{
         .buf0_full = @truncate(u1, bufctrl_idx) == 0,
-        .buf0_data_pid = @boolToInt(next_pid.isSet(bufctrl_idx)),
+        .buf0_data_pid = pid,
+        .buf0_last_in_transfer = true,
         .buf0_len = len,
     });
 
@@ -359,68 +535,105 @@ fn startTransfer(bufctrl_idx: u5, len: u10) void {
 
     rp2040.usb.device_ep_buf_ctrl.write(bufctrl_idx, .{
         .buf0_full = @truncate(u1, bufctrl_idx) == 0,
-        .buf0_data_pid = @boolToInt(next_pid.isSet(bufctrl_idx)),
+        .buf0_data_pid = pid,
+        .buf0_last_in_transfer = true,
         .buf0_len = len,
         .buf0_available = true,
     });
-
-    next_pid.toggle(bufctrl_idx);
 }
 
-const ep0_buffer = @intToPtr(*[64]u8, rp2040.usb.dpram_base_address + 0x100);
+fn serveEp0() void {
+    executor.yield();
 
-fn handleSetupPacket(setup_packet: protocol.SetupPacket) void {
-    next_pid.set(0);
+    reconnect_loop: while (true) {
+        const connection = blk: {
+            arm.disableInterrupts();
+            defer arm.enableInterrupts();
+            break :blk current_connection;
+        };
 
-    if (setup_packet.request_type.recipient != .Device or setup_packet.request_type.type != .Standard) {
-        return;
-    }
+        setup_packet_loop: while (true) {
+            const setup_packet = receiveSetupPacket(connection) catch
+                continue :reconnect_loop;
 
-    switch (setup_packet.request_type.direction) {
-        .Out => {
-            switch (setup_packet.request) {
-                .SetAddress => {
-                    device_address_to_set = @truncate(u7, setup_packet.value);
+            if (setup_packet.request_type.recipient != .Device or setup_packet.request_type.type != .Standard)
+                continue :setup_packet_loop;
+
+            switch (setup_packet.request_type.direction) {
+                .Out => switch (setup_packet.request) {
+                    .SetAddress => {
+                        // FIXME: do we need to wait for this to complete, rather
+                        // than just waiting for it to be enqueued? If we don't wait
+                        // for it to complete, does it race with endpoint drivers
+                        // sending post-configuration data?
+                        sendOnEp0(connection, &[_]u8{}, 1) catch continue :reconnect_loop;
+                        rp2040.usb.addr_endp.write(0, .{ .address = @truncate(u7, setup_packet.value) });
+                    },
+
+                    .SetConfiguration => {
+                        // FIXME: do we need to wait for this to complete, rather
+                        // than just waiting for it to be enqueued? If we don't wait
+                        // for it to complete, does it race with endpoint drivers
+                        // sending post-configuration data?
+                        sendOnEp0(connection, &[_]u8{}, 1) catch continue :reconnect_loop;
+
+                        {
+                            arm.disableInterrupts();
+                            defer arm.enableInterrupts();
+
+                            if (connection != current_connection) {
+                                continue :reconnect_loop;
+                            }
+
+                            configured = true;
+                        }
+
+                        executor.submitAll(connection_waiters);
+                    },
+
+                    else => {
+                        // FIXME: should we be acknowledging here even
+                        // though we don't recognize the request?
+                    },
                 },
 
-                .SetConfiguration => {
-                    configured = true;
-                    executor.submitAll(&connection_waiters);
-                },
+                .In => switch (setup_packet.request) {
+                    .GetDescriptor => switch (@intToEnum(protocol.DescriptorType, setup_packet.value >> 8)) {
+                        .Device => {
+                            const len = @minimum(setup_packet.length, derived_config.device_descriptor.len);
+                            sendOnEp0(connection, derived_config.device_descriptor[0..len], 1) catch continue :reconnect_loop;
+                            receiveOnEp0(connection, &[_]u8{}, 1) catch continue :reconnect_loop;
+                        },
 
-                else => {},
+                        .Configuration => {
+                            const len = @minimum(setup_packet.length, derived_config.configuration_descriptor.len);
+                            // FIXME: handle long configuration descriptors
+                            sendOnEp0(connection, derived_config.configuration_descriptor[0..len], 1) catch continue :reconnect_loop;
+                            receiveOnEp0(connection, &[_]u8{}, 1) catch continue :reconnect_loop;
+                        },
+
+                        .String => {
+                            const index = @truncate(u8, setup_packet.value);
+                            const len = @minimum(setup_packet.length, derived_config.string_descriptors[index].len);
+                            if (index < derived_config.string_descriptors.len) {
+                                // FIXME: handle long string descriptors
+                                // FIXME: what do we do for out-of-bounds descriptor requests?
+                                sendOnEp0(connection, derived_config.string_descriptors[index][0..len], 1) catch continue :reconnect_loop;
+                                receiveOnEp0(connection, &[_]u8{}, 1) catch continue :reconnect_loop;
+                            }
+                        },
+
+                        else => {
+                            // FIXME: what do we do here?
+                        },
+                    },
+                },
             }
-
-            startTransfer(0, 0);
-        },
-
-        .In => switch (setup_packet.request) {
-            .GetDescriptor => switch (@intToEnum(protocol.DescriptorType, setup_packet.value >> 8)) {
-                .Device => {
-                    next_pid.set(0);
-                    std.mem.copy(u8, ep0_buffer, derived_config.device_descriptor);
-                    startTransfer(0, derived_config.device_descriptor.len);
-                },
-
-                .Configuration => {
-                    const len = @minimum(setup_packet.length, derived_config.configuration_descriptor.len);
-                    std.mem.copy(u8, ep0_buffer, derived_config.configuration_descriptor[0..len]);
-                    startTransfer(0, @intCast(u10, len));
-                },
-
-                .String => {
-                    const index = @truncate(u8, setup_packet.value);
-                    std.mem.copy(u8, ep0_buffer, derived_config.string_descriptors[index]);
-                    startTransfer(0, @intCast(u10, derived_config.string_descriptors[index].len));
-                },
-
-                else => {}, // FIXME panic?
-            },
-
-            else => {},
-        },
+        }
     }
 }
+
+var ep0_serve_frame: @Frame(serveEp0) = undefined;
 
 pub fn init() void {
     // Start up USB PLL
@@ -480,13 +693,15 @@ pub fn init() void {
         });
     }
 
-    rp2040.usb.sie_ctrl.write(.{
-        .pullup_en = true,
+    rp2040.usb.sie_ctrl.set(.{
+        .pullup_en,
     });
 
     rp2040.ppb.nvic_iser.write(.{
         .usbctrl = true,
     });
+
+    ep0_serve_frame = async serveEp0();
 }
 
 pub inline fn send(connection: ConnectionId, comptime interface: usize, comptime endpoint_of_interface: usize, data: []const u8) Error!void {
