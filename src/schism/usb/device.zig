@@ -399,13 +399,13 @@ pub fn handleIrq() void {
                     const len = rp2040.usb.device_ep_buf_ctrl.read(1).buf0_len;
                     const waiter = @fieldParentPtr(Ep0TransferWaiter, "continuation", ep0_transfer_waiters.popFront().?);
                     std.mem.copy(u8, waiter.state.pending.buffer.Rx, ep0_buffer[0..len]);
-                    waiter.state.result = .{ .rx = len };
+                    waiter.state = .{ .result = .{ .rx = len } };
                     executor.submit(&waiter.continuation);
                 },
 
                 .Tx => {
                     const waiter = @fieldParentPtr(Ep0TransferWaiter, "continuation", ep0_transfer_waiters.popFront().?);
-                    waiter.state.result = .{ .tx = {} };
+                    waiter.state = .{ .result = .{ .tx = {} } };
                     executor.submit(&waiter.continuation);
                 },
 
@@ -438,7 +438,7 @@ pub fn handleIrq() void {
                     std.mem.copy(u8, &tx_buffers[channel], waiter.state.source);
                     startTransfer(txBufCtrlIndex(channel), @intCast(u10, waiter.state.source.len), @boolToInt(next_tx_pid.isSet(channel)));
                     next_tx_pid.toggle(channel);
-                    waiter.state.result = {};
+                    waiter.state = .{ .result = {} };
                     executor.submit(&waiter.continuation);
                 } else {
                     std.debug.assert(tx_in_flight.isSet(channel));
@@ -453,7 +453,7 @@ pub fn handleIrq() void {
                     const len = rp2040.usb.device_ep_buf_ctrl.read(rxBufCtrlIndex(channel)).buf0_len;
                     const waiter = @fieldParentPtr(RxWaiter, "continuation", queue.popFront().?);
                     std.mem.copy(u8, waiter.state.destination, rx_buffers[channel][0..len]);
-                    waiter.state.result = @intCast(u6, len);
+                    waiter.state = .{ .result = @intCast(u6, len) };
                     executor.submit(&waiter.continuation);
                 }
 
@@ -488,7 +488,7 @@ pub fn handleIrq() void {
         ep0_transfer_in_flight = .None;
         while (ep0_transfer_waiters.popFront()) |continuation| {
             const waiter = @fieldParentPtr(Ep0TransferWaiter, "continuation", continuation);
-            waiter.state.result = error.BusReset;
+            waiter.state = .{ .result = error.BusReset };
             executor.submit(continuation);
         }
 
@@ -497,7 +497,7 @@ pub fn handleIrq() void {
         for (tx_waiters) |*queue| {
             while (queue.popFront()) |continuation| {
                 const waiter = @fieldParentPtr(TxWaiter, "continuation", continuation);
-                waiter.state.result = error.BusReset;
+                waiter.state = .{ .result = error.BusReset };
                 executor.submit(continuation);
             }
         }
@@ -507,7 +507,7 @@ pub fn handleIrq() void {
         for (rx_waiters) |*queue| {
             while (queue.popFront()) |continuation| {
                 const waiter = @fieldParentPtr(RxWaiter, "continuation", continuation);
-                waiter.state.result = error.BusReset;
+                waiter.state = .{ .result = error.BusReset };
                 executor.submit(continuation);
             }
         }
