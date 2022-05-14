@@ -318,7 +318,7 @@ fn receiveOnEp0(connection: ConnectionId, destination: []u8, pid: u1) Error!u10 
     }
 
     if (ep0_transfer_in_flight == .None) {
-        startTransfer(1, destination.len, pid);
+        startTransfer(1, @intCast(u10, destination.len), pid);
         ep0_transfer_in_flight = .Rx;
     }
 
@@ -344,13 +344,13 @@ fn sendOnEp0(connection: ConnectionId, source: []const u8, pid: u1) Error!void {
     arm.disableInterrupts();
 
     if (connection != current_connection) {
-        defer arm.enableInterrupts;
+        defer arm.enableInterrupts();
         return error.ConnectionLost;
     }
 
     if (ep0_transfer_in_flight == .None) {
         std.mem.copy(u8, ep0_buffer, source);
-        startTransfer(0, source.len, pid);
+        startTransfer(0, @intCast(u10, source.len), pid);
         ep0_transfer_in_flight = .Tx;
         arm.enableInterrupts();
         return;
@@ -368,7 +368,7 @@ fn sendOnEp0(connection: ConnectionId, source: []const u8, pid: u1) Error!void {
         arm.enableInterrupts();
     }
 
-    return (try waiter.state.result).Tx;
+    return (try waiter.state.result).tx;
 }
 
 pub fn handleIrq() void {
@@ -394,6 +394,8 @@ pub fn handleIrq() void {
         if (@truncate(u1, buff_status) != 0) {
             switch (ep0_transfer_in_flight) {
                 .Rx => {
+                    // FIXME: validate length against destination buffer?
+                    const len = rp2040.usb.device_ep_buf_ctrl.read(1).buf0_len;
                     const waiter = @fieldParentPtr(Ep0TransferWaiter, "continuation", ep0_transfer_waiters.popFront().?);
                     std.mem.copy(u8, waiter.state.pending.buffer.Rx, ep0_buffer[0..len]);
                     waiter.state.result = .{ .rx = len };
@@ -411,14 +413,14 @@ pub fn handleIrq() void {
                     .Tx => |source| {
                         _ = ep0_transfer_waiters.popFront().?;
                         std.mem.copy(u8, ep0_buffer, source);
-                        startTransfer(0, source.len, waiter.state.pending.pid);
+                        startTransfer(0, @intCast(u10, source.len), waiter.state.pending.pid);
                         waiter.state.result = .{ .tx = {} };
                         ep0_transfer_in_flight = .Tx;
                         executor.submit(continuation);
                     },
 
                     .Rx => |destination| {
-                        startTransfer(1, destination.len, waiter.state.pending.pid);
+                        startTransfer(1, @intCast(u10, destination.len), waiter.state.pending.pid);
                         ep0_transfer_in_flight = .Rx;
                     },
                 }
@@ -432,7 +434,7 @@ pub fn handleIrq() void {
                 if (queue.popFront()) |continuation| {
                     const waiter = @fieldParentPtr(TxWaiter, "continuation", continuation);
                     std.mem.copy(u8, &tx_buffers[channel], waiter.state.source);
-                    startTransfer(txBufCtrlIndex(channel), @intCast(u10, waiter.state.source.len), next_tx_pid.isSet(channel));
+                    startTransfer(txBufCtrlIndex(channel), @intCast(u10, waiter.state.source.len), @boolToInt(next_tx_pid.isSet(channel)));
                     next_tx_pid.toggle(channel);
                     waiter.state.result = {};
                     executor.submit(&waiter.continuation);
@@ -455,7 +457,7 @@ pub fn handleIrq() void {
 
                 if (queue.peekFront()) |continuation| {
                     const waiter = @fieldParentPtr(RxWaiter, "continuation", continuation);
-                    startTransfer(rxBufCtrlIndex(channel), @intCast(u10, waiter.state.destination.len), next_rx_pid.isSet(channel));
+                    startTransfer(rxBufCtrlIndex(channel), @intCast(u10, waiter.state.destination.len), @boolToInt(next_rx_pid.isSet(channel)));
                     next_rx_pid.toggle(channel);
                 } else {
                     std.debug.assert(rx_in_flight.isSet(channel));
@@ -588,7 +590,7 @@ fn serveEp0() void {
                             configured = true;
                         }
 
-                        executor.submitAll(connection_waiters);
+                        executor.submitAll(&connection_waiters);
                     },
 
                     else => {
@@ -602,14 +604,14 @@ fn serveEp0() void {
                         .Device => {
                             const len = @minimum(setup_packet.length, derived_config.device_descriptor.len);
                             sendOnEp0(connection, derived_config.device_descriptor[0..len], 1) catch continue :reconnect_loop;
-                            receiveOnEp0(connection, &[_]u8{}, 1) catch continue :reconnect_loop;
+                            _ = receiveOnEp0(connection, &[_]u8{}, 1) catch continue :reconnect_loop;
                         },
 
                         .Configuration => {
                             const len = @minimum(setup_packet.length, derived_config.configuration_descriptor.len);
                             // FIXME: handle long configuration descriptors
                             sendOnEp0(connection, derived_config.configuration_descriptor[0..len], 1) catch continue :reconnect_loop;
-                            receiveOnEp0(connection, &[_]u8{}, 1) catch continue :reconnect_loop;
+                            _ = receiveOnEp0(connection, &[_]u8{}, 1) catch continue :reconnect_loop;
                         },
 
                         .String => {
@@ -619,13 +621,17 @@ fn serveEp0() void {
                                 // FIXME: handle long string descriptors
                                 // FIXME: what do we do for out-of-bounds descriptor requests?
                                 sendOnEp0(connection, derived_config.string_descriptors[index][0..len], 1) catch continue :reconnect_loop;
-                                receiveOnEp0(connection, &[_]u8{}, 1) catch continue :reconnect_loop;
+                                _ = receiveOnEp0(connection, &[_]u8{}, 1) catch continue :reconnect_loop;
                             }
                         },
 
                         else => {
                             // FIXME: what do we do here?
                         },
+                    },
+
+                    else => {
+                        // FIXME: what do we do here?
                     },
                 },
             }
