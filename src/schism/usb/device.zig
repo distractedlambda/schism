@@ -352,16 +352,17 @@ fn sendOnEp0(connection: ConnectionId, source: []const u8, pid: u1) Error!void {
         std.mem.copy(u8, ep0_buffer, source);
         startTransfer(0, @intCast(u10, source.len), pid);
         ep0_transfer_in_flight = .Tx;
-        arm.enableInterrupts();
-        return;
     }
 
-    var waiter = Ep0TransferWaiter{ .continuation = Continuation.init(@frame()), .state = .{
-        .pending = .{
-            .pid = pid,
-            .buffer = .{ .Tx = source },
+    var waiter = Ep0TransferWaiter{
+        .continuation = Continuation.init(@frame()),
+        .state = .{
+            .pending = .{
+                .pid = pid,
+                .buffer = .{ .Tx = source },
+            },
         },
-    } };
+    };
 
     suspend {
         ep0_transfer_waiters.pushBack(&waiter.continuation);
@@ -402,7 +403,11 @@ pub fn handleIrq() void {
                     executor.submit(&waiter.continuation);
                 },
 
-                .Tx => {},
+                .Tx => {
+                    const waiter = @fieldParentPtr(Ep0TransferWaiter, "continuation", ep0_transfer_waiters.popFront().?);
+                    waiter.state.result = .{ .tx = {} };
+                    executor.submit(&waiter.continuation);
+                },
 
                 .None => unreachable,
             }
@@ -411,12 +416,9 @@ pub fn handleIrq() void {
                 const waiter = @fieldParentPtr(Ep0TransferWaiter, "continuation", continuation);
                 switch (waiter.state.pending.buffer) {
                     .Tx => |source| {
-                        _ = ep0_transfer_waiters.popFront().?;
                         std.mem.copy(u8, ep0_buffer, source);
                         startTransfer(0, @intCast(u10, source.len), waiter.state.pending.pid);
-                        waiter.state.result = .{ .tx = {} };
                         ep0_transfer_in_flight = .Tx;
-                        executor.submit(continuation);
                     },
 
                     .Rx => |destination| {
@@ -564,19 +566,11 @@ fn serveEp0() void {
             switch (setup_packet.request_type.direction) {
                 .Out => switch (setup_packet.request) {
                     .SetAddress => {
-                        // FIXME: do we need to wait for this to complete, rather
-                        // than just waiting for it to be enqueued? If we don't wait
-                        // for it to complete, does it race with endpoint drivers
-                        // sending post-configuration data?
                         sendOnEp0(connection, &[_]u8{}, 1) catch continue :reconnect_loop;
                         rp2040.usb.addr_endp.write(0, .{ .address = @truncate(u7, setup_packet.value) });
                     },
 
                     .SetConfiguration => {
-                        // FIXME: do we need to wait for this to complete, rather
-                        // than just waiting for it to be enqueued? If we don't wait
-                        // for it to complete, does it race with endpoint drivers
-                        // sending post-configuration data?
                         sendOnEp0(connection, &[_]u8{}, 1) catch continue :reconnect_loop;
 
                         {
