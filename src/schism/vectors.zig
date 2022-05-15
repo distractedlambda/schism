@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const arm = @import("../arm.zig");
+const bootrom = @import("bootrom.zig");
 const config = @import("config.zig").resolved;
 const executor = @import("executor.zig");
 const gpio = @import("gpio.zig");
@@ -95,12 +96,17 @@ fn handleReset() callconv(.C) noreturn {
     const data_end = @extern([*]volatile u32, .{ .name = "__data_end__" });
     for (data_start[0 .. (@ptrToInt(data_end) - @ptrToInt(data_start)) / @sizeOf(u32)]) |*word, i| word.* = data_source[i];
 
+    // Link bootrom routines
+    // FIXME: do we need to do this even earlier, for safety? The danger is a
+    // call to one of those late-linked functions being emitted for code that
+    // runs above.
+    bootrom.init();
+
     // Initialize peripherals
     gpio.init();
     usb.init();
 
     // Start running user code
-    arm.enableInterrupts();
     core0_frame = async @import("root").main();
     executor.run();
 }

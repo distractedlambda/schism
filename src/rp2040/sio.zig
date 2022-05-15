@@ -1,3 +1,5 @@
+const bits = @import("../bits.zig");
+
 const Register = @import("register.zig").Register;
 const RegisterArray = @import("register_array.zig").RegisterArray;
 const RegisterMatrix = @import("register_matrix.zig").RegisterMatrix;
@@ -43,19 +45,27 @@ pub const fifo_rd = Register(base_address + 0x058);
 
 pub const spinlock_st = Register(base_address + 0x05c);
 
-pub const div_udividend = Register(base_address + 0x060);
-pub const div_udivisor = Register(base_address + 0x064);
-pub const div_sdividend = Register(base_address + 0x068);
-pub const div_sdivisor = Register(base_address + 0x06c);
-pub const div_quotient = Register(base_address + 0x070);
-pub const div_remainder = Register(base_address + 0x074);
+pub const div_udividend = Register(base_address + 0x060, .{ .Scalar = u32 });
+pub const div_udivisor = Register(base_address + 0x064, .{ .Scalar = u32 });
+pub const div_sdividend = Register(base_address + 0x068, .{ .Scalar = i32 });
+pub const div_sdivisor = Register(base_address + 0x06c, .{ .Scalar = i32 });
+pub const div_quotient = Register(base_address + 0x070, .{ .Scalar = u32 });
+pub const div_remainder = Register(base_address + 0x074, .{ .Scalar = u32 });
 
-pub const div_csr = struct {
-    pub usingnamespace Register(base_address + 0x078);
-
-    // pub const dirty = RegisterField(bool, 1);
-    // pub const ready = RegisterField(bool, 0);
-};
+pub const div_csr = Register(base_address + 0x078, .{
+    .Record = &[_]bits.BitStructField{
+        .{
+            .name = "dirty",
+            .type = bool,
+            .lsb = 1,
+        },
+        .{
+            .name = "ready",
+            .type = bool,
+            .lsb = 0,
+        },
+    },
+});
 
 pub const interp_accum = RegisterMatrix(2, 2, base_address + 0x080, 0x40, 0x4);
 pub const interp_base = RegisterMatrix(2, 3, base_address + 0x088, 0x40, 0x4);

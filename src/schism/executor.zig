@@ -79,45 +79,24 @@ pub const ContinuationQueue = struct {
 var ready_continuations = CoreLocal(ContinuationQueue).init(.{});
 
 pub fn submit(continuation: *Continuation) void {
-    // FIXME: save and restore interrupt status
-    arm.disableInterrupts();
-    defer arm.enableInterrupts();
-    submitUnsafe(continuation);
-}
-
-pub fn submitUnsafe(continuation: *Continuation) void {
     ready_continuations.ptr().pushBack(continuation);
 }
 
 pub fn submitAll(queue: *ContinuationQueue) void {
-    // FIXME: save and restore interrupt status
-    arm.disableInterrupts();
-    defer arm.enableInterrupts();
-    submitAllUnsafe(queue);
-}
-
-pub fn submitAllUnsafe(queue: *ContinuationQueue) void {
     ready_continuations.ptr().spliceBack(queue);
 }
 
 pub fn run() noreturn {
     while (true) {
-        const continuation = get_continuation: {
-            while (true) {
-                if (blk: {
-                    arm.disableInterrupts();
-                    defer arm.enableInterrupts();
-                    break :blk ready_continuations.ptr().popFront();
-                }) |cont| {
-                    break :get_continuation cont;
-                }
+        if (ready_continuations.ptr().popFront()) |continuation| {
+            const frame = continuation.frame;
+            resume frame;
+        } else {
+            arm.waitForInterrupt();
+        }
 
-                arm.waitForEvent();
-            }
-        };
-
-        const frame = continuation.frame;
-        resume frame;
+        arm.enableInterrupts();
+        arm.disableInterrupts();
     }
 }
 

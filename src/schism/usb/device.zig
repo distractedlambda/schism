@@ -131,16 +131,10 @@ pub const ConnectionId = enum(usize) { _ };
 
 var configured = false;
 var current_connection = @intToEnum(ConnectionId, 0);
-var connection_waiters = ContinuationQueue{}; // never mutated in ISRs
+var connection_waiters = ContinuationQueue{};
 
 pub fn connect() ConnectionId {
-    arm.disableInterrupts();
-    defer arm.enableInterrupts();
-
     while (!configured) {
-        arm.enableInterrupts();
-        defer arm.disableInterrupts();
-
         var continuation = Continuation.init(@frame());
 
         suspend {
@@ -175,10 +169,7 @@ inline fn rxBufCtrlIndex(channel: RxChannelIndex) u5 {
 fn receiveImpl(connection: ConnectionId, channel: RxChannelIndex, destination: []u8) Error!u6 {
     std.debug.assert(channel < derived_config.num_rx_channels);
 
-    arm.disableInterrupts();
-
     if (connection != current_connection) {
-        defer arm.enableInterrupts();
         return error.ConnectionLost;
     }
 
@@ -195,7 +186,6 @@ fn receiveImpl(connection: ConnectionId, channel: RxChannelIndex, destination: [
 
     suspend {
         rx_waiters[channel].pushBack(&waiter.continuation);
-        arm.enableInterrupts();
     }
 
     return waiter.destination_and_result.result;
@@ -223,21 +213,15 @@ inline fn txBufCtrlIndex(channel: TxChannelIndex) u5 {
 fn sendImpl(connection: ConnectionId, channel: TxChannelIndex, source: []const u8) Error!void {
     std.debug.assert(channel < derived_config.num_tx_channels);
 
-    arm.disableInterrupts();
-
     if (connection != current_connection) {
-        defer arm.enableInterrupts();
         return error.ConnectionLost;
     }
 
     if (!tx_in_flight.isSet(channel)) {
         tx_in_flight.set(channel);
-        arm.enableInterrupts();
         std.mem.copy(u8, &tx_buffers[channel], source);
-        arm.disableInterrupts();
         startTransfer(txBufCtrlIndex(channel), source.len, next_tx_pid.isSet(channel));
         next_tx_pid.toggle(channel);
-        arm.enableInterrupts();
     } else {
         var waiter = TxWaiter{
             .continuation = Continuation.init(@frame()),
@@ -246,7 +230,6 @@ fn sendImpl(connection: ConnectionId, channel: TxChannelIndex, source: []const u
 
         suspend {
             tx_waiters[channel].pushBack(&waiter.continuation);
-            arm.enableInterrupts();
         }
 
         return waiter.source_and_result.result;
@@ -284,15 +267,11 @@ var ep0_transfer_in_flight = false;
 const ep0_buffer = @intToPtr(*[64]u8, rp2040.usb.dpram_base_address + 0x100);
 
 fn receiveSetupPacket(connection: ConnectionId) Error!protocol.SetupPacket {
-    arm.disableInterrupts();
-
     if (connection != current_connection) {
-        defer arm.enableInterrupts();
         return error.ConnectionLost;
     }
 
     if (next_setup_packet) |setup_packet| {
-        defer arm.enableInterrupts();
         next_setup_packet = null;
         return setup_packet;
     }
@@ -301,7 +280,6 @@ fn receiveSetupPacket(connection: ConnectionId) Error!protocol.SetupPacket {
 
     suspend {
         setup_packet_waiters.pushBack(&waiter.continuation);
-        arm.enableInterrupts();
     }
 
     return waiter.packet;
@@ -310,10 +288,7 @@ fn receiveSetupPacket(connection: ConnectionId) Error!protocol.SetupPacket {
 fn receiveOnEp0(connection: ConnectionId, destination: []u8, pid: u1) Error!u10 {
     // FIXME: don't suspend when receiving a zero-length packet?
 
-    arm.disableInterrupts();
-
     if (connection != current_connection) {
-        defer arm.enableInterrupts();
         return error.ConnectionLost;
     }
 
@@ -334,17 +309,13 @@ fn receiveOnEp0(connection: ConnectionId, destination: []u8, pid: u1) Error!u10 
 
     suspend {
         ep0_transfer_waiters.pushBack(&waiter.continuation);
-        arm.enableInterrupts();
     }
 
     return (try waiter.state.result).rx;
 }
 
 fn sendOnEp0(connection: ConnectionId, source: []const u8, pid: u1) Error!void {
-    arm.disableInterrupts();
-
     if (connection != current_connection) {
-        defer arm.enableInterrupts();
         return error.ConnectionLost;
     }
 
@@ -366,13 +337,15 @@ fn sendOnEp0(connection: ConnectionId, source: []const u8, pid: u1) Error!void {
 
     suspend {
         ep0_transfer_waiters.pushBack(&waiter.continuation);
-        arm.enableInterrupts();
     }
 
     return (try waiter.state.result).tx;
 }
 
 pub fn handleIrq() void {
+    arm.disableInterrupts();
+    defer arm.enableInterrupts();
+
     const ints = rp2040.usb.ints.read();
 
     if (ints.setup_req) {
@@ -553,11 +526,7 @@ fn serveEp0() void {
     executor.yield();
 
     reconnect_loop: while (true) {
-        const connection = blk: {
-            arm.disableInterrupts();
-            defer arm.enableInterrupts();
-            break :blk current_connection;
-        };
+        const connection = current_connection;
 
         setup_packet_loop: while (true) {
             const setup_packet = receiveSetupPacket(connection) catch
@@ -576,16 +545,11 @@ fn serveEp0() void {
                     .SetConfiguration => {
                         sendOnEp0(connection, &[_]u8{}, 1) catch continue :reconnect_loop;
 
-                        {
-                            arm.disableInterrupts();
-                            defer arm.enableInterrupts();
-
-                            if (connection != current_connection) {
-                                continue :reconnect_loop;
-                            }
-
-                            configured = true;
+                        if (connection != current_connection) {
+                            continue :reconnect_loop;
                         }
+
+                        configured = true;
 
                         executor.submitAll(&connection_waiters);
                     },

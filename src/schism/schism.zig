@@ -4,6 +4,7 @@ const gpio = @import("gpio.zig");
 const usb = @import("usb/usb.zig");
 
 comptime {
+    _ = @import("divider.zig");
     _ = @import("vectors.zig");
 }
 
