@@ -8,10 +8,13 @@ pub fn RegisterMatrix(
     comptime base_address: usize,
     comptime row_stride: usize,
     comptime col_stride: usize,
-    comptime spec: anytype,
+    comptime spec: bits.BitStructSpec,
 ) type {
     return struct {
         pub const Bits = bits.BitStruct(u32, spec);
+
+        pub const rows = rows;
+        pub const cols = cols;
 
         pub inline fn address(row: usize, col: usize) usize {
             std.debug.assert(row < rows);
@@ -27,12 +30,12 @@ pub fn RegisterMatrix(
             @intToPtr(*volatile u32, address(row, col)).* = value;
         }
 
-        pub inline fn read(row: usize, col: usize) Bits.Fields {
+        pub inline fn read(row: usize, col: usize) Bits.Unpacked {
             return Bits.unpack(readRaw(row, col));
         }
 
-        pub inline fn write(row: usize, col: usize, fields: Bits.Fields) void {
-            writeRaw(row, col, Bits.pack(fields));
+        pub inline fn write(row: usize, col: usize, unpacked: Bits.Unpacked) void {
+            writeRaw(row, col, Bits.pack(unpacked));
         }
     };
 }

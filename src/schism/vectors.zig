@@ -70,12 +70,12 @@ fn handleReset() callconv(.C) noreturn {
     while (!rp2040.clocks.clk_ref_selected.read().xosc_clksrc) {}
 
     // Start up system PLL, targeting 125 MHz
-    resets.unreset(.{.pll_sys});
+    resets.unreset(.{ .pll_sys = true });
     rp2040.pll_sys.fbdiv_int.write(125);
-    rp2040.pll_sys.pwr.clear(.{ .pd, .vcopd });
+    rp2040.pll_sys.pwr.clear(.{ .pd = true, .vcopd = true });
     while (!rp2040.pll_sys.cs.read().lock) {}
     rp2040.pll_sys.prim.write(.{ .postdiv1 = 6, .postdiv2 = 2 });
-    rp2040.pll_sys.pwr.clear(.{.postdivpd});
+    rp2040.pll_sys.pwr.clear(.{ .postdivpd = true });
 
     // Switch system clock to PLL
     rp2040.clocks.clk_sys_control.write(.{ .src = .ClksrcClkSysAux });

@@ -1,3 +1,5 @@
+const bits = @import("../bits.zig");
+
 const Register = @import("register.zig").Register;
 const RegisterArray = @import("register_array.zig").RegisterArray;
 
@@ -37,33 +39,165 @@ pub const syst_calib = struct {
     // pub const tenms = RegisterField(u24, 0);
 };
 
-const irq_spec = .{
-    .{ .name = "timer_irq0", .type = bool, .lsb = 0, .default = false },
-    .{ .name = "timer_irq1", .type = bool, .lsb = 1, .default = false },
-    .{ .name = "timer_irq2", .type = bool, .lsb = 2, .default = false },
-    .{ .name = "timer_irq3", .type = bool, .lsb = 3, .default = false },
-    .{ .name = "pwm_wrap", .type = bool, .lsb = 4, .default = false },
-    .{ .name = "usbctrl", .type = bool, .lsb = 5, .default = false },
-    .{ .name = "xip", .type = bool, .lsb = 6, .default = false },
-    .{ .name = "pio0_irq0", .type = bool, .lsb = 7, .default = false },
-    .{ .name = "pio0_irq1", .type = bool, .lsb = 8, .default = false },
-    .{ .name = "pio1_irq0", .type = bool, .lsb = 9, .default = false },
-    .{ .name = "pio1_irq1", .type = bool, .lsb = 10, .default = false },
-    .{ .name = "dma_irq0", .type = bool, .lsb = 11, .default = false },
-    .{ .name = "dma_irq1", .type = bool, .lsb = 12, .default = false },
-    .{ .name = "io_bank0", .type = bool, .lsb = 13, .default = false },
-    .{ .name = "io_qspi", .type = bool, .lsb = 14, .default = false },
-    .{ .name = "sio_proc0", .type = bool, .lsb = 15, .default = false },
-    .{ .name = "sio_proc1", .type = bool, .lsb = 16, .default = false },
-    .{ .name = "clocks", .type = bool, .lsb = 17, .default = false },
-    .{ .name = "spi0", .type = bool, .lsb = 18, .default = false },
-    .{ .name = "spi1", .type = bool, .lsb = 19, .default = false },
-    .{ .name = "uart0", .type = bool, .lsb = 20, .default = false },
-    .{ .name = "uart1", .type = bool, .lsb = 21, .default = false },
-    .{ .name = "adc_fifo", .type = bool, .lsb = 22, .default = false },
-    .{ .name = "i2c0", .type = bool, .lsb = 23, .default = false },
-    .{ .name = "i2c1", .type = bool, .lsb = 24, .default = false },
-    .{ .name = "rtc", .type = bool, .lsb = 25, .default = false },
+const irq_spec = bits.BitStructSpec{
+    .Record = &[_]bits.BitStructField{
+        .{
+            .name = "timer_irq0",
+            .type = bool,
+            .lsb = 0,
+            .default = &false,
+        },
+        .{
+            .name = "timer_irq1",
+            .type = bool,
+            .lsb = 1,
+            .default = &false,
+        },
+        .{
+            .name = "timer_irq2",
+            .type = bool,
+            .lsb = 2,
+            .default = &false,
+        },
+        .{
+            .name = "timer_irq3",
+            .type = bool,
+            .lsb = 3,
+            .default = &false,
+        },
+        .{
+            .name = "pwm_wrap",
+            .type = bool,
+            .lsb = 4,
+            .default = &false,
+        },
+        .{
+            .name = "usbctrl",
+            .type = bool,
+            .lsb = 5,
+            .default = &false,
+        },
+        .{
+            .name = "xip",
+            .type = bool,
+            .lsb = 6,
+            .default = &false,
+        },
+        .{
+            .name = "pio0_irq0",
+            .type = bool,
+            .lsb = 7,
+            .default = &false,
+        },
+        .{
+            .name = "pio0_irq1",
+            .type = bool,
+            .lsb = 8,
+            .default = &false,
+        },
+        .{
+            .name = "pio1_irq0",
+            .type = bool,
+            .lsb = 9,
+            .default = &false,
+        },
+        .{
+            .name = "pio1_irq1",
+            .type = bool,
+            .lsb = 10,
+            .default = &false,
+        },
+        .{
+            .name = "dma_irq0",
+            .type = bool,
+            .lsb = 11,
+            .default = &false,
+        },
+        .{
+            .name = "dma_irq1",
+            .type = bool,
+            .lsb = 12,
+            .default = &false,
+        },
+        .{
+            .name = "io_bank0",
+            .type = bool,
+            .lsb = 13,
+            .default = &false,
+        },
+        .{
+            .name = "io_qspi",
+            .type = bool,
+            .lsb = 14,
+            .default = &false,
+        },
+        .{
+            .name = "sio_proc0",
+            .type = bool,
+            .lsb = 15,
+            .default = &false,
+        },
+        .{
+            .name = "sio_proc1",
+            .type = bool,
+            .lsb = 16,
+            .default = &false,
+        },
+        .{
+            .name = "clocks",
+            .type = bool,
+            .lsb = 17,
+            .default = &false,
+        },
+        .{
+            .name = "spi0",
+            .type = bool,
+            .lsb = 18,
+            .default = &false,
+        },
+        .{
+            .name = "spi1",
+            .type = bool,
+            .lsb = 19,
+            .default = &false,
+        },
+        .{
+            .name = "uart0",
+            .type = bool,
+            .lsb = 20,
+            .default = &false,
+        },
+        .{
+            .name = "uart1",
+            .type = bool,
+            .lsb = 21,
+            .default = &false,
+        },
+        .{
+            .name = "adc_fifo",
+            .type = bool,
+            .lsb = 22,
+            .default = &false,
+        },
+        .{
+            .name = "i2c0",
+            .type = bool,
+            .lsb = 23,
+            .default = &false,
+        },
+        .{
+            .name = "i2c1",
+            .type = bool,
+            .lsb = 24,
+            .default = &false,
+        },
+        .{
+            .name = "rtc",
+            .type = bool,
+            .lsb = 25,
+            .default = &false,
+        },
+    },
 };
 
 pub const nvic_iser = Register(base_address + 0xe100, irq_spec);

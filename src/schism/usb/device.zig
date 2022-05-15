@@ -377,7 +377,7 @@ pub fn handleIrq() void {
 
     if (ints.setup_req) {
         const setup_packet = @bitCast(protocol.SetupPacket, @intToPtr(*const volatile [8]u8, rp2040.usb.dpram_base_address).*);
-        rp2040.usb.sie_status.clear(.{.setup_rec});
+        rp2040.usb.sie_status.clear(.{ .setup_rec = true });
         if (setup_packet_waiters.popFront()) |continuation| {
             const waiter = @fieldParentPtr(SetupPacketWaiter, "continuation", continuation);
             waiter.packet = setup_packet;
@@ -473,7 +473,7 @@ pub fn handleIrq() void {
     }
 
     if (ints.bus_reset) {
-        rp2040.usb.sie_status.clear(.{.bus_reset});
+        rp2040.usb.sie_status.clear(.{ .bus_reset = true });
         rp2040.usb.addr_endp.write(0, .{ .address = 0 });
 
         current_connection = @intToEnum(ConnectionId, @enumToInt(current_connection) +% 1);
@@ -640,17 +640,17 @@ var ep0_serve_frame: @Frame(serveEp0) = undefined;
 
 pub fn init() void {
     // Start up USB PLL
-    resets.unreset(.{.pll_usb});
+    resets.unreset(.{ .pll_usb = true });
     rp2040.pll_usb.fbdiv_int.write(120);
-    rp2040.pll_usb.pwr.clear(.{ .pd, .vcopd });
+    rp2040.pll_usb.pwr.clear(.{ .pd = true, .vcopd = true });
     while (!rp2040.pll_usb.cs.read().lock) {}
     rp2040.pll_usb.prim.write(.{ .postdiv1 = 6, .postdiv2 = 5 });
-    rp2040.pll_usb.pwr.clear(.{.postdivpd});
+    rp2040.pll_usb.pwr.clear(.{ .postdivpd = true });
 
     // Enable USB clock
     rp2040.clocks.clk_usb_ctrl.write(.{ .enable = true });
 
-    resets.unreset(.{.usbctrl});
+    resets.unreset(.{ .usbctrl = true });
 
     rp2040.usb.usb_muxing.write(.{
         .softcon = true,
@@ -696,13 +696,9 @@ pub fn init() void {
         });
     }
 
-    rp2040.usb.sie_ctrl.set(.{
-        .pullup_en,
-    });
+    rp2040.usb.sie_ctrl.set(.{ .pullup_en = true });
 
-    rp2040.ppb.nvic_iser.write(.{
-        .usbctrl = true,
-    });
+    rp2040.ppb.nvic_iser.write(.{ .usbctrl = true });
 
     ep0_serve_frame = async serveEp0();
 }

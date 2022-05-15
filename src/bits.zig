@@ -1,122 +1,140 @@
 const std = @import("std");
 
-pub fn BitStruct(comptime Int: type, comptime spec: anytype) type {
+pub fn BitStruct(comptime Int: type, comptime spec: BitStructSpec) type {
     if (@typeInfo(Int) != .Int or @typeInfo(Int).Int.signedness != .unsigned) {
         @compileError("expected an unsigned integer type, got " ++ @typeName(Int));
     }
 
-    if (@TypeOf(spec) == type) {
-        if (@bitSizeOf(spec) > @bitSizeOf(Int)) {
-            @compileError(@typeName(spec) ++ " does not fit in " ++ @typeName(Int));
-        }
-    } else {
-        comptime var population: Int = 0;
-        inline for (spec) |field_spec| {
-            if (field_spec.lsb + @bitSizeOf(field_spec.type) > @bitSizeOf(Int)) {
-                @compileError("field '" ++ field_spec.name ++ "' does not fit in " ++ @typeName(Int));
+    switch (spec) {
+        .Scalar => |value_type| {
+            if (@bitSizeOf(value_type) > @bitSizeOf(Int)) {
+                @compileError(@typeName(spec) ++ " does not fit in " ++ @typeName(Int));
             }
 
-            if (@truncate(std.meta.Int(.unsigned, @bitSizeOf(field_spec.type)), population >> field_spec.lsb) != 0) {
-                @compileError("field '" ++ field_spec.name ++ "' overlaps another field");
-            }
+            return struct {
+                pub const Int = Int;
 
-            population |= ((1 << @bitSizeOf(field_spec.type)) - 1) << field_spec.lsb;
-        }
-    }
+                pub const Unpacked = value_type;
 
-    return struct {
-        pub const Int: type = Int;
-
-        pub const Fields: type = blk: {
-            if (@TypeOf(spec) == type) {
-                break :blk spec;
-            } else {
-                comptime var struct_fields: [spec.len]std.builtin.Type.StructField = undefined;
-
-                inline for (spec) |field_spec, i| {
-                    struct_fields[i] = .{
-                        .name = field_spec.name,
-                        .field_type = field_spec.type,
-                        .is_comptime = false,
-                        .alignment = @alignOf(field_spec.type),
-                        .default_value = default_blk: {
-                            if (@hasField(@TypeOf(field_spec), "default")) {
-                                break :default_blk &@as(field_spec.type, field_spec.default);
-                            } else {
-                                break :default_blk null;
-                            }
-                        },
-                    };
+                pub inline fn pack(value: Unpacked) Int {
+                    return asBits(value);
                 }
 
-                break :blk @Type(.{ .Struct = .{
-                    .layout = .Auto,
-                    .fields = &struct_fields,
-                    .decls = &[0]std.builtin.Type.Declaration{},
-                    .is_tuple = false,
-                } });
-            }
-        };
+                pub inline fn unpack(int: Int) Unpacked {
+                    return fromBits(Unpacked, @truncate(std.meta.Int(.unsigned, @bitSizeOf(Unpacked)), int));
+                }
+            };
+        },
 
-        pub const MaskBit: type = blk: {
-            comptime var enum_fields: [spec.len]std.builtin.Type.EnumField = undefined;
-            comptime var num_enum_fields = 0;
+        .Record => |field_specs| {
+            comptime var population: Int = 0;
+            comptime var unpacked_fields: [field_specs.len]std.builtin.Type.StructField = undefined;
+            comptime var flag_mask_fields: [field_specs.len]std.builtin.Type.StructField = undefined;
+            comptime var next_flag_mask_field = 0;
 
-            inline for (spec) |field_spec| {
+            inline for (field_specs) |field_spec, i| {
+                if (field_spec.lsb + @bitSizeOf(field_spec.type) > @bitSizeOf(Int)) {
+                    @compileError("field '" ++ field_spec.name ++ "' does not fit in " ++ @typeName(Int));
+                }
+
+                if (@truncate(std.meta.Int(.unsigned, @bitSizeOf(field_spec.type)), population >> field_spec.lsb) != 0) {
+                    @compileError("field '" ++ field_spec.name ++ "' overlaps another field");
+                }
+
+                population |= ((1 << @bitSizeOf(field_spec.type)) - 1) << field_spec.lsb;
+
+                unpacked_fields[i] = .{
+                    .name = field_spec.name,
+                    .field_type = field_spec.type,
+                    .is_comptime = false,
+                    .alignment = @alignOf(field_spec.type),
+                    .default_value = field_spec.default,
+                };
+
                 if (field_spec.type == bool) {
-                    enum_fields[num_enum_fields] = .{
+                    flag_mask_fields[next_flag_mask_field] = .{
                         .name = field_spec.name,
-                        .value = 1 << field_spec.lsb,
+                        .field_type = bool,
+                        .is_comptime = false,
+                        .alignment = @alignOf(bool),
+                        .default_value = &false,
                     };
-                    num_enum_fields += 1;
+
+                    next_flag_mask_field += 1;
                 }
             }
 
-            break :blk @Type(.{ .Enum = .{
-                .layout = .Auto,
-                .tag_type = u32,
-                .fields = enum_fields[0..num_enum_fields],
-                .decls = &[0]std.builtin.Type.Declaration{},
-                .is_exhaustive = true,
-            } });
-        };
+            return struct {
+                pub const Int = Int;
 
-        pub inline fn pack(fields: Fields) Int {
-            if (@TypeOf(spec) == type) {
-                return asBits(fields);
-            } else {
-                var int: Int = 0;
-                inline for (spec) |field_spec| {
-                    int |= @as(Int, asBits(@field(fields, field_spec.name))) << field_spec.lsb;
+                pub const Unpacked = @Type(.{
+                    .Struct = .{
+                        .layout = .Auto,
+                        .fields = &unpacked_fields,
+                        .decls = &[_]std.builtin.Type.Declaration{},
+                        .is_tuple = false,
+                    },
+                });
+
+                pub const FlagMask = @Type(.{
+                    .Struct = .{
+                        .layout = .Auto,
+                        .fields = flag_mask_fields[0..next_flag_mask_field],
+                        .decls = &[_]std.builtin.Type.Declaration{},
+                        .is_tuple = false,
+                    },
+                });
+
+                pub inline fn pack(unpacked: Unpacked) Int {
+                    var int: Int = 0;
+
+                    inline for (field_specs) |field_spec| {
+                        int |= @as(Int, asBits(@field(unpacked, field_spec.name))) << field_spec.lsb;
+                    }
+
+                    return int;
                 }
-                return int;
-            }
-        }
 
-        pub inline fn unpack(int: Int) Fields {
-            if (@TypeOf(spec) == type) {
-                return @truncate(spec, int);
-            } else {
-                var fields: Fields = undefined;
-                inline for (spec) |field_spec| {
-                    @field(fields, field_spec.name) = fromBits(
-                        field_spec.type,
-                        @truncate(std.meta.Int(.unsigned, @bitSizeOf(field_spec.type)), int >> field_spec.lsb),
-                    );
+                pub inline fn unpack(int: Int) Unpacked {
+                    var unpacked: Unpacked = undefined;
+
+                    inline for (field_specs) |field_spec| {
+                        @field(unpacked, field_spec.name) = fromBits(
+                            field_spec.type,
+                            @truncate(std.meta.Int(.unsigned, @bitSizeOf(field_spec.type)), int >> field_spec.lsb),
+                        );
+                    }
+
+                    return unpacked;
                 }
-                return fields;
-            }
-        }
 
-        pub inline fn mask(bits: anytype) Int {
-            var int: Int = 0;
-            inline for (bits) |bit| {
-                int |= @enumToInt(@as(MaskBit, bit));
-            }
-            return int;
-        }
-    };
+                pub inline fn packFlagMask(mask: FlagMask) Int {
+                    var int: Int = 0;
+
+                    inline for (field_specs) |field_spec| {
+                        if (@hasField(FlagMask, field_spec.name)) {
+                            int |= @as(Int, asBits(@field(mask, field_spec.name))) << field_spec.lsb;
+                        }
+                    }
+
+                    return int;
+                }
+            };
+        },
+    }
 }
+
+pub const BitStructSpec = union(enum) {
+    Scalar: type,
+    Record: []const BitStructField,
+};
+
+pub const BitStructField = struct {
+    name: []const u8,
+    type: type,
+    lsb: u16,
+    default: ?*const anyopaque = null,
+};
 
 pub fn BitsOf(comptime T: type) type {
     return std.meta.Int(.unsigned, @bitSizeOf(T));

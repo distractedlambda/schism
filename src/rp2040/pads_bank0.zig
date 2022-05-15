@@ -1,3 +1,5 @@
+const bits = @import("../bits.zig");
+
 const PeripheralRegister = @import("peripheral_register.zig").PeripheralRegister;
 const PeripheralRegisterArray = @import("peripheral_register_array.zig").PeripheralRegisterArray;
 
@@ -22,14 +24,51 @@ pub const SlewRate = enum(u1) {
     Fast,
 };
 
-const spec = .{
-    .{ .name = "od", .type = bool, .lsb = 7, .default = false },
-    .{ .name = "ie", .type = bool, .lsb = 6, .default = true },
-    .{ .name = "drive", .type = DriveStrength, .lsb = 4, .default = .@"4mA" },
-    .{ .name = "pue", .type = bool, .lsb = 3, .default = false },
-    .{ .name = "pde", .type = bool, .lsb = 2, .default = true },
-    .{ .name = "schmitt", .type = bool, .lsb = 1, .default = true },
-    .{ .name = "slewfast", .type = SlewRate, .lsb = 0, .default = .Slow },
+const spec = bits.BitStructSpec{
+    .Record = &[_]bits.BitStructField{
+        .{
+            .name = "od",
+            .type = bool,
+            .lsb = 7,
+            .default = &false,
+        },
+        .{
+            .name = "ie",
+            .type = bool,
+            .lsb = 6,
+            .default = &true,
+        },
+        .{
+            .name = "drive",
+            .type = DriveStrength,
+            .lsb = 4,
+            .default = &DriveStrength.@"4mA",
+        },
+        .{
+            .name = "pue",
+            .type = bool,
+            .lsb = 3,
+            .default = &false,
+        },
+        .{
+            .name = "pde",
+            .type = bool,
+            .lsb = 2,
+            .default = &true,
+        },
+        .{
+            .name = "schmitt",
+            .type = bool,
+            .lsb = 1,
+            .default = &true,
+        },
+        .{
+            .name = "slewfast",
+            .type = SlewRate,
+            .lsb = 0,
+            .default = &SlewRate.Slow,
+        },
+    },
 };
 
 pub const gpio = PeripheralRegisterArray(30, base_address + 0x04, 0x04, spec);

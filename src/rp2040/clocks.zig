@@ -1,3 +1,5 @@
+const bits = @import("../bits.zig");
+
 const PeripheralRegister = @import("peripheral_register.zig").PeripheralRegister;
 const PeripheralRegisterArray = @import("peripheral_register_array.zig").PeripheralRegisterArray;
 
@@ -81,89 +83,105 @@ pub const clock_gpout_ctrl = PeripheralRegisterArray(4, base_address + 0x00, 0x0
 
 pub const clk_gpout_div = PeripheralRegisterArray(4, base_address + 0x04, 0x0c, full_div_spec);
 
+pub const ClkRefAuxsrc = enum(u2) {
+    ClksrcPllUsb,
+    ClksrcGpin0,
+    ClksrcGpin1,
+    _,
+};
+
+pub const ClkRefSrc = enum(u2) {
+    RoscClksrcPh,
+    ClksrcClkRefAux,
+    XoscClksrc,
+    _,
+};
+
 pub const clk_ref_ctrl = PeripheralRegister(base_address + 0x30, .{
-    .{
-        .name = "auxsrc",
-        .type = enum(u2) {
-            ClksrcPllUsb,
-            ClksrcGpin0,
-            ClksrcGpin1,
-            _,
+    .Record = &[_]bits.BitStructField{
+        .{
+            .name = "auxsrc",
+            .type = ClkRefAuxsrc,
+            .lsb = 5,
+            .default = &ClkRefAuxsrc.ClksrcPllUsb,
         },
-        .lsb = 5,
-        .default = .ClksrcPllUsb,
-    },
-    .{
-        .name = "src",
-        .type = enum(u2) {
-            RoscClksrcPh,
-            ClksrcClkRefAux,
-            XoscClksrc,
-            _,
+        .{
+            .name = "src",
+            .type = ClkRefSrc,
+            .lsb = 0,
+            .default = &ClkRefSrc.RoscClksrcPh,
         },
-        .lsb = 0,
-        .default = .RoscClksrcPh,
     },
 });
 
 pub const clk_ref_div = PeripheralRegister(base_address + 0x34, partial_div_spec);
 
 pub const clk_ref_selected = PeripheralRegister(base_address + 0x38, .{
-    .{
-        .name = "rosc_clksrc_ph",
-        .type = bool,
-        .lsb = 0,
-    },
-    .{
-        .name = "clksrc_clk_ref_aux",
-        .type = bool,
-        .lsb = 1,
-    },
-    .{
-        .name = "xosc_clksrc",
-        .type = bool,
-        .lsb = 2,
+    .Record = &[_]bits.BitStructField{
+        .{
+            .name = "rosc_clksrc_ph",
+            .type = bool,
+            .lsb = 0,
+        },
+        .{
+            .name = "clksrc_clk_ref_aux",
+            .type = bool,
+            .lsb = 1,
+        },
+        .{
+            .name = "xosc_clksrc",
+            .type = bool,
+            .lsb = 2,
+        },
     },
 });
 
+pub const ClkSysAuxsrc = enum(u3) {
+    ClksrcPllSys,
+    ClksrcPllUsb,
+    RoscClksrc,
+    XoscClksrc,
+    ClksrcGpin0,
+    ClksrcGpin1,
+    _,
+};
+
+pub const ClkSysSrc = enum(u1) {
+    ClkRef,
+    ClksrcClkSysAux,
+};
+
 pub const clk_sys_control = PeripheralRegister(base_address + 0x3c, .{
-    .{
-        .name = "auxsrc",
-        .type = enum(u3) {
-            ClksrcPllSys,
-            ClksrcPllUsb,
-            RoscClksrc,
-            XoscClksrc,
-            ClksrcGpin0,
-            ClksrcGpin1,
-            _,
+    .Record = &[_]bits.BitStructField{
+        .{
+            .name = "auxsrc",
+            .type = ClkSysAuxsrc,
+            .lsb = 5,
+            .default = &ClkSysAuxsrc.ClksrcPllSys,
         },
-        .lsb = 5,
-        .default = .ClksrcPllSys,
-    },
-    .{
-        .name = "src",
-        .type = enum(u1) {
-            ClkRef,
-            ClksrcClkSysAux,
+        .{
+            .name = "src",
+            .type = ClkSysSrc,
+            .lsb = 0,
+            .default = &ClkSysSrc.ClkRef,
         },
-        .lsb = 0,
-        .default = .ClkRef,
     },
 });
 
 pub const clk_sys_div = PeripheralRegister(base_address + 0x40, full_div_spec);
 
 pub const clk_sys_selected = PeripheralRegister(base_address + 0x44, .{
-    .{
-        .name = "clk_ref",
-        .type = bool,
-        .lsb = 0,
-    },
-    .{
-        .name = "clksrc_clk_sys_aux",
-        .type = bool,
-        .lsb = 1,
+    .Record = &[_]bits.BitStructField{
+        .{
+            .name = "clk_ref",
+            .type = bool,
+            .lsb = 0,
+        },
+        .{
+            .name = "clksrc_clk_sys_aux",
+            .type = bool,
+            .lsb = 1,
+        },
     },
 });
 
@@ -197,44 +215,48 @@ pub const clk_peri_ctrl = PeripheralRegister(base_address + 0x48, .{
     },
 });
 
-const usb_adc_rtc_ctrl_spec = .{
-    .{
-        .name = "nudge",
-        .type = bool,
-        .lsb = 20,
-        .default = false,
-    },
-    .{
-        .name = "phase",
-        .type = u2,
-        .lsb = 16,
-        .default = 0,
-    },
-    .{
-        .name = "enable",
-        .type = bool,
-        .lsb = 11,
-        .default = false,
-    },
-    .{
-        .name = "kill",
-        .type = bool,
-        .lsb = 10,
-        .default = false,
-    },
-    .{
-        .name = "auxsrc",
-        .type = enum(u3) {
-            ClksrcPllUsb,
-            ClksrcPllSys,
-            RoscClksrcPh,
-            XoscClksrc,
-            ClksrcGpin0,
-            ClksrcGpin1,
-            _,
+const UsbAdcRtcAuxsrc = enum(u3) {
+    ClksrcPllUsb,
+    ClksrcPllSys,
+    RoscClksrcPh,
+    XoscClksrc,
+    ClksrcGpin0,
+    ClksrcGpin1,
+    _,
+};
+
+const usb_adc_rtc_ctrl_spec = bits.BitStructSpec{
+    .Record = &[_]bits.BitStructField{
+        .{
+            .name = "nudge",
+            .type = bool,
+            .lsb = 20,
+            .default = &false,
         },
-        .lsb = 5,
-        .default = .ClksrcPllUsb,
+        .{
+            .name = "phase",
+            .type = u2,
+            .lsb = 16,
+            .default = &@as(u2, 0),
+        },
+        .{
+            .name = "enable",
+            .type = bool,
+            .lsb = 11,
+            .default = &false,
+        },
+        .{
+            .name = "kill",
+            .type = bool,
+            .lsb = 10,
+            .default = &false,
+        },
+        .{
+            .name = "auxsrc",
+            .type = UsbAdcRtcAuxsrc,
+            .lsb = 5,
+            .default = &UsbAdcRtcAuxsrc.ClksrcPllUsb,
+        },
     },
 };
 

@@ -1,8 +1,6 @@
-const std = @import("std");
-
 const bits = @import("../bits.zig");
 
-pub fn Register(comptime address: usize, comptime spec: anytype) type {
+pub fn Register(comptime address: usize, comptime spec: bits.BitStructSpec) type {
     return struct {
         pub const Bits = bits.BitStruct(u32, spec);
 
@@ -20,16 +18,16 @@ pub fn Register(comptime address: usize, comptime spec: anytype) type {
             @intToPtr(*volatile u32, address).* = value;
         }
 
-        pub inline fn readNonVolatile() Bits.Fields {
+        pub inline fn readNonVolatile() Bits.Unpacked {
             return Bits.unpack(readNonVolatileRaw());
         }
 
-        pub inline fn read() Bits.Fields {
+        pub inline fn read() Bits.Unpacked {
             return Bits.unpack(readRaw());
         }
 
-        pub inline fn write(fields: Bits.Fields) void {
-            writeRaw(Bits.pack(fields));
+        pub inline fn write(unpacked: Bits.Unpacked) void {
+            writeRaw(Bits.pack(unpacked));
         }
     };
 }

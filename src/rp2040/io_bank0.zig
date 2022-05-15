@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const bits = @import("../bits.zig");
+
 const PeripheralRegisterArray = @import("peripheral_register_array.zig").PeripheralRegisterArray;
 const PeripheralRegisterMatrix = @import("peripheral_register_matrix.zig").PeripheralRegisterMatrix;
 
@@ -52,19 +54,46 @@ pub const gpio_status = struct {
 };
 
 pub const gpio_ctrl = PeripheralRegisterArray(30, base_address + 0x004, 0x8, .{
-    .{ .name = "irqover", .type = Override, .lsb = 28, .default = .None },
-    .{ .name = "inover", .type = Override, .lsb = 16, .default = .None },
-    .{ .name = "oeover", .type = Override, .lsb = 12, .default = .None },
-    .{ .name = "outover", .type = Override, .lsb = 8, .default = .None },
-    .{ .name = "funcsel", .type = Funcsel, .lsb = 0, .default = .Null },
+    .Record = &[_]bits.BitStructField{
+        .{
+            .name = "irqover",
+            .type = Override,
+            .lsb = 28,
+            .default = &Override.None,
+        },
+        .{
+            .name = "inover",
+            .type = Override,
+            .lsb = 16,
+            .default = &Override.None,
+        },
+        .{
+            .name = "oeover",
+            .type = Override,
+            .lsb = 12,
+            .default = &Override.None,
+        },
+        .{
+            .name = "outover",
+            .type = Override,
+            .lsb = 8,
+            .default = &Override.None,
+        },
+        .{
+            .name = "funcsel",
+            .type = Funcsel,
+            .lsb = 0,
+            .default = &Funcsel.Null,
+        },
+    },
 });
 
-pub const intr = PeripheralRegisterArray(4, base_address + 0x0f0, 0x4, u32);
+pub const intr = PeripheralRegisterArray(4, base_address + 0x0f0, 0x4, .{ .Scalar = u32 });
 
-pub const proc_inte = PeripheralRegisterMatrix(2, 4, base_address + 0x100, 0x30, 0x4, u32);
-pub const proc_intf = PeripheralRegisterMatrix(2, 4, base_address + 0x110, 0x30, 0x4, u32);
-pub const proc_ints = PeripheralRegisterMatrix(2, 4, base_address + 0x120, 0x30, 0x4, u32);
+pub const proc_inte = PeripheralRegisterMatrix(2, 4, base_address + 0x100, 0x30, 0x4, .{ .Scalar = u32 });
+pub const proc_intf = PeripheralRegisterMatrix(2, 4, base_address + 0x110, 0x30, 0x4, .{ .Scalar = u32 });
+pub const proc_ints = PeripheralRegisterMatrix(2, 4, base_address + 0x120, 0x30, 0x4, .{ .Scalar = u32 });
 
-pub const dormant_wake_inte = PeripheralRegisterArray(4, base_address + 0x160, 0x4, u32);
-pub const dormant_wake_intf = PeripheralRegisterArray(4, base_address + 0x170, 0x4, u32);
-pub const dormant_wake_ints = PeripheralRegisterArray(4, base_address + 0x180, 0x4, u32);
+pub const dormant_wake_inte = PeripheralRegisterArray(4, base_address + 0x160, 0x4, .{ .Scalar = u32 });
+pub const dormant_wake_intf = PeripheralRegisterArray(4, base_address + 0x170, 0x4, .{ .Scalar = u32 });
+pub const dormant_wake_ints = PeripheralRegisterArray(4, base_address + 0x180, 0x4, .{ .Scalar = u32 });

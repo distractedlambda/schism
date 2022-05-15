@@ -4,20 +4,20 @@ const RegisterMatrix = @import("register_matrix.zig").RegisterMatrix;
 
 const base_address = 0xd0000000;
 
-pub const cpuid = Register(base_address + 0x000, u1);
+pub const cpuid = Register(base_address + 0x000, .{ .Scalar = u1 });
 
 pub const gpio_in = Register(base_address + 0x004);
 pub const gpio_hi_in = Register(base_address + 0x008);
 
-pub const gpio_out = Register(base_address + 0x010, u30);
-pub const gpio_out_set = Register(base_address + 0x014, u30);
-pub const gpio_out_clr = Register(base_address + 0x018, u30);
-pub const gpio_out_xor = Register(base_address + 0x01c, u30);
+pub const gpio_out = Register(base_address + 0x010, .{ .Scalar = u30 });
+pub const gpio_out_set = Register(base_address + 0x014, .{ .Scalar = u30 });
+pub const gpio_out_clr = Register(base_address + 0x018, .{ .Scalar = u30 });
+pub const gpio_out_xor = Register(base_address + 0x01c, .{ .Scalar = u30 });
 
-pub const gpio_oe = Register(base_address + 0x020, u30);
-pub const gpio_oe_set = Register(base_address + 0x024, u30);
-pub const gpio_oe_clr = Register(base_address + 0x028, u30);
-pub const gpio_oe_xor = Register(base_address + 0x02c, u30);
+pub const gpio_oe = Register(base_address + 0x020, .{ .Scalar = u30 });
+pub const gpio_oe_set = Register(base_address + 0x024, .{ .Scalar = u30 });
+pub const gpio_oe_clr = Register(base_address + 0x028, .{ .Scalar = u30 });
+pub const gpio_oe_xor = Register(base_address + 0x02c, .{ .Scalar = u30 });
 
 pub const gpio_hi_out = Register(base_address + 0x030);
 pub const gpio_hi_out_set = Register(base_address + 0x034);

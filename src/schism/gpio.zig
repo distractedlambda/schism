@@ -113,10 +113,10 @@ pub fn handleIrq() callconv(.C) void {
 }
 
 pub fn init() void {
-    resets.unreset(.{ .pads_bank0, .io_bank0 });
+    resets.unreset(.{ .pads_bank0 = true, .io_bank0 = true });
 
     inline for (config.gpio) |gpio_config, gpio_num| {
-        const pads_gpio = rp2040.pads_bank0.gpio.Bits.Fields{
+        const pads_gpio = rp2040.pads_bank0.gpio.Bits.Unpacked{
             .od = !gpio_config.output_enabled,
             .ie = gpio_config.input_enabled,
             .drive = gpio_config.drive_strength,
@@ -130,7 +130,7 @@ pub fn init() void {
             rp2040.pads_bank0.gpio.write(gpio_num, pads_gpio);
         }
 
-        const gpio_ctrl = rp2040.io_bank0.gpio_ctrl.Bits.Fields{
+        const gpio_ctrl = rp2040.io_bank0.gpio_ctrl.Bits.Unpacked{
             .irqover = .None,
             .inover = gpio_config.input_override,
             .oeover = gpio_config.output_enable_override,

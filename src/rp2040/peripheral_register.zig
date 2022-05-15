@@ -1,6 +1,8 @@
+const bits = @import("../bits.zig");
+
 const Register = @import("register.zig").Register;
 
-pub fn PeripheralRegister(comptime address: usize, comptime spec: anytype) type {
+pub fn PeripheralRegister(comptime address: usize, comptime spec: bits.BitStructSpec) type {
     return struct {
         pub usingnamespace Register(address, spec);
 
@@ -16,16 +18,16 @@ pub fn PeripheralRegister(comptime address: usize, comptime spec: anytype) type 
             @intToPtr(*volatile u32, address + 0x3000).* = mask;
         }
 
-        pub inline fn toggle(mask: anytype) void {
-            toggleRaw(@This().Bits.mask(mask));
+        pub inline fn toggle(mask: @This().Bits.FlagMask) void {
+            toggleRaw(@This().Bits.packFlagMask(mask));
         }
 
-        pub inline fn set(mask: anytype) void {
-            setRaw(@This().Bits.mask(mask));
+        pub inline fn set(mask: @This().Bits.FlagMask) void {
+            setRaw(@This().Bits.packFlagMask(mask));
         }
 
-        pub inline fn clear(mask: anytype) void {
-            clearRaw(@This().Bits.mask(mask));
+        pub inline fn clear(mask: @This().Bits.FlagMask) void {
+            clearRaw(@This().Bits.packFlagMask(mask));
         }
     };
 }
