@@ -149,7 +149,7 @@ const RxWaiter = struct {
     continuation: Continuation,
     state: union {
         destination: []u8,
-        result: Error!u6,
+        result: Error!usize,
     },
 };
 
@@ -168,6 +168,7 @@ inline fn rxBufCtrlIndex(channel: RxChannelIndex) u5 {
 
 fn receiveImpl(connection: ConnectionId, channel: RxChannelIndex, destination: []u8) Error!u6 {
     std.debug.assert(channel < derived_config.num_rx_channels);
+    std.debug.assert(destination.len <= 64);
 
     if (connection != current_connection) {
         return error.ConnectionLost;
@@ -212,6 +213,7 @@ inline fn txBufCtrlIndex(channel: TxChannelIndex) u5 {
 
 fn sendImpl(connection: ConnectionId, channel: TxChannelIndex, source: []const u8) Error!void {
     std.debug.assert(channel < derived_config.num_tx_channels);
+    std.debug.assert(source.len <= 64);
 
     if (connection != current_connection) {
         return error.ConnectionLost;
@@ -219,7 +221,7 @@ fn sendImpl(connection: ConnectionId, channel: TxChannelIndex, source: []const u
 
     if (!tx_in_flight.isSet(channel)) {
         tx_in_flight.set(channel);
-        std.mem.copy(u8, &tx_buffers[channel], source);
+        @memcpy(tx_buffers[channel], source, source.len);
         startTransfer(txBufCtrlIndex(channel), source.len, next_tx_pid.isSet(channel));
         next_tx_pid.toggle(channel);
     } else {
@@ -253,7 +255,7 @@ const Ep0TransferWaiter = struct {
         },
         result: Error!union {
             tx: void,
-            rx: u10,
+            rx: usize,
         },
     },
 };
@@ -285,15 +287,17 @@ fn receiveSetupPacket(connection: ConnectionId) Error!protocol.SetupPacket {
     return waiter.packet;
 }
 
-fn receiveOnEp0(connection: ConnectionId, destination: []u8, pid: u1) Error!u10 {
+fn receiveOnEp0(connection: ConnectionId, destination: []u8, pid: u1) Error!usize {
     // FIXME: don't suspend when receiving a zero-length packet?
+
+    std.debug.assert(destination.len <= 64);
 
     if (connection != current_connection) {
         return error.ConnectionLost;
     }
 
     if (!ep0_transfer_in_flight) {
-        startTransfer(1, @intCast(u10, destination.len), pid);
+        startTransfer(1, destination.len, pid);
         ep0_transfer_in_flight = true;
     }
 
@@ -315,13 +319,15 @@ fn receiveOnEp0(connection: ConnectionId, destination: []u8, pid: u1) Error!u10 
 }
 
 fn sendOnEp0(connection: ConnectionId, source: []const u8, pid: u1) Error!void {
+    std.debug.assert(source.len <= 64);
+
     if (connection != current_connection) {
         return error.ConnectionLost;
     }
 
     if (!ep0_transfer_in_flight) {
-        std.mem.copy(u8, ep0_buffer, source);
-        startTransfer(0, @intCast(u10, source.len), pid);
+        @memcpy(@as([]u8, ep0_buffer).ptr, source.ptr, source.len);
+        startTransfer(0, source.len, pid);
         ep0_transfer_in_flight = true;
     }
 
@@ -371,7 +377,6 @@ pub fn handleIrq() void {
                 switch (@truncate(u2, buff_status)) {
                     // TX
                     0b01 => {
-                        // FIXME: validate length sent?
                         _ = waiter.state.pending.buffer.Tx;
                         waiter.state = .{ .result = .{ .tx = {} } };
                         executor.submit(&waiter.continuation);
@@ -379,10 +384,9 @@ pub fn handleIrq() void {
 
                     // RX
                     0b10 => {
-                        // FIXME: validate length against destination buffer?
-                        const len = rp2040.usb.device_ep_buf_ctrl.read(1).buf0_len;
-                        std.mem.copy(u8, waiter.state.pending.buffer.Rx, ep0_buffer[0..len]);
-                        waiter.state = .{ .result = .{ .rx = len } };
+                        const buf_len = rp2040.usb.device_ep_buf_ctrl.read(1).buf0_len;
+                        @memcpy(waiter.state.pending.buffer.Rx.ptr, @as([]const u8, ep0_buffer).ptr, @minimum(buf_len, waiter.state.pending.buffer.Rx.len));
+                        waiter.state = .{ .result = .{ .rx = buf_len } };
                         executor.submit(&waiter.continuation);
                     },
 
@@ -394,12 +398,12 @@ pub fn handleIrq() void {
                 const waiter = @fieldParentPtr(Ep0TransferWaiter, "continuation", continuation);
                 switch (waiter.state.pending.buffer) {
                     .Tx => |source| {
-                        std.mem.copy(u8, ep0_buffer, source);
-                        startTransfer(0, @intCast(u10, source.len), waiter.state.pending.pid);
+                        @memcpy(@as([]u8, ep0_buffer).ptr, source.ptr, source.len);
+                        startTransfer(0, source.len, waiter.state.pending.pid);
                     },
 
                     .Rx => |destination| {
-                        startTransfer(1, @intCast(u10, destination.len), waiter.state.pending.pid);
+                        startTransfer(1, destination.len, waiter.state.pending.pid);
                     },
                 }
             } else {
@@ -411,8 +415,8 @@ pub fn handleIrq() void {
             if (@truncate(u1, buff_status >> txBufCtrlIndex(channel)) != 0) {
                 if (queue.popFront()) |continuation| {
                     const waiter = @fieldParentPtr(TxWaiter, "continuation", continuation);
-                    std.mem.copy(u8, &tx_buffers[channel], waiter.state.source);
-                    startTransfer(txBufCtrlIndex(channel), @intCast(u10, waiter.state.source.len), @boolToInt(next_tx_pid.isSet(channel)));
+                    @memcpy(@as([]u8, &tx_buffers[channel]).ptr, waiter.state.source.ptr, waiter.state.source.len);
+                    startTransfer(txBufCtrlIndex(channel), waiter.state.source.len, @boolToInt(next_tx_pid.isSet(channel)));
                     next_tx_pid.toggle(channel);
                     waiter.state = .{ .result = {} };
                     executor.submit(&waiter.continuation);
@@ -426,16 +430,16 @@ pub fn handleIrq() void {
         inline for (rx_waiters) |*queue, channel| {
             if (@truncate(u1, buff_status >> rxBufCtrlIndex(channel)) != 0) {
                 {
-                    const len = rp2040.usb.device_ep_buf_ctrl.read(rxBufCtrlIndex(channel)).buf0_len;
+                    const buf_len = rp2040.usb.device_ep_buf_ctrl.read(rxBufCtrlIndex(channel)).buf0_len;
                     const waiter = @fieldParentPtr(RxWaiter, "continuation", queue.popFront().?);
-                    std.mem.copy(u8, waiter.state.destination, rx_buffers[channel][0..len]);
-                    waiter.state = .{ .result = @intCast(u6, len) };
+                    @memcpy(waiter.state.destination.ptr, @as([]const u8, &rx_buffers[channel]).ptr, @minimum(buf_len, waiter.state.destination.len));
+                    waiter.state = .{ .result = buf_len };
                     executor.submit(&waiter.continuation);
                 }
 
                 if (queue.peekFront()) |continuation| {
                     const waiter = @fieldParentPtr(RxWaiter, "continuation", continuation);
-                    startTransfer(rxBufCtrlIndex(channel), @intCast(u10, waiter.state.destination.len), @boolToInt(next_rx_pid.isSet(channel)));
+                    startTransfer(rxBufCtrlIndex(channel), waiter.state.destination.len, @boolToInt(next_rx_pid.isSet(channel)));
                     next_rx_pid.toggle(channel);
                 } else {
                     std.debug.assert(rx_in_flight.isSet(channel));
@@ -490,14 +494,14 @@ pub fn handleIrq() void {
     }
 }
 
-fn startTransfer(bufctrl_idx: u5, len: u10, pid: u1) void {
+fn startTransfer(bufctrl_idx: u5, len: usize, pid: u1) void {
     std.debug.assert(len <= 64);
 
     rp2040.usb.device_ep_buf_ctrl.write(bufctrl_idx, .{
         .buf0_full = @truncate(u1, bufctrl_idx) == 0,
         .buf0_data_pid = pid,
         .buf0_last_in_transfer = true,
-        .buf0_len = len,
+        .buf0_len = @intCast(u10, len),
     });
 
     // FIXME: do we really need this dsb?
@@ -507,17 +511,12 @@ fn startTransfer(bufctrl_idx: u5, len: u10, pid: u1) void {
     arm.nop();
     arm.nop();
     arm.nop();
-    arm.nop();
-    arm.nop();
-    arm.nop();
-    arm.nop();
-    arm.nop();
 
     rp2040.usb.device_ep_buf_ctrl.write(bufctrl_idx, .{
         .buf0_full = @truncate(u1, bufctrl_idx) == 0,
         .buf0_data_pid = pid,
         .buf0_last_in_transfer = true,
-        .buf0_len = len,
+        .buf0_len = @intCast(u10, len),
         .buf0_available = true,
     });
 }

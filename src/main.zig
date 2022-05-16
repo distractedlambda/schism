@@ -68,7 +68,7 @@ pub fn main() void {
     await drive_blue;
 }
 
-pub fn panic(message: []const u8, error_return_trace: ?*std.builtin.StackTrace) noreturn {
+pub noinline fn panic(message: []const u8, error_return_trace: ?*std.builtin.StackTrace) noreturn {
     _ = message;
     _ = error_return_trace;
     arm.disableInterrupts();
