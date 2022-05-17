@@ -167,26 +167,10 @@ pub const LanguageId = enum(u16) {
     _,
 };
 
-pub fn StringDescriptor0(comptime len: usize) type {
-    return packed struct {
-        length: u8 = @sizeOf(@This()),
-        descriptor_type: DescriptorType = .String,
-        language_ids: [len]LanguageId,
-    };
-}
-
 pub fn StringDescriptor(comptime len: usize) type {
     return packed struct {
         length: u8 = @sizeOf(@This()),
         descriptor_type: DescriptorType = .String,
-        string: [len]u8,
+        string: [len]u16,
     };
-}
-
-pub inline fn stringDescriptor0(language_ids: anytype) StringDescriptor0(language_ids.len) {
-    return .{ .language_ids = language_ids };
-}
-
-pub inline fn stringDescriptor(string: anytype) StringDescriptor(string.len) {
-    return .{ .string = string };
 }

@@ -21,14 +21,21 @@ const derived_config: struct {
     const StringDescriptorTable = struct {
         descriptors: []const []const u8,
 
-        fn init(comptime languages: anytype) @This() {
-            return comptime .{ .descriptors = &[_][]const u8{&std.mem.toBytes(protocol.stringDescriptor0(languages))} };
+        fn init(comptime languages: []const protocol.LanguageId) @This() {
+            comptime {
+                var descriptor0_string: [languages.len]u16 = undefined;
+                for (languages) |language, i| descriptor0_string[i] = @enumToInt(language);
+                const descriptor0 = protocol.StringDescriptor(languages.len){ .string = descriptor0_string };
+                return .{ .descriptors = &[_][]const u8{&std.mem.toBytes(descriptor0)} };
+            }
         }
 
-        fn addString(comptime self: *@This(), comptime string_or_null: ?[]const u8) u8 {
+        fn addUtf8(comptime self: *@This(), comptime utf8_or_null: ?[]const u8) u8 {
             comptime {
-                const string = string_or_null orelse return 0;
-                self.descriptors = self.descriptors ++ &[_][]const u8{&std.mem.toBytes(protocol.stringDescriptor(string[0..string.len].*))};
+                const utf8 = utf8_or_null orelse return 0;
+                const utf16 = std.unicode.utf8ToUtf16LeStringLiteral(utf8).*;
+                const descriptor = protocol.StringDescriptor(utf16.len){ .string = utf16 };
+                self.descriptors = self.descriptors ++ &[_][]const u8{&std.mem.toBytes(descriptor)};
                 return self.descriptors.len - 1;
             }
         }
@@ -36,15 +43,15 @@ const derived_config: struct {
 
     const usb_device_config = config.usb.?.Device;
 
-    var string_descriptor_table = StringDescriptorTable.init([_]protocol.LanguageId{usb_device_config.language_id});
-    var interface_and_endpoint_descriptors: []const u8 = &[_]u8{};
+    var string_descriptor_table = StringDescriptorTable.init(&[_]protocol.LanguageId{usb_device_config.language_id});
+    var interface_descriptors_blob: []const u8 = &[_]u8{};
     var channel_assignments: []const []const u4 = &[_][]const u4{};
     var num_tx_channels: u4 = 0;
     var num_rx_channels: u4 = 0;
 
     for (usb_device_config.interfaces) |interface_config, interface_index| {
         var endpoint_channel_assignments: [interface_config.endpoints.len]u4 = undefined;
-        var combined_endpoint_descriptors: []const u8 = &[_]u8{};
+        var endpoint_descriptors_blob: []const u8 = &[_]u8{};
 
         for (interface_config.endpoints) |endpoint_config, endpoint_index| {
             endpoint_channel_assignments[endpoint_index] = pick_channel: {
@@ -61,37 +68,34 @@ const derived_config: struct {
                 }
             };
 
-            combined_endpoint_descriptors = combined_endpoint_descriptors ++ std.mem.toBytes(
-                protocol.EndpointDescriptor{
-                    .endpoint_address = .{
-                        .endpoint_number = endpoint_channel_assignments[endpoint_index] + 1,
-                        .direction = endpoint_config.direction,
-                    },
-                    .attributes = .{
-                        .transfer_type = .Bulk,
-                    },
-                    .max_packet_size = 64,
-                    .interval = 0, // FIXME correct value?
+            const endpoint_descriptor = std.mem.toBytes(protocol.EndpointDescriptor{
+                .endpoint_address = .{
+                    .endpoint_number = endpoint_channel_assignments[endpoint_index] + 1,
+                    .direction = endpoint_config.direction,
                 },
-            );
+                .attributes = .{ .transfer_type = .Bulk },
+                .max_packet_size = 64,
+                .interval = 0, // FIXME correct value?
+            });
+
+            endpoint_descriptors_blob = endpoint_descriptors_blob ++ endpoint_descriptor;
         }
 
-        interface_and_endpoint_descriptors = interface_and_endpoint_descriptors ++ std.mem.toBytes(
-            protocol.InterfaceDescriptor{
-                .interface_number = interface_index,
-                .alternate_setting = 0,
-                .num_endpoints = interface_config.endpoints.len,
-                .interface_class = interface_config.class,
-                .interface_subclass = interface_config.subclass,
-                .interface_protocol = interface_config.protocol,
-                .interface_string_index = string_descriptor_table.addString(interface_config.name),
-            },
-        ) ++ combined_endpoint_descriptors;
+        const interface_descriptor = std.mem.toBytes(protocol.InterfaceDescriptor{
+            .interface_number = interface_index,
+            .alternate_setting = 0,
+            .num_endpoints = interface_config.endpoints.len,
+            .interface_class = interface_config.class,
+            .interface_subclass = interface_config.subclass,
+            .interface_protocol = interface_config.protocol,
+            .interface_string_index = string_descriptor_table.addUtf8(interface_config.name),
+        });
 
+        interface_descriptors_blob = interface_descriptors_blob ++ interface_descriptor ++ endpoint_descriptors_blob;
         channel_assignments = channel_assignments ++ [_][]const u4{&endpoint_channel_assignments};
     }
 
-    const device_descriptor = &std.mem.toBytes(protocol.DeviceDescriptor{
+    const device_descriptor = std.mem.toBytes(protocol.DeviceDescriptor{
         .bcd_usb = .@"1.1",
         .device_class = .Device,
         .device_subclass = 0,
@@ -100,24 +104,24 @@ const derived_config: struct {
         .vendor_id = usb_device_config.vendor_id,
         .product_id = usb_device_config.product_id,
         .bcd_device = usb_device_config.bcd_device,
-        .manufacturer_string_index = string_descriptor_table.addString(usb_device_config.manufacturer),
-        .product_string_index = string_descriptor_table.addString(usb_device_config.product),
-        .serial_number_string_index = string_descriptor_table.addString(usb_device_config.serial_number),
+        .manufacturer_string_index = string_descriptor_table.addUtf8(usb_device_config.manufacturer),
+        .product_string_index = string_descriptor_table.addUtf8(usb_device_config.product),
+        .serial_number_string_index = string_descriptor_table.addUtf8(usb_device_config.serial_number),
         .num_configurations = 1,
     });
 
     const configuration_descriptor = std.mem.toBytes(protocol.ConfigurationDescriptor{
-        .total_length = @sizeOf(protocol.ConfigurationDescriptor) + interface_and_endpoint_descriptors.len,
+        .total_length = @sizeOf(protocol.ConfigurationDescriptor) + interface_descriptors_blob.len,
         .num_interfaces = usb_device_config.interfaces.len,
         .configuration_value = 1,
         .configuration_string_index = 0,
         .attributes = .{ .remote_wakeup = false, .self_powered = true },
         .max_power = 50,
-    }) ++ interface_and_endpoint_descriptors;
+    });
 
     break :blk .{
-        .device_descriptor = device_descriptor,
-        .configuration_descriptor = configuration_descriptor,
+        .device_descriptor = &device_descriptor,
+        .configuration_descriptor = &configuration_descriptor,
         .string_descriptors = string_descriptor_table.descriptors,
         .channel_assignments = channel_assignments,
         .num_tx_channels = num_tx_channels,
@@ -362,7 +366,6 @@ pub fn handleIrq() void {
             waiter.packet = setup_packet;
             executor.submit(continuation);
         } else {
-            std.debug.assert(next_setup_packet == null);
             next_setup_packet = setup_packet;
         }
     }
@@ -500,7 +503,6 @@ fn startTransfer(bufctrl_idx: u5, len: usize, pid: u1) void {
     rp2040.usb.device_ep_buf_ctrl.write(bufctrl_idx, .{
         .buf0_full = @truncate(u1, bufctrl_idx) == 0,
         .buf0_data_pid = pid,
-        .buf0_last_in_transfer = true,
         .buf0_len = @intCast(u10, len),
     });
 
@@ -515,7 +517,6 @@ fn startTransfer(bufctrl_idx: u5, len: usize, pid: u1) void {
     rp2040.usb.device_ep_buf_ctrl.write(bufctrl_idx, .{
         .buf0_full = @truncate(u1, bufctrl_idx) == 0,
         .buf0_data_pid = pid,
-        .buf0_last_in_transfer = true,
         .buf0_len = @intCast(u10, len),
         .buf0_available = true,
     });
@@ -576,11 +577,11 @@ fn serveEp0() void {
 
                         .String => {
                             const index = @truncate(u8, setup_packet.value);
-                            const len = @minimum(setup_packet.length, derived_config.string_descriptors[index].len);
                             if (index < derived_config.string_descriptors.len) {
+                                const descriptor = derived_config.string_descriptors[index];
+                                const len = @minimum(descriptor.len, setup_packet.length);
                                 // FIXME: handle long string descriptors
-                                // FIXME: what do we do for out-of-bounds descriptor requests?
-                                sendOnEp0(connection, derived_config.string_descriptors[index][0..len], 1) catch continue :reconnect_loop;
+                                sendOnEp0(connection, descriptor[0..len], 1) catch continue :reconnect_loop;
                                 _ = receiveOnEp0(connection, &[_]u8{}, 1) catch continue :reconnect_loop;
                             }
                         },
