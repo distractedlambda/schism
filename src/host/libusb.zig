@@ -63,7 +63,7 @@ pub const Interface = extern struct {
     num_altsetting: c_int,
 
     pub fn altsettings(self: *const Interface) []const InterfaceDescriptor {
-        return self.altsetting[0..self.num_altsetting];
+        return self.altsetting[0..@intCast(usize, self.num_altsetting)];
     }
 };
 
@@ -111,7 +111,7 @@ pub const Context = opaque {
     }
 
     pub fn getDeviceList(self: *Context) Error![]*Device {
-        var list: **Device = undefined;
+        var list: [*]*Device = undefined;
         const len = try checkLenError(libusb_get_device_list(self, &list));
         return list[0..len];
     }
@@ -138,7 +138,7 @@ pub const Device = opaque {
         libusb_free_device_list(list.ptr, 0);
     }
 
-    pub fn open(self: *Device) Error!DeviceHandle {
+    pub fn open(self: *Device) Error!*DeviceHandle {
         var handle: *DeviceHandle = undefined;
         try checkError(libusb_open(self, &handle));
         return handle;
@@ -204,23 +204,21 @@ pub const DeviceHandle = opaque {
         return checkLenError(libusb_get_string_descriptor(self, index, lang_id, buffer.ptr, std.math.lossyCast(c_int, buffer.len)));
     }
 
-    pub fn bulkTransfer(self: *DeviceHandle, endpoint: u8, buffer: []u8) Error!usize {
+    fn bulkTransfer(self: *DeviceHandle, endpoint: u8, buffer: []u8) Error!usize {
         const transfer = libusb_alloc_transfer(0) orelse return error.NoMem;
         defer libusb_free_transfer(transfer);
 
         var continuation = TransferContinuation{ .frame = @frame() };
 
         suspend {
-            libusb_fill_bulk_transfer(
-                transfer,
-                self,
-                endpoint,
-                buffer.ptr,
-                std.math.lossyCast(c_int, buffer.len),
-                transferCallback,
-                &continuation,
-                0,
-            );
+            transfer.dev_handle = self;
+            transfer.endpoint = endpoint;
+            transfer.type = 2;
+            transfer.timeout = 0;
+            transfer.length = std.math.lossyCast(c_int, buffer.len);
+            transfer.callback = transferCallback;
+            transfer.user_data = &continuation;
+            transfer.buffer = buffer.ptr;
 
             checkError(libusb_submit_transfer(transfer)) catch |err| {
                 continuation.result = err;
@@ -240,13 +238,13 @@ pub const DeviceHandle = opaque {
     }
 
     pub fn bulkTransferInExact(self: *DeviceHandle, endpoint_number: u4, buffer: []u8) Error!void {
-        if (try self.bulkTransferIn(endpoint_number, buffer) != buffer.len) {
+        if ((try self.bulkTransferIn(endpoint_number, buffer)) != buffer.len) {
             return error.IncompleteTransfer;
         }
     }
 
     pub fn bulkTransferOutExact(self: *DeviceHandle, endpoint_number: u4, buffer: []const u8) Error!void {
-        if (try self.bulkTransferOut(endpoint_number, buffer) != buffer.len) {
+        if ((try self.bulkTransferOut(endpoint_number, buffer)) != buffer.len) {
             return error.IncompleteTransfer;
         }
     }
@@ -314,12 +312,12 @@ fn convertError(code: anytype) Error {
         -11 => error.NoMem,
         -12 => error.NotSupported,
         -99 => error.Other,
-        else => error.UnknownLibUsbError,
+        else => error.Other,
     };
 }
 
 fn transferCallback(transfer: *Transfer) callconv(.C) void {
-    const continuation = @ptrCast(*TransferContinuation, transfer.user_data);
+    const continuation = @alignCast(@alignOf(TransferContinuation), @ptrCast(*align(1) TransferContinuation, transfer.user_data));
 
     continuation.result = switch (transfer.status) {
         .Completed => @intCast(usize, transfer.actual_length),
@@ -390,17 +388,6 @@ extern fn libusb_alloc_transfer(iso_packets: c_int) ?*Transfer;
 extern fn libusb_free_transfer(transfer: ?*Transfer) void;
 
 extern fn libusb_submit_transfer(transfer: *Transfer) c_int;
-
-extern fn libusb_fill_bulk_transfer(
-    transfer: *Transfer,
-    dev_handle: *DeviceHandle,
-    endpoint: u8,
-    buffer: [*]u8,
-    length: c_int,
-    callback: TransferCallbackFunction,
-    user_data: ?*anyopaque,
-    timeout: c_uint,
-) void;
 
 extern fn libusb_handle_events(ctx: ?*Context) c_int;
 

@@ -23,4 +23,13 @@ pub fn build(builder: *std.build.Builder) void {
 
     const test_step = builder.step("test", "Run unit tests");
     test_step.dependOn(&exe_tests.step);
+
+    const picoboot_dump_flash_exe = builder.addExecutable("picoboot_dump_flash", "src/picoboot_dump_flash.zig");
+    picoboot_dump_flash_exe.setBuildMode(build_mode);
+    picoboot_dump_flash_exe.linkLibC();
+    picoboot_dump_flash_exe.linkFramework("IOKit");
+    picoboot_dump_flash_exe.linkFramework("Foundation");
+    picoboot_dump_flash_exe.linkFramework("Security");
+    picoboot_dump_flash_exe.linkSystemLibrary("usb-1.0");
+    picoboot_dump_flash_exe.install();
 }

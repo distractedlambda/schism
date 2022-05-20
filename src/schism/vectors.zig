@@ -7,7 +7,7 @@ const executor = @import("executor.zig");
 const gpio = @import("gpio.zig");
 const resets = @import("resets.zig");
 const rp2040 = @import("../rp2040/rp2040.zig");
-const usb = @import("usb/usb.zig");
+const usb_device = @import("usb_device.zig");
 
 comptime {
     @export(vector_table, .{ .name = "__vectors", .section = ".vectors" });
@@ -27,7 +27,7 @@ pub var vector_table = VectorTable{
     .irq2 = handleTimerIrq2,
     .irq3 = handleTimerIrq3,
     .irq4 = handlePwmIrqWrap,
-    .irq5 = usb.handleIrq,
+    .irq5 = handleUsbIrq,
     .irq6 = handleXipIrq,
     .irq7 = handlePio0Irq0,
     .irq8 = handlePio0Irq1,
@@ -104,11 +104,22 @@ fn handleReset() callconv(.C) noreturn {
 
     // Initialize peripherals
     gpio.init();
-    usb.init();
+
+    if (config.usb) |usb_config| {
+        switch (usb_config) {
+            .Device => usb_device.init(),
+        }
+    }
 
     // Start running user code
     core0_frame = async @import("root").main();
     executor.run();
+}
+
+fn handleUsbIrq() callconv(.C) void {
+    switch (config.usb orelse return) {
+        .Device => usb_device.handleIrq(),
+    }
 }
 
 fn handleNmi() callconv(.C) void {

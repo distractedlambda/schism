@@ -30,12 +30,12 @@ pub const Device = struct {
 
             for (configuration_descriptor.interfaces()) |interface| {
                 for (interface.altsettings()) |interface_descriptor| {
-                    if (interface_descriptor.bIntefaceClass != 0xff) continue;
-                    if (interface_descriptor.bInterfaceSubclass != 0x00) continue;
+                    if (interface_descriptor.bInterfaceClass != 0xff) continue;
+                    if (interface_descriptor.bInterfaceSubClass != 0x00) continue;
                     if (interface_descriptor.bInterfaceProtocol != 0x00) continue;
 
-                    var in_endpoint_number: ?u7 = null;
-                    var out_endpoint_number: ?u7 = null;
+                    var in_endpoint_number: ?u4 = null;
+                    var out_endpoint_number: ?u4 = null;
 
                     for (interface_descriptor.endpoints()) |endpoint_descriptor| {
                         if (@truncate(u2, endpoint_descriptor.bmAttributes) != 0b10) continue;
@@ -54,7 +54,7 @@ pub const Device = struct {
 
                     device.ref();
 
-                    return .{
+                    return Device{
                         .device = device,
                         .configuration_value = configuration_descriptor.bConfigurationValue,
                         .alternate_setting = interface_descriptor.bAlternateSetting,
@@ -73,12 +73,12 @@ pub const Device = struct {
         self.device.unref();
     }
 
-    pub fn findAny(context: *libusb.Context) ?Device {
+    pub fn findAny(context: *libusb.Context) libusb.Error!?Device {
         const device_list = try context.getDeviceList();
         defer libusb.Device.unrefAndFreeList(device_list);
 
         for (device_list) |device| {
-            return PicobootDevice.init(device) catch continue orelse continue;
+            return Device.init(device) catch continue orelse continue;
         }
 
         return null;
@@ -91,7 +91,13 @@ pub const Device = struct {
         try device_handle.claimInterface(self.interface_number);
         errdefer device_handle.releaseInterface(self.interface_number) catch {};
         try device_handle.setInterfaceAlternateSetting(self.interface_number, self.alternate_setting);
-        return .{ .device_handle = device_handle, .interface_number = self.interface_number };
+
+        return Connection{
+            .device_handle = device_handle,
+            .interface_number = self.interface_number,
+            .out_endpoint_number = self.out_endpoint_number,
+            .in_endpoint_number = self.in_endpoint_number,
+        };
     }
 };
 
@@ -212,8 +218,8 @@ pub const Exclusivity = enum(u8) {
 };
 
 fn Command(comptime Args: type) type {
-    comptime std.debug.assert(@bitSizeOf(args) % 8 == 0);
-    comptime std.debug.assert(@sizeOf(args) <= 16);
+    comptime std.debug.assert(@bitSizeOf(Args) % 8 == 0);
+    comptime std.debug.assert(@sizeOf(Args) <= 16);
 
     return packed struct {
         magic: u32 = 0x431fd10b,

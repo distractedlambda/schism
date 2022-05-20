@@ -1,7 +1,7 @@
 const config = @import("config.zig");
 const executor = @import("executor.zig");
 const gpio = @import("gpio.zig");
-const usb = @import("usb/usb.zig");
+const usb_device = @import("usb_device.zig");
 
 comptime {
     _ = @import("divider.zig");
@@ -20,6 +20,6 @@ pub const readGpio = gpio.read;
 pub const yieldUntilGpioLow = gpio.yieldUntilLow;
 pub const yieldUntilGpioHigh = gpio.yieldUntilHigh;
 
-pub const usbDeviceConnect = usb.device.connect;
-pub const usbDeviceSend = usb.device.send;
-pub const usbDeviceReceive = usb.device.receive;
+pub const usbDeviceConnect = usb_device.connect;
+pub const usbDeviceSend = usb_device.send;
+pub const usbDeviceReceive = usb_device.receive;
