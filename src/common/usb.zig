@@ -1,3 +1,11 @@
+const builtin = @import("builtin");
+
+comptime {
+    if (builtin.cpu.arch.endian() != .Little) {
+        @compileError("packed struct definitions in this file assume a little-endian target");
+    }
+}
+
 pub const SetupPacket = packed struct {
     request_type: RequestType,
     request: Request,

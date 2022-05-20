@@ -543,6 +543,7 @@ fn serveEp0() void {
                     },
 
                     .SetConfiguration => {
+                        // FIXME: handle re-configuration, un-configuration
                         sendOnEp0(connection, &[_]u8{}, 1) catch continue :reconnect_loop;
 
                         if (connection != current_connection) {
