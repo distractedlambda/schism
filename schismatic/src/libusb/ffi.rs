@@ -25,7 +25,7 @@ extern "C" {
 
     pub fn libusb_get_device_list(
         ctx: *mut libusb_context,
-        list: &mut *mut *mut libusb_device,
+        list: &mut MaybeUninit<*mut *mut libusb_device>,
     ) -> isize;
 
     pub fn libusb_free_device_list(list: *mut *mut libusb_device, unref_devices: c_int);

@@ -1,6 +1,7 @@
 use std::{
     mem::{ManuallyDrop, MaybeUninit},
     ptr::NonNull,
+    slice,
     sync::{
         atomic::{self, AtomicBool},
         Arc,
@@ -8,7 +9,7 @@ use std::{
     thread,
 };
 
-use super::{error, ffi::*, Context, Result};
+use super::{error, ffi::*, Context, Device, Error, ErrorInner, Result};
 
 impl Context {
     pub fn new() -> Result<Arc<Self>> {
@@ -39,6 +40,33 @@ impl Context {
             event_thread_should_exit,
             event_thread,
         }))
+    }
+
+    pub fn get_devices<B: FromIterator<Device>>(self: &Arc<Self>) -> Result<B> {
+        let mut list = MaybeUninit::uninit();
+        unsafe {
+            let len_or_err = libusb_get_device_list(self.inner.as_ptr(), &mut list);
+
+            if len_or_err < 0 {
+                return Err(Error(ErrorInner::ReturnCode(
+                    len_or_err.try_into().unwrap(),
+                )));
+            }
+
+            let list = list.assume_init();
+
+            let collected = slice::from_raw_parts(list, len_or_err as usize)
+                .into_iter()
+                .map(|&it| Device {
+                    context: self.clone(),
+                    inner: NonNull::new_unchecked(it),
+                })
+                .collect();
+
+            libusb_free_device_list(list, 0);
+
+            Ok(collected)
+        }
     }
 }
 
