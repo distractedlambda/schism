@@ -1,12 +1,12 @@
 const std = @import("std");
 
-const arm = @import("../arm.zig");
+const arm = @import("arm.zig");
 const config = @import("config.zig").resolved;
 const core_local = @import("core_local.zig");
 const executor = @import("executor.zig");
 const gpio_waiters = @import("gpio_waiters.zig");
 const resets = @import("resets.zig");
-const rp2040 = @import("../rp2040/rp2040.zig");
+const rp2040 = @import("rp2040.zig");
 
 const Continuation = executor.Continuation;
 const ContinuationQueue = executor.ContinuationQueue;

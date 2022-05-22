@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const arm = @import("../arm.zig");
+const arm = @import("arm.zig");
 const config = @import("config.zig");
 const core_local = @import("core_local.zig");
 

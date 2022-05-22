@@ -1,11 +1,11 @@
 const std = @import("std");
 
 const arm = @import("../arm.zig");
-const config = @import("config.zig").resolved;
-const executor = @import("executor.zig");
-const usb = @import("../common/usb.zig");
-const resets = @import("resets.zig");
-const rp2040 = @import("../rp2040/rp2040.zig");
+const config = @import("../config.zig").resolved;
+const executor = @import("../executor.zig");
+const protocol = @import("protocol.zig");
+const resets = @import("../resets.zig");
+const rp2040 = @import("../rp2040.zig");
 
 const Continuation = executor.Continuation;
 const ContinuationQueue = executor.ContinuationQueue;
@@ -21,11 +21,11 @@ const derived_config: struct {
     const StringDescriptorTable = struct {
         descriptors: []const []const u8,
 
-        fn init(comptime languages: []const usb.LanguageId) @This() {
+        fn init(comptime languages: []const protocol.LanguageId) @This() {
             comptime {
                 var descriptor0_string: [languages.len]u16 = undefined;
                 for (languages) |language, i| descriptor0_string[i] = @enumToInt(language);
-                const descriptor0 = usb.StringDescriptor(languages.len){ .string = descriptor0_string };
+                const descriptor0 = protocol.StringDescriptor(languages.len){ .string = descriptor0_string };
                 return .{ .descriptors = &[_][]const u8{&std.mem.toBytes(descriptor0)} };
             }
         }
@@ -34,7 +34,7 @@ const derived_config: struct {
             comptime {
                 const utf8 = utf8_or_null orelse return 0;
                 const utf16 = std.unicode.utf8ToUtf16LeStringLiteral(utf8).*;
-                const descriptor = usb.StringDescriptor(utf16.len){ .string = utf16 };
+                const descriptor = protocol.StringDescriptor(utf16.len){ .string = utf16 };
                 self.descriptors = self.descriptors ++ &[_][]const u8{&std.mem.toBytes(descriptor)};
                 return self.descriptors.len - 1;
             }
@@ -43,7 +43,7 @@ const derived_config: struct {
 
     const usb_device_config = config.usb.?.Device;
 
-    var string_descriptor_table = StringDescriptorTable.init(&[_]usb.LanguageId{usb_device_config.language_id});
+    var string_descriptor_table = StringDescriptorTable.init(&[_]protocol.LanguageId{usb_device_config.language_id});
     var interface_descriptors_blob: []const u8 = &[_]u8{};
     var channel_assignments: []const []const u4 = &[_][]const u4{};
     var num_tx_channels: u4 = 0;
@@ -68,7 +68,7 @@ const derived_config: struct {
                 }
             };
 
-            const endpoint_descriptor = std.mem.toBytes(usb.EndpointDescriptor{
+            const endpoint_descriptor = std.mem.toBytes(protocol.EndpointDescriptor{
                 .endpoint_address = .{
                     .endpoint_number = endpoint_channel_assignments[endpoint_index] + 1,
                     .direction = endpoint_config.direction,
@@ -81,7 +81,7 @@ const derived_config: struct {
             endpoint_descriptors_blob = endpoint_descriptors_blob ++ endpoint_descriptor;
         }
 
-        const interface_descriptor = std.mem.toBytes(usb.InterfaceDescriptor{
+        const interface_descriptor = std.mem.toBytes(protocol.InterfaceDescriptor{
             .interface_number = interface_index,
             .alternate_setting = 0,
             .num_endpoints = interface_config.endpoints.len,
@@ -95,7 +95,7 @@ const derived_config: struct {
         channel_assignments = channel_assignments ++ [_][]const u4{&endpoint_channel_assignments};
     }
 
-    const device_descriptor = std.mem.toBytes(usb.DeviceDescriptor{
+    const device_descriptor = std.mem.toBytes(protocol.DeviceDescriptor{
         .bcd_usb = .@"1.1",
         .device_class = .Device,
         .device_subclass = 0,
@@ -110,8 +110,8 @@ const derived_config: struct {
         .num_configurations = 1,
     });
 
-    const configuration_descriptor = std.mem.toBytes(usb.ConfigurationDescriptor{
-        .total_length = @sizeOf(usb.ConfigurationDescriptor) + interface_descriptors_blob.len,
+    const configuration_descriptor = std.mem.toBytes(protocol.ConfigurationDescriptor{
+        .total_length = @sizeOf(protocol.ConfigurationDescriptor) + interface_descriptors_blob.len,
         .num_interfaces = usb_device_config.interfaces.len,
         .configuration_value = 1,
         .configuration_string_index = 0,
@@ -244,7 +244,7 @@ fn sendImpl(connection: ConnectionId, channel: TxChannelIndex, source: []const u
 
 const SetupPacketWaiter = struct {
     continuation: Continuation,
-    packet: Error!usb.SetupPacket = undefined,
+    packet: Error!protocol.SetupPacket = undefined,
 };
 
 const Ep0TransferWaiter = struct {
@@ -265,14 +265,14 @@ const Ep0TransferWaiter = struct {
 };
 
 var setup_packet_waiters = ContinuationQueue{};
-var next_setup_packet: ?usb.SetupPacket = null;
+var next_setup_packet: ?protocol.SetupPacket = null;
 
 var ep0_transfer_waiters = ContinuationQueue{};
 var ep0_transfer_in_flight = false;
 
 const ep0_buffer = @intToPtr(*[64]u8, rp2040.usb.dpram_base_address + 0x100);
 
-fn receiveSetupPacket(connection: ConnectionId) Error!usb.SetupPacket {
+fn receiveSetupPacket(connection: ConnectionId) Error!protocol.SetupPacket {
     if (connection != current_connection) {
         return error.ConnectionLost;
     }
@@ -359,7 +359,7 @@ pub fn handleIrq() void {
     const ints = rp2040.usb.ints.read();
 
     if (ints.setup_req) {
-        const setup_packet = @bitCast(usb.SetupPacket, @intToPtr(*const volatile [8]u8, rp2040.usb.dpram_base_address).*);
+        const setup_packet = @bitCast(protocol.SetupPacket, @intToPtr(*const volatile [8]u8, rp2040.usb.dpram_base_address).*);
         rp2040.usb.sie_status.clear(.{ .setup_rec = true });
         if (setup_packet_waiters.popFront()) |continuation| {
             const waiter = @fieldParentPtr(SetupPacketWaiter, "continuation", continuation);
@@ -562,7 +562,7 @@ fn serveEp0() void {
                 },
 
                 .In => switch (setup_packet.request) {
-                    .GetDescriptor => switch (@intToEnum(usb.DescriptorType, setup_packet.value >> 8)) {
+                    .GetDescriptor => switch (@intToEnum(protocol.DescriptorType, setup_packet.value >> 8)) {
                         .Device => {
                             const len = @minimum(setup_packet.length, derived_config.device_descriptor.len);
                             sendOnEp0(connection, derived_config.device_descriptor[0..len], 1) catch continue :reconnect_loop;

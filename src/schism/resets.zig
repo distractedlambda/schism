@@ -1,4 +1,4 @@
-const rp2040 = @import("../rp2040/rp2040.zig");
+const rp2040 = @import("rp2040.zig");
 
 pub inline fn reset(blocks: rp2040.resets.reset.Bits.FlagMask) void {
     rp2040.resets.reset.set(blocks);

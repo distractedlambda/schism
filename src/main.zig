@@ -1,30 +1,27 @@
 const std = @import("std");
 
-const arm = @import("arm.zig");
-const llvmintrin = @import("llvmintrin.zig");
-const picosystem = @import("picosystem/picosystem.zig");
-const schism = @import("schism/schism.zig");
+const schism = @import("schism.zig");
 
 comptime {
     _ = schism;
-    _ = picosystem;
+    _ = schism.picosystem;
 }
 
-const led_pin = picosystem.pins.user_led.blue;
-const button_pin = picosystem.pins.buttons.down;
+const led_pin = schism.picosystem.pins.user_led.blue;
+const button_pin = schism.picosystem.pins.buttons.down;
 
 pub const schism_config = blk: {
     var config = schism.Config{};
 
-    config.gpio[picosystem.pins.user_led.red].function = .{ .Sio = .{} };
-    config.gpio[picosystem.pins.user_led.green].function = .{ .Sio = .{} };
-    config.gpio[picosystem.pins.user_led.blue].function = .{ .Sio = .{} };
-    config.gpio[picosystem.pins.screen.backlight].function = .{ .Sio = .{} };
+    config.gpio[schism.picosystem.pins.user_led.red].function = .{ .Sio = .{} };
+    config.gpio[schism.picosystem.pins.user_led.green].function = .{ .Sio = .{} };
+    config.gpio[schism.picosystem.pins.user_led.blue].function = .{ .Sio = .{} };
+    config.gpio[schism.picosystem.pins.screen.backlight].function = .{ .Sio = .{} };
 
-    config.gpio[picosystem.pins.buttons.a].function = .{ .Sio = .{ .allow_yield_until_low = true, .allow_yield_until_high = true } };
-    config.gpio[picosystem.pins.buttons.b].function = .{ .Sio = .{ .allow_yield_until_low = true, .allow_yield_until_high = true } };
-    config.gpio[picosystem.pins.buttons.x].function = .{ .Sio = .{ .allow_yield_until_low = true, .allow_yield_until_high = true } };
-    config.gpio[picosystem.pins.buttons.y].function = .{ .Sio = .{ .allow_yield_until_low = true, .allow_yield_until_high = true } };
+    config.gpio[schism.picosystem.pins.buttons.a].function = .{ .Sio = .{ .allow_yield_until_low = true, .allow_yield_until_high = true } };
+    config.gpio[schism.picosystem.pins.buttons.b].function = .{ .Sio = .{ .allow_yield_until_low = true, .allow_yield_until_high = true } };
+    config.gpio[schism.picosystem.pins.buttons.x].function = .{ .Sio = .{ .allow_yield_until_low = true, .allow_yield_until_high = true } };
+    config.gpio[schism.picosystem.pins.buttons.y].function = .{ .Sio = .{ .allow_yield_until_low = true, .allow_yield_until_high = true } };
 
     config.usb = .{ .Device = .{
         .manufacturer = "lucascorp",
@@ -60,9 +57,9 @@ fn driveLed(comptime led_gpio: u5, comptime button_gpio: u5) void {
 }
 
 pub fn main() void {
-    var drive_red = async driveLed(picosystem.pins.user_led.red, picosystem.pins.buttons.a);
-    var drive_green = async driveLed(picosystem.pins.user_led.green, picosystem.pins.buttons.b);
-    var drive_blue = async driveLed(picosystem.pins.user_led.blue, picosystem.pins.buttons.x);
+    var drive_red = async driveLed(schism.picosystem.pins.user_led.red, schism.picosystem.pins.buttons.a);
+    var drive_green = async driveLed(schism.picosystem.pins.user_led.green, schism.picosystem.pins.buttons.b);
+    var drive_blue = async driveLed(schism.picosystem.pins.user_led.blue, schism.picosystem.pins.buttons.x);
     await drive_red;
     await drive_green;
     await drive_blue;
@@ -71,8 +68,8 @@ pub fn main() void {
 pub noinline fn panic(message: []const u8, error_return_trace: ?*std.builtin.StackTrace) noreturn {
     _ = message;
     _ = error_return_trace;
-    arm.disableInterrupts();
-    schism.enableGpioOutput(picosystem.pins.screen.backlight);
-    schism.setGpio(picosystem.pins.screen.backlight);
-    llvmintrin.trap();
+    schism.arm.disableInterrupts();
+    schism.enableGpioOutput(schism.picosystem.pins.screen.backlight);
+    schism.setGpio(schism.picosystem.pins.screen.backlight);
+    schism.llvmintrin.trap();
 }

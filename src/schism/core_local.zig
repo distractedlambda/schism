@@ -1,4 +1,4 @@
-const rp2040 = @import("../rp2040/rp2040.zig");
+const rp2040 = @import("rp2040.zig");
 
 pub fn CoreLocal(comptime T: type) type {
     return struct {

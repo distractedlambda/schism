@@ -1,7 +1,7 @@
 const std = @import("std");
 
-const rp2040 = @import("../rp2040/rp2040.zig");
-const usb = @import("../common/usb.zig");
+const rp2040 = @import("rp2040.zig");
+const usb = @import("usb.zig");
 
 pub const Config = struct {
     core0_stack_top: usize = 0x20041000,
@@ -143,7 +143,7 @@ pub const Config = struct {
         Device: Device,
 
         pub const Device = struct {
-            language_id: usb.LanguageId = .EnglishUnitedStates,
+            language_id: usb.protocol.LanguageId = .EnglishUnitedStates,
             vendor_id: u16 = 0,
             product_id: u16 = 1,
             bcd_device: u16 = 0,
@@ -162,7 +162,7 @@ pub const Config = struct {
         };
 
         pub const Endpoint = struct {
-            direction: usb.EndpointDescriptor.EndpointAddress.Direction,
+            direction: usb.protocol.EndpointDescriptor.EndpointAddress.Direction,
         };
     };
 };

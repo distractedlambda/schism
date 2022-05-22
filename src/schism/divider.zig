@@ -1,5 +1,5 @@
 const std = @import("std");
-const rp2040 = @import("../rp2040/rp2040.zig");
+const rp2040 = @import("rp2040.zig");
 
 comptime {
     @export(idiv, .{ .name = "__aeabi_idiv", .linkage = .Weak });
