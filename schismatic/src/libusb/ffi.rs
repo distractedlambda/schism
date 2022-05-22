@@ -148,6 +148,33 @@ extern "C" {
     pub fn libusb_handle_events(ctx: *mut libusb_context) -> c_int;
 }
 
+pub const LIBUSB_TRANSFER_COMPLETED: c_int = 0;
+pub const LIBUSB_TRANSFER_ERROR: c_int = 1;
+pub const LIBUSB_TRANSFER_TIMED_OUT: c_int = 2;
+pub const LIBUSB_TRANSFER_CANCELED: c_int = 3;
+pub const LIBUSB_TRANSFER_STALL: c_int = 4;
+pub const LIBUSB_TRANSFER_NO_DEVICE: c_int = 5;
+pub const LIBUSB_TRANSFER_OVERFLOW: c_int = 6;
+
+pub const LIBUSB_TRANSFER_TYPE_CONTROL: c_uchar = 0;
+pub const LIBUSB_TRANSFER_TYPE_ISOCHRONOUS: c_uchar = 1;
+pub const LIBUSB_TRANSFER_TYPE_BULK: c_uchar = 2;
+pub const LIBUSB_TRANSFER_TYPE_INTERRUPT: c_uchar = 3;
+pub const LIBUSB_TRANSFER_TYPE_BULK_STREAM: c_uchar = 4;
+
+pub const LIBUSB_CAP_HAS_CAPABILITY: u32 = 0x0000;
+pub const LIBUSB_CAP_HAS_HOTPLUG: u32 = 0x0001;
+pub const LIBUSB_CAP_HAS_HID_ACCESS: u32 = 0x0100;
+pub const LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER: u32 = 0x0101;
+
+pub const LIBUSB_LOG_CB_GLOBAL: c_int = 0x1;
+pub const LIBUSB_LOG_CB_CONTEXT: c_int = 0x2;
+
+pub type libusb_transfer_cb_fn = unsafe extern "C" fn(transfer: &mut libusb_transfer);
+
+type libusb_log_cb =
+    unsafe extern "C" fn(ctx: *mut libusb_context, level: libusb_log_level, str: *const c_char);
+
 #[repr(C)]
 pub struct libusb_transfer {
     pub dev_handle: *mut libusb_device_handle,
@@ -163,22 +190,6 @@ pub struct libusb_transfer {
     pub buffer: *mut c_uchar,
     pub num_iso_packets: c_int,
 }
-
-pub const LIBUSB_TRANSFER_COMPLETED: c_int = 0;
-pub const LIBUSB_TRANSFER_ERROR: c_int = 1;
-pub const LIBUSB_TRANSFER_TIMED_OUT: c_int = 2;
-pub const LIBUSB_TRANSFER_CANCELED: c_int = 3;
-pub const LIBUSB_TRANSFER_STALL: c_int = 4;
-pub const LIBUSB_TRANSFER_NO_DEVICE: c_int = 5;
-pub const LIBUSB_TRANSFER_OVERFLOW: c_int = 6;
-
-pub const LIBUSB_TRANSFER_TYPE_CONTROL: c_uchar = 0;
-pub const LIBUSB_TRANSFER_TYPE_ISOCHRONOUS: c_uchar = 1;
-pub const LIBUSB_TRANSFER_TYPE_BULK: c_uchar = 2;
-pub const LIBUSB_TRANSFER_TYPE_INTERRUPT: c_uchar = 3;
-pub const LIBUSB_TRANSFER_TYPE_BULK_STREAM: c_uchar = 4;
-
-pub type libusb_transfer_cb_fn = unsafe extern "C" fn(transfer: &mut libusb_transfer);
 
 #[repr(C)]
 pub struct libusb_device_descriptor {
@@ -281,14 +292,3 @@ pub enum libusb_option {
     LIBUSB_OPTION_USE_USBDK = 1,
     LIBUSB_OPTION_NO_DEVICE_DISCOVERY = 2,
 }
-
-pub const LIBUSB_LOG_CB_GLOBAL: c_int = 0x1;
-pub const LIBUSB_LOG_CB_CONTEXT: c_int = 0x2;
-
-type libusb_log_cb =
-    unsafe extern "C" fn(ctx: *mut libusb_context, level: libusb_log_level, str: *const c_char);
-
-pub const LIBUSB_CAP_HAS_CAPABILITY: u32 = 0x0000;
-pub const LIBUSB_CAP_HAS_HOTPLUG: u32 = 0x0001;
-pub const LIBUSB_CAP_HAS_HID_ACCESS: u32 = 0x0100;
-pub const LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER: u32 = 0x0101;
