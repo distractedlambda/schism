@@ -11,7 +11,7 @@ use std::{
 
 use super::{
     error, ffi::*, BulkTransferIn, BulkTransferNode, BulkTransferOut, BulkTransferState,
-    DeviceHandle, EndpointAddress, EndpointDirection, Error, ErrorInner, Result,
+    DeviceHandle, EndpointAddress, Error, ErrorInner, Result, TransferDirection,
 };
 
 use parking_lot::Mutex;
@@ -22,7 +22,7 @@ impl DeviceHandle {
         destination: &mut [u8],
         endpoint: EndpointAddress,
     ) -> BulkTransferIn {
-        assert_eq!(endpoint.direction(), EndpointDirection::In);
+        assert_eq!(endpoint.direction(), TransferDirection::In);
 
         BulkTransferIn {
             node: Arc::new(BulkTransferNode {
@@ -42,7 +42,7 @@ impl DeviceHandle {
         source: &[u8],
         endpoint: EndpointAddress,
     ) -> BulkTransferOut {
-        assert_eq!(endpoint.direction(), EndpointDirection::Out);
+        assert_eq!(endpoint.direction(), TransferDirection::Out);
 
         BulkTransferOut {
             node: Arc::new(BulkTransferNode {

@@ -4,12 +4,13 @@ use std::{
     marker::PhantomData,
     mem,
     mem::ManuallyDrop,
+    num::NonZeroU8,
     os::raw::c_int,
     ptr::NonNull,
     result,
     sync::{atomic::AtomicBool, Arc},
     task::Waker,
-    thread::JoinHandle, num::NonZeroU8,
+    thread::JoinHandle,
 };
 
 use parking_lot::Mutex;
@@ -19,7 +20,7 @@ mod context;
 mod descriptors;
 mod device;
 mod device_handle;
-mod endpoint_address;
+mod endpoints;
 mod error;
 mod ffi;
 
@@ -90,9 +91,17 @@ enum BulkTransferState {
 pub struct EndpointAddress(u8);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum EndpointDirection {
+pub enum TransferDirection {
     Out,
     In,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TransferType {
+    Control,
+    Isochronous,
+    Bulk,
+    Interrupt,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
