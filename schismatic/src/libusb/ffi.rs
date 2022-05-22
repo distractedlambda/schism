@@ -118,19 +118,19 @@ extern "C" {
 
     pub fn libusb_get_active_config_descriptor(
         dev: *mut libusb_device,
-        config: &mut *mut libusb_config_descriptor,
+        config: &mut MaybeUninit<*mut libusb_config_descriptor>,
     ) -> c_int;
 
     pub fn libusb_get_config_descriptor(
         dev: *mut libusb_device,
         config_index: u8,
-        config: &mut *mut libusb_config_descriptor,
+        config: &mut MaybeUninit<*mut libusb_config_descriptor>,
     ) -> c_int;
 
     pub fn libusb_get_config_descriptor_by_value(
         dev: *mut libusb_device,
         bConfigurationValue: u8,
-        config: &mut *mut libusb_config_descriptor,
+        config: &mut MaybeUninit<*mut libusb_config_descriptor>,
     ) -> c_int;
 
     pub fn libusb_free_config_descriptor(config: *mut libusb_config_descriptor);
@@ -193,71 +193,71 @@ pub struct libusb_transfer {
 
 #[repr(C)]
 pub struct libusb_device_descriptor {
-    bLength: u8,
-    bDescriptorType: u8,
-    bcdUSB: u16,
-    bDeviceClass: u8,
-    bDeviceSubClass: u8,
-    bDeviceProtocol: u8,
-    bMaxPacketSize0: u8,
-    idVendor: u16,
-    idProduct: u16,
-    bcdDEvice: u16,
-    iManufacturer: u8,
-    iProduct: u8,
-    iSerialNumber: u8,
-    bNumConfigurations: u8,
+    pub bLength: u8,
+    pub bDescriptorType: u8,
+    pub bcdUSB: u16,
+    pub bDeviceClass: u8,
+    pub bDeviceSubClass: u8,
+    pub bDeviceProtocol: u8,
+    pub bMaxPacketSize0: u8,
+    pub idVendor: u16,
+    pub idProduct: u16,
+    pub bcdDevice: u16,
+    pub iManufacturer: u8,
+    pub iProduct: u8,
+    pub iSerialNumber: u8,
+    pub bNumConfigurations: u8,
 }
 
 #[repr(C)]
 pub struct libusb_config_descriptor {
-    bLength: u8,
-    bDescriptorType: u8,
-    wTotalLength: u16,
-    bNumInterfaces: u8,
-    bConfigurationValue: u8,
-    iConfiguration: u8,
-    bmAttributes: u8,
-    MaxPower: u8,
-    interface: *const libusb_interface,
-    extra: *const c_uchar,
-    extra_length: c_int,
+    pub bLength: u8,
+    pub bDescriptorType: u8,
+    pub wTotalLength: u16,
+    pub bNumInterfaces: u8,
+    pub bConfigurationValue: u8,
+    pub iConfiguration: u8,
+    pub bmAttributes: u8,
+    pub MaxPower: u8,
+    pub interface: *const libusb_interface,
+    pub extra: *const c_uchar,
+    pub extra_length: c_int,
 }
 
 #[repr(C)]
 pub struct libusb_interface {
-    altsetting: *const libusb_interface_descriptor,
-    num_altsetting: c_int,
+    pub altsetting: *const libusb_interface_descriptor,
+    pub num_altsetting: c_int,
 }
 
 #[repr(C)]
 pub struct libusb_interface_descriptor {
-    bLength: u8,
-    bDescriptorType: u8,
-    bInterfaceNumber: u8,
-    bAlternateSetting: u8,
-    bNumEndpoints: u8,
-    bInterfaceClass: u8,
-    bInterfaceSubClass: u8,
-    bInterfaceProtocol: u8,
-    iInterface: u8,
-    endpoint: *const libusb_endpoint_descriptor,
-    extra: *const c_uchar,
-    extra_length: c_int,
+    pub bLength: u8,
+    pub bDescriptorType: u8,
+    pub bInterfaceNumber: u8,
+    pub bAlternateSetting: u8,
+    pub bNumEndpoints: u8,
+    pub bInterfaceClass: u8,
+    pub bInterfaceSubClass: u8,
+    pub bInterfaceProtocol: u8,
+    pub iInterface: u8,
+    pub endpoint: *const libusb_endpoint_descriptor,
+    pub extra: *const c_uchar,
+    pub extra_length: c_int,
 }
 
 #[repr(C)]
 pub struct libusb_endpoint_descriptor {
-    bLength: u8,
-    bDescriptorType: u8,
-    bEndpointAddress: u8,
-    bmAttributes: u8,
-    wMaxPacketSize: u16,
-    bInterval: u8,
-    bRefresh: u8,
-    bSynchAddress: u8,
-    extra: *const c_uchar,
-    extra_length: c_int,
+    pub bLength: u8,
+    pub bDescriptorType: u8,
+    pub bEndpointAddress: u8,
+    pub bmAttributes: u8,
+    pub wMaxPacketSize: u16,
+    pub bInterval: u8,
+    pub bRefresh: u8,
+    pub bSynchAddress: u8,
+    pub extra: *const c_uchar,
+    pub extra_length: c_int,
 }
 
 #[repr(C)]

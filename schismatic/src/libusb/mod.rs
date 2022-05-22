@@ -9,13 +9,14 @@ use std::{
     result,
     sync::{atomic::AtomicBool, Arc},
     task::Waker,
-    thread::JoinHandle,
+    thread::JoinHandle, num::NonZeroU8,
 };
 
 use parking_lot::Mutex;
 
 mod bulk_transfer;
 mod context;
+mod descriptors;
 mod device;
 mod device_handle;
 mod endpoint_address;
@@ -92,4 +93,60 @@ pub struct EndpointAddress(u8);
 pub enum EndpointDirection {
     Out,
     In,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct StringDescriptorIndex(NonZeroU8);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ConfigurationAttributes(u8);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct EndpointAttributes(u8);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct MaxPower(u8);
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct DeviceDescriptor {
+    pub bcd_usb: u16,
+    pub device_class: u8,
+    pub device_sub_class: u8,
+    pub device_protocol: u8,
+    pub max_packet_size: u8,
+    pub vendor_id: u16,
+    pub product_id: u16,
+    pub bcd_device: u16,
+    pub manufacturer: Option<StringDescriptorIndex>,
+    pub product: Option<StringDescriptorIndex>,
+    pub serial_number: Option<StringDescriptorIndex>,
+    pub num_configurations: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ConfigurationDescriptor {
+    pub configuration_value: u8,
+    pub configuration: Option<StringDescriptorIndex>,
+    pub attributes: ConfigurationAttributes,
+    pub max_power: MaxPower,
+    pub interfaces: Vec<InterfaceDescriptor>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct InterfaceDescriptor {
+    pub interface_number: u8,
+    pub alternate_setting: u8,
+    pub interface_class: u8,
+    pub interface_sub_class: u8,
+    pub interface_protocol: u8,
+    pub interface: Option<StringDescriptorIndex>,
+    pub endpoints: Vec<EndpointDescriptor>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct EndpointDescriptor {
+    pub endpoint_address: EndpointAddress,
+    pub attributes: EndpointAttributes,
+    pub max_packet_size: u16,
+    pub interval: u8,
 }
