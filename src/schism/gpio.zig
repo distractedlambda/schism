@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const arm = @import("arm.zig");
-const config = @import("config.zig").resolved;
+const config = @import("Config.zig").resolved;
 const core_local = @import("core_local.zig");
 const executor = @import("executor.zig");
 const gpio_waiters = @import("gpio_waiters.zig");

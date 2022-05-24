@@ -1,4 +1,3 @@
-const config = @import("schism/config.zig");
 const executor = @import("schism/executor.zig");
 const gpio = @import("schism/gpio.zig");
 const usb = @import("schism/usb.zig");
@@ -13,7 +12,7 @@ comptime {
     _ = @import("schism/vectors.zig");
 }
 
-pub const Config = config.Config;
+pub const Config = @import("schism/Config.zig");
 
 pub const yield = executor.yield;
 

@@ -1,4 +1,4 @@
-const config = @import("config.zig").resolved;
+const config = @import("Config.zig").resolved;
 
 pub const device = @import("usb/device.zig");
 pub const protocol = @import("usb/protocol.zig");

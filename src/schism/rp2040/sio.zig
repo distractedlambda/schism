@@ -125,4 +125,4 @@ pub const interp_accum_add = RegisterMatrix(2, 2, base_address + 0x0b4, 0x40, 0x
 
 pub const interp_base1and0 = RegisterArray(2, base_address + 0x0bc, 0x40);
 
-pub const spinlock = RegisterArray(32, base_address + 0x100, 0x4);
+pub const spinlock = RegisterArray(32, base_address + 0x100, 0x4, .{ .Scalar = u32 });

@@ -2,7 +2,7 @@ const std = @import("std");
 
 const arm = @import("arm.zig");
 const bootrom = @import("bootrom.zig");
-const config = @import("config.zig").resolved;
+const config = @import("Config.zig").resolved;
 const executor = @import("executor.zig");
 const gpio = @import("gpio.zig");
 const resets = @import("resets.zig");
