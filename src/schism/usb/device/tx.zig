@@ -10,16 +10,34 @@ const Continuation = executor.Continuation;
 const ContinuationQueue = executor.ContinuationQueue;
 const Error = @import("error.zig").Error;
 
-var waiters = [1]ContinuationQueue{.{}} ** derived_config.num_tx_channels;
-var in_flight = std.StaticBitSet(derived_config.num_tx_channels).initEmpty();
+var buffer_waiters = [1]ContinuationQueue{.{}} ** derived_config.num_tx_channels;
+var buffer_used = std.StaticBitSet(derived_config.num_tx_channels).initEmpty();
 var next_pid = std.StaticBitSet(derived_config.num_tx_channels).initEmpty();
 
-const Waiter = struct {
+const BufferWaiter = struct {
     continuation: Continuation,
-    state: union {
-        source: []const u8,
-        result: Error!void,
-    },
+    result: Error!void = undefined,
+};
+
+pub const Buffer = struct {
+    channel: ChannelIndex,
+    pid: u1,
+    len: usize = 0,
+
+    pub fn submit(self: @This()) void {
+        buffers.submit(bufCtrlIndex(self.channel), self.len, self.pid);
+    }
+
+    pub fn write(self: *@This(), data: []const u8) usize {
+        const copy_len = @minimum(64 - self.len, data.len);
+        @memcpy(buffers.tx[self.channel][self.len..].ptr, data.ptr, copy_len);
+        self.len += copy_len;
+        return copy_len;
+    }
+
+    pub fn isFull(self: @This()) bool {
+        return self.len == 64;
+    }
 };
 
 const ChannelIndex = std.math.IntFittingRange(0, derived_config.num_tx_channels - 1);
@@ -28,58 +46,53 @@ inline fn bufCtrlIndex(channel: ChannelIndex) u5 {
     return @as(u5, channel) * 2 + 2;
 }
 
-pub fn send(connection_id: connection.Id, channel: ChannelIndex, source: []const u8) Error!void {
+pub fn nextBuffer(connection_id: connection.Id, channel: ChannelIndex) Error!Buffer {
     std.debug.assert(channel < derived_config.num_tx_channels);
-    std.debug.assert(source.len <= 64);
 
     if (connection_id != connection.current) {
         return error.ConnectionLost;
     }
 
-    if (!in_flight.isSet(channel)) {
-        in_flight.set(channel);
-        @memcpy(buffers.tx[channel], source, source.len);
-        buffers.submit(bufCtrlIndex(channel), source.len, next_pid.isSet(channel));
-        next_pid.toggle(channel);
+    const pid = @boolToInt(next_pid.isSet(channel));
+    next_pid.toggle(channel);
+
+    if (!buffer_used.isSet(channel)) {
+        buffer_used.set(channel);
     } else {
-        var waiter = Waiter{
-            .continuation = Continuation.init(@frame()),
-            .source_and_result = .{ .source = source },
-        };
+        var waiter = BufferWaiter{ .continuation = Continuation.init(@frame()) };
 
         suspend {
-            waiters[channel].pushBack(&waiter.continuation);
+            buffer_waiters[channel].pushBack(&waiter.continuation);
         }
 
-        return waiter.source_and_result.result;
+        try waiter.result;
     }
+
+    return Buffer{ .channel = channel, .pid = pid };
 }
 
 pub fn handleBufferStatusInterrupt(status: u32) void {
-    for (waiters) |*queue, channel| {
+    for (buffer_waiters) |*queue, channel| {
         if (@truncate(u1, status >> bufCtrlIndex(@intCast(ChannelIndex, channel))) != 0) {
             if (queue.popFront()) |continuation| {
-                const waiter = @fieldParentPtr(Waiter, "continuation", continuation);
-                @memcpy(@as([]u8, &buffers.tx[channel]).ptr, waiter.state.source.ptr, waiter.state.source.len);
-                buffers.submit(bufCtrlIndex(@intCast(ChannelIndex, channel)), waiter.state.source.len, @boolToInt(next_pid.isSet(channel)));
-                next_pid.toggle(channel);
-                waiter.state = .{ .result = {} };
+                const waiter = @fieldParentPtr(BufferWaiter, "continuation", continuation);
+                waiter.result = {};
                 executor.submit(&waiter.continuation);
             } else {
-                std.debug.assert(in_flight.isSet(channel));
-                in_flight.unset(channel);
+                std.debug.assert(buffer_used.isSet(channel));
+                buffer_used.unset(channel);
             }
         }
     }
 }
 
 pub fn cancelAll(err: Error) void {
-    in_flight = @TypeOf(in_flight).initEmpty();
+    buffer_used = @TypeOf(buffer_used).initEmpty();
     next_pid = @TypeOf(next_pid).initEmpty();
-    for (waiters) |*queue| {
+    for (buffer_waiters) |*queue| {
         while (queue.popFront()) |continuation| {
-            const waiter = @fieldParentPtr(Waiter, "continuation", continuation);
-            waiter.state = .{ .result = err };
+            const waiter = @fieldParentPtr(BufferWaiter, "continuation", continuation);
+            waiter.result = err;
             executor.submit(continuation);
         }
     }

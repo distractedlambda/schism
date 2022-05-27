@@ -2,15 +2,15 @@ const std = @import("std");
 
 const arm = @import("arm.zig");
 const config = @import("Config.zig").resolved;
-const core_local = @import("core_local.zig");
 const executor = @import("executor.zig");
 const gpio_waiters = @import("gpio_waiters.zig");
+const multicore = @import("multicore.zig");
 const resets = @import("resets.zig");
 const rp2040 = @import("rp2040.zig");
 
 const Continuation = executor.Continuation;
 const ContinuationQueue = executor.ContinuationQueue;
-const CoreLocal = core_local.CoreLocal;
+const CoreLocal = multicore.CoreLocal;
 
 fn checkGpioInBounds(comptime gpio: u5) void {
     if (gpio >= 30) {
@@ -61,7 +61,7 @@ pub fn yieldUntilLow(comptime gpio: u5) void {
 
     suspend {
         gpio_waiters.yield_until_low[gpio].ptr().pushBack(&continuation);
-        rp2040.io_bank0.proc_inte.setRaw(core_local.currentCore(), gpio / 8, @as(u32, 1) << (gpio % 8 * 4));
+        rp2040.io_bank0.proc_inte.setRaw(multicore.currentCore(), gpio / 8, @as(u32, 1) << (gpio % 8 * 4));
     }
 }
 
@@ -76,7 +76,7 @@ pub fn yieldUntilHigh(comptime gpio: u5) void {
 
     suspend {
         gpio_waiters.yield_until_high[gpio].ptr().pushBack(&continuation);
-        rp2040.io_bank0.proc_inte.setRaw(core_local.currentCore(), gpio / 8, @as(u32, 1) << (gpio % 8 * 4 + 1));
+        rp2040.io_bank0.proc_inte.setRaw(multicore.currentCore(), gpio / 8, @as(u32, 1) << (gpio % 8 * 4 + 1));
     }
 }
 
@@ -88,8 +88,8 @@ pub fn handleIrq() callconv(.C) void {
     var interrupt_status: [rp2040.io_bank0.intr.len]u32 = undefined;
 
     for (interrupt_status) |*status, i| {
-        status.* = rp2040.io_bank0.proc_ints.read(core_local.currentCore(), i);
-        rp2040.io_bank0.proc_inte.clearRaw(core_local.currentCore(), i, status.*);
+        status.* = rp2040.io_bank0.proc_ints.read(multicore.currentCore(), i);
+        rp2040.io_bank0.proc_inte.clearRaw(multicore.currentCore(), i, status.*);
     }
 
     inline for (config.gpio) |gpio_config, gpio_num| {

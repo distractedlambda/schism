@@ -1,4 +1,4 @@
-const rp2040 = @import("rp2040.zig");
+const multicore = @import("../multicore.zig");
 
 pub fn CoreLocal(comptime T: type) type {
     return struct {
@@ -11,23 +11,19 @@ pub fn CoreLocal(comptime T: type) type {
         }
 
         pub fn constPtr(self: *const @This()) *const T {
-            return &self.storage[currentCore()];
+            return &self.storage[multicore.currentCore()];
         }
 
         pub fn ptr(self: *@This()) *T {
-            return &self.storage[currentCore()];
+            return &self.storage[multicore.currentCore()];
         }
 
         pub fn get(self: *const @This()) T {
-            return self.storage[currentCore()];
+            return self.storage[multicore.currentCore()];
         }
 
         pub fn set(self: *@This(), value: T) void {
-            self.storage[currentCore()] = value;
+            self.storage[multicore.currentCore()] = value;
         }
     };
-}
-
-pub fn currentCore() u1 {
-    return @intCast(u1, rp2040.sio.cpuid.readNonVolatile());
 }

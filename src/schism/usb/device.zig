@@ -16,7 +16,10 @@ const tx = @import("device/tx.zig");
 
 const Continuation = executor.Continuation;
 const ContinuationQueue = executor.ContinuationQueue;
-const Error = @import("device/error.zig").Error;
+
+pub const ConnectionId = connection.Id;
+pub const Error = @import("device/error.zig").Error;
+pub const TransmitBuffer = tx.Buffer;
 
 pub fn handleIrq() void {
     arm.disableInterrupts();
@@ -102,12 +105,16 @@ pub fn init() void {
     control.init();
 }
 
-pub inline fn send(connection_id: connection.Id, comptime interface: usize, comptime endpoint_of_interface: usize, data: []const u8) Error!void {
+pub const connect = connection.connect;
+
+pub const tryConnect = connection.tryConnect;
+
+pub fn nextTransmitBuffer(connection_id: ConnectionId, comptime interface: usize, comptime endpoint_of_interface: usize) Error!TransmitBuffer {
     comptime std.debug.assert(config.usb.?.Device.interfaces[interface].endpoints[endpoint_of_interface].direction == .In);
-    return tx.send(connection_id, comptime derived_config.channel_assignments[interface][endpoint_of_interface], data);
+    return tx.nextBuffer(connection_id, comptime derived_config.channel_assignments[interface][endpoint_of_interface]);
 }
 
-pub inline fn receive(connection_id: connection.Id, comptime interface: usize, comptime endpoint_of_interface: usize, destination: []u8) Error!void {
+pub fn receive(connection_id: ConnectionId, comptime interface: usize, comptime endpoint_of_interface: usize, destination: []u8) Error!void {
     comptime std.debug.assert(config.usb.?.Device.interfaces[interface].endpoints[endpoint_of_interface].direction == .Out);
     return rx.receive(connection_id, comptime derived_config.channel_assignments[interface][endpoint_of_interface], destination);
 }

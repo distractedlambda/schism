@@ -21,6 +21,14 @@ pub fn connect() Id {
     return current;
 }
 
+pub fn tryConnect() ?Id {
+    if (!configured) {
+        return null;
+    }
+
+    return current;
+}
+
 pub fn invalidate() void {
     current = @intToEnum(Id, @enumToInt(current) +% 1);
     configured = false;

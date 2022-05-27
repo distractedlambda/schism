@@ -14,3 +14,5 @@ pub fn handleIrq() callconv(.C) void {
         .Device => device.handleIrq(),
     }
 }
+
+pub const log = @import("usb/log.zig").log;

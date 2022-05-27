@@ -27,3 +27,5 @@ pub const yieldUntilGpioHigh = gpio.yieldUntilHigh;
 pub const usbDeviceConnect = usb.device.connect;
 pub const usbDeviceSend = usb.device.send;
 pub const usbDeviceReceive = usb.device.receive;
+
+pub const usbLog = usb.log;

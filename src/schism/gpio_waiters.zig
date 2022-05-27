@@ -1,5 +1,5 @@
 const ContinuationQueue = @import("executor.zig").ContinuationQueue;
-const CoreLocal = @import("core_local.zig").CoreLocal;
+const CoreLocal = @import("multicore.zig").CoreLocal;
 
 pub const Waiters = [30]CoreLocal(ContinuationQueue);
 

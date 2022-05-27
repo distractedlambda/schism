@@ -31,13 +31,12 @@ pub const schism_config = blk: {
         .serial_number = "123456",
         .interfaces = &[_]schism.Config.UsbInterface{
             .{
-                .name = "marcopolo",
+                .name = "Schism Logging",
                 .class = 0xFF,
                 .subclass = 0,
                 .protocol = 0,
                 .endpoints = &[_]schism.Config.UsbEndpoint{
                     .{ .direction = .In },
-                    .{ .direction = .Out },
                 },
             },
         },
@@ -49,8 +48,10 @@ pub const schism_config = blk: {
 fn driveLed(comptime led_gpio: u5, comptime button_gpio: u5) void {
     schism.enableGpioOutput(led_gpio);
     while (true) {
+        std.log.info("Clearing gpio {}", .{led_gpio});
         schism.clearGpio(led_gpio);
         schism.yieldUntilGpioLow(button_gpio);
+        std.log.info("Setting gpio {}", .{led_gpio});
         schism.setGpio(led_gpio);
         schism.yieldUntilGpioHigh(button_gpio);
     }
@@ -64,6 +65,8 @@ pub fn main() void {
     await drive_green;
     await drive_blue;
 }
+
+pub const log = schism.usbLog;
 
 pub noinline fn panic(message: []const u8, error_return_trace: ?*std.builtin.StackTrace) noreturn {
     _ = message;

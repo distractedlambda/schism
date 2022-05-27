@@ -1,5 +1,5 @@
-const arm = @import("arm.zig");
-const rp2040 = @import("rp2040.zig");
+const arm = @import("../arm.zig");
+const rp2040 = @import("../rp2040.zig");
 
 const CoreLocal = @import("core_local.zig").CoreLocal;
 

@@ -1,9 +1,9 @@
 const std = @import("std");
 
 const arm = @import("arm.zig");
-const core_local = @import("core_local.zig");
+const multicore = @import("multicore.zig");
 
-const CoreLocal = core_local.CoreLocal;
+const CoreLocal = multicore.CoreLocal;
 
 pub const Continuation = struct {
     frame: anyframe,
