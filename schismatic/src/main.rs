@@ -9,28 +9,18 @@ mod picoboot;
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 enum Cli {
-    #[clap(about = "List recognized devices")]
-    ListDevices,
+    #[clap(about = "Follow the log output of a Schism-based device")]
+    FollowLog,
 }
 
 fn main() -> Result<()> {
     let args = Cli::parse();
     match args {
-        Cli::ListDevices => {
+        Cli::FollowLog => {
             let context = libusb::Context::new()?;
             let devices: Vec<_> = context.get_devices()?;
 
             for device in devices {
-                let device_descriptor = if let Ok(desciptor) = device.get_descriptor() {
-                    desciptor
-                } else {
-                    continue;
-                };
-
-                if !picoboot::device_descriptor_matches(&device_descriptor) {
-                    continue;
-                }
-
                 let configuration_descriptor =
                     if let Ok(descriptor) = device.get_active_configuration_descriptor() {
                         descriptor
@@ -38,14 +28,8 @@ fn main() -> Result<()> {
                         continue;
                     };
 
-                let picoboot_interface =
-                    if let Some(interface) = picoboot::find_interface(&configuration_descriptor) {
-                        interface
-                    } else {
-                        continue;
-                    };
-
-                println!("{:#?}", picoboot_interface)
+                for interface in configuration_descriptor.interfaces {
+                }
             }
 
             Ok(())

@@ -18,29 +18,54 @@ pub const schism_config = blk: {
     config.gpio[schism.picosystem.pins.user_led.blue].function = .{ .Sio = .{} };
     config.gpio[schism.picosystem.pins.screen.backlight].function = .{ .Sio = .{} };
 
-    config.gpio[schism.picosystem.pins.buttons.a].function = .{ .Sio = .{ .allow_yield_until_low = true, .allow_yield_until_high = true } };
-    config.gpio[schism.picosystem.pins.buttons.b].function = .{ .Sio = .{ .allow_yield_until_low = true, .allow_yield_until_high = true } };
-    config.gpio[schism.picosystem.pins.buttons.x].function = .{ .Sio = .{ .allow_yield_until_low = true, .allow_yield_until_high = true } };
-    config.gpio[schism.picosystem.pins.buttons.y].function = .{ .Sio = .{ .allow_yield_until_low = true, .allow_yield_until_high = true } };
+    config.gpio[schism.picosystem.pins.buttons.a].function = .{
+        .Sio = .{
+            .allow_yield_until_low = true,
+            .allow_yield_until_high = true,
+        },
+    };
 
-    config.usb = .{ .Device = .{
-        .manufacturer = "lucascorp",
-        .product = "echoer2000",
-        .product_id = 0x4004,
-        .vendor_id = 0xcafe,
-        .serial_number = "123456",
-        .interfaces = &[_]schism.Config.UsbInterface{
-            .{
-                .name = "Schism Logging",
-                .class = 0xFF,
-                .subclass = 0,
-                .protocol = 0,
-                .endpoints = &[_]schism.Config.UsbEndpoint{
-                    .{ .direction = .In },
+    config.gpio[schism.picosystem.pins.buttons.b].function = .{
+        .Sio = .{
+            .allow_yield_until_low = true,
+            .allow_yield_until_high = true,
+        },
+    };
+
+    config.gpio[schism.picosystem.pins.buttons.x].function = .{
+        .Sio = .{
+            .allow_yield_until_low = true,
+            .allow_yield_until_high = true,
+        },
+    };
+
+    config.gpio[schism.picosystem.pins.buttons.y].function = .{
+        .Sio = .{
+            .allow_yield_until_low = true,
+            .allow_yield_until_high = true,
+        },
+    };
+
+    config.usb = .{
+        .Device = .{
+            .manufacturer = "lucascorp",
+            .product = "echoer2000",
+            .product_id = 0x4004,
+            .vendor_id = 0xcafe,
+            .serial_number = "123456",
+            .interfaces = &[_]schism.Config.UsbInterface{
+                .{
+                    .name = "Schism Device Logger",
+                    .class = 0xFF,
+                    .subclass = 0,
+                    .protocol = 0,
+                    .endpoints = &[_]schism.Config.UsbEndpoint{
+                        .{ .direction = .In },
+                    },
                 },
             },
         },
-    } };
+    };
 
     break :blk config;
 };
