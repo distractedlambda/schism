@@ -1,13 +1,32 @@
 package org.schism.cousb
 
+import org.schism.cousb.Libusb.DeviceDescriptor
+import org.schism.cousb.Libusb.DeviceDescriptor.BCD_DEVICE
+import org.schism.cousb.Libusb.DeviceDescriptor.BCD_USB
+import org.schism.cousb.Libusb.DeviceDescriptor.B_DEVICE_CLASS
+import org.schism.cousb.Libusb.DeviceDescriptor.B_DEVICE_PROTOCOL
+import org.schism.cousb.Libusb.DeviceDescriptor.B_DEVICE_SUB_CLASS
+import org.schism.cousb.Libusb.DeviceDescriptor.B_MAX_PACKET_SIZE_0
+import org.schism.cousb.Libusb.DeviceDescriptor.B_NUM_CONFIGURATIONS
+import org.schism.cousb.Libusb.DeviceDescriptor.ID_PRODUCT
+import org.schism.cousb.Libusb.DeviceDescriptor.ID_VENDOR
+import org.schism.cousb.Libusb.DeviceDescriptor.I_MANUFACTURER
+import org.schism.cousb.Libusb.DeviceDescriptor.I_PRODUCT
+import org.schism.cousb.Libusb.DeviceDescriptor.I_SERIAL_NUMBER
+import org.schism.cousb.Libusb.checkReturnCode
+import org.schism.cousb.Libusb.freeConfigDescriptor
+import org.schism.cousb.Libusb.getConfigDescriptor
+import org.schism.cousb.Libusb.getDeviceDescriptor
+import org.schism.cousb.Libusb.refDevice
+import org.schism.cousb.Libusb.unrefDevice
 import java.lang.foreign.MemoryAddress
 import java.lang.foreign.MemorySession
 import java.lang.foreign.ValueLayout.ADDRESS
 
 public class USBDevice internal constructor(handle: MemoryAddress) {
     init {
-        Libusb.ref_device.invokeExact(handle) as MemoryAddress
-        USBContext.cleaner.register(this) { Libusb.unref_device.invokeExact(handle) }
+        refDevice(handle) as MemoryAddress
+        USBContext.cleaner.register(this) { unrefDevice(handle) }
     }
 
     internal val handle = handle
@@ -23,51 +42,41 @@ public class USBDevice internal constructor(handle: MemoryAddress) {
     public val manufacturer: USBStringDescriptorIndex
     public val product: USBStringDescriptorIndex
     public val serialNumber: USBStringDescriptorIndex
-    public val configurations: Map<USBConfigurationValue, USBConfiguration>
+    public val configurations: List<USBConfiguration>
 
     init {
         MemorySession.openConfined().use { memorySession ->
-            val descriptor = memorySession.allocate(Libusb.device_descriptor)
-            Libusb.checkReturnCode(Libusb.get_device_descriptor.invokeExact(handle, descriptor) as Int)
-            usbVersion = (Libusb.device_descriptor_bcdUSB[descriptor] as Short).toUShort()
-            deviceClass = (Libusb.device_descriptor_bDeviceClass[descriptor] as Byte).toUByte()
-            deviceSubClass = (Libusb.device_descriptor_bDeviceSubClass[descriptor] as Byte).toUByte()
-            deviceProtocol = (Libusb.device_descriptor_bDeviceProtocol[descriptor] as Byte).toUByte()
-            endpoint0MaxPacketSize = (Libusb.device_descriptor_bMaxPacketSize0[descriptor] as Byte).toUByte()
-            vendorID = (Libusb.device_descriptor_idVendor[descriptor] as Short).toUShort()
-            productID = (Libusb.device_descriptor_idProduct[descriptor] as Short).toUShort()
-            deviceVersion = (Libusb.device_descriptor_bcdDevice[descriptor] as Short).toUShort()
-            manufacturer = USBStringDescriptorIndex((Libusb.device_descriptor_iManufacturer[descriptor] as Byte).toUByte())
-            product = USBStringDescriptorIndex((Libusb.device_descriptor_iProduct[descriptor] as Byte).toUByte())
-            serialNumber = USBStringDescriptorIndex((Libusb.device_descriptor_iSerialNumber[descriptor] as Byte).toUByte())
+            val descriptor = memorySession.allocate(DeviceDescriptor.LAYOUT)
+            checkReturnCode(getDeviceDescriptor(handle, descriptor) as Int)
 
-            val numConfigurations = (Libusb.device_descriptor_bNumConfigurations[descriptor] as Byte).toUByte()
+            usbVersion = (BCD_USB[descriptor] as Short).toUShort()
+            deviceClass = (B_DEVICE_CLASS[descriptor] as Byte).toUByte()
+            deviceSubClass = (B_DEVICE_SUB_CLASS[descriptor] as Byte).toUByte()
+            deviceProtocol = (B_DEVICE_PROTOCOL[descriptor] as Byte).toUByte()
+            endpoint0MaxPacketSize = (B_MAX_PACKET_SIZE_0[descriptor] as Byte).toUByte()
+            vendorID = (ID_VENDOR[descriptor] as Short).toUShort()
+            productID = (ID_PRODUCT[descriptor] as Short).toUShort()
+            deviceVersion = (BCD_DEVICE[descriptor] as Short).toUShort()
+            manufacturer = USBStringDescriptorIndex((I_MANUFACTURER[descriptor] as Byte).toUByte())
+            product = USBStringDescriptorIndex((I_PRODUCT[descriptor] as Byte).toUByte())
+            serialNumber = USBStringDescriptorIndex((I_SERIAL_NUMBER[descriptor] as Byte).toUByte())
+
+            val numConfigurations = (B_NUM_CONFIGURATIONS[descriptor] as Byte).toUByte()
             val configDescriptorStorage = memorySession.allocate(ADDRESS)
-            configurations = buildMap {
+
+            configurations = buildList {
                 for (i in 0 until numConfigurations.toInt()) {
-                    Libusb.checkReturnCode(Libusb.get_config_descriptor.invokeExact(handle, i.toByte(), configDescriptorStorage) as Int)
+                    checkReturnCode(getConfigDescriptor(handle, i.toByte(), configDescriptorStorage) as Int)
                     val configDescriptor = configDescriptorStorage[ADDRESS, 0]
                     try {
-                        val configurationValue = USBConfigurationValue((Libusb.config_descriptor_bConfigurationValue[configDescriptor] as Byte).toUByte())
-                        val attributes = (Libusb.config_descriptor_bmAttributes[configDescriptor] as Byte).toInt()
-                        set(
-                            configurationValue,
-                            USBConfiguration(
-                                device = this@USBDevice,
-                                value = configurationValue,
-                                name = USBStringDescriptorIndex((Libusb.config_descriptor_iConfiguration[configDescriptor] as Byte).toUByte()),
-                                selfPowered = (attributes shr 6) and 1 != 0,
-                                remoteWakeup = (attributes shr 5) and 1 != 0,
-                                maxPowerMilliamps = (Libusb.config_descriptor_MaxPower[configDescriptor] as Byte).toUByte().toInt() * 2,
-                                interfaces = Libusb.config_descriptor_interface[configDescriptor] as MemoryAddress,
-                                interfaceCount = (Libusb.config_descriptor_bNumInterfaces[configDescriptor] as Byte).toUByte(),
-                            ),
-                        )
+                        add(USBConfiguration(this@USBDevice, configDescriptor))
                     } finally {
-                        Libusb.free_config_descriptor(configDescriptor)
+                        freeConfigDescriptor(configDescriptor)
                     }
                 }
             }
         }
     }
+
+    public companion object
 }
