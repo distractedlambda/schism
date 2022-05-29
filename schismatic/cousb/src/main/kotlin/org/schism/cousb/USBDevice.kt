@@ -1,29 +1,29 @@
-package org.schism.schismatic
+package org.schism.cousb
 
 import java.lang.foreign.MemoryAddress
 import java.lang.foreign.MemorySession
 import java.lang.foreign.ValueLayout.ADDRESS
 
-class USBDevice(handle: MemoryAddress) {
+public class USBDevice internal constructor(handle: MemoryAddress) {
     init {
         Libusb.ref_device.invokeExact(handle) as MemoryAddress
         USBContext.cleaner.register(this) { Libusb.unref_device.invokeExact(handle) }
     }
 
-    val handle = handle
+    internal val handle = handle
 
-    val usbVersion: UShort
-    val deviceClass: UByte
-    val deviceSubClass: UByte
-    val deviceProtocol: UByte
-    val endpoint0MaxPacketSize: UByte
-    val vendorID: UShort
-    val productID: UShort
-    val deviceVersion: UShort
-    val manufacturer: USBStringDescriptorIndex
-    val product: USBStringDescriptorIndex
-    val serialNumber: USBStringDescriptorIndex
-    val configurations: Map<USBConfigurationValue, USBConfiguration>
+    public val usbVersion: UShort
+    public val deviceClass: UByte
+    public val deviceSubClass: UByte
+    public val deviceProtocol: UByte
+    public val endpoint0MaxPacketSize: UByte
+    public val vendorID: UShort
+    public val productID: UShort
+    public val deviceVersion: UShort
+    public val manufacturer: USBStringDescriptorIndex
+    public val product: USBStringDescriptorIndex
+    public val serialNumber: USBStringDescriptorIndex
+    public val configurations: Map<USBConfigurationValue, USBConfiguration>
 
     init {
         MemorySession.openConfined().use { memorySession ->

@@ -1,4 +1,4 @@
-package org.schism.schismatic
+package org.schism.cousb
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,7 +10,7 @@ import java.lang.foreign.ValueLayout.ADDRESS
 import java.lang.ref.Cleaner
 import kotlin.concurrent.thread
 
-object USBContext {
+internal object USBContext {
     private val mutableAttachedDevices = MutableStateFlow<Set<USBDevice>>(linkedSetOf())
 
     val attachedDevices: StateFlow<Set<USBDevice>> get() = mutableAttachedDevices

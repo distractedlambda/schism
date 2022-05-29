@@ -1,4 +1,4 @@
-package org.schism.schismatic
+package org.schism.cousb
 
 import java.lang.Math.toIntExact
 import java.lang.foreign.FunctionDescriptor
@@ -15,7 +15,7 @@ import java.lang.foreign.ValueLayout.JAVA_LONG
 import java.lang.foreign.ValueLayout.JAVA_SHORT
 import java.lang.invoke.MethodHandle
 
-object Libusb {
+internal object Libusb {
     val alloc_transfer: MethodHandle
     val cancel_transfer: MethodHandle
     val claim_interface: MethodHandle
