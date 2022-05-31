@@ -7,7 +7,7 @@ public sealed class USBEndpoint(
 ) {
     public val configuration: USBConfiguration
         get() = iface.configuration
-    
+
     public val device: USBDevice
         get() = iface.device
 

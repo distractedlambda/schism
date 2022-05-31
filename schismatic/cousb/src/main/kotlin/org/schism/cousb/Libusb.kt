@@ -127,6 +127,31 @@ internal object Libusb {
         val NUM_ISO_PACKETS = LAYOUT.varHandle(groupElement("num_iso_packets"))
     }
 
+    internal object TransferStatus {
+        const val COMPLETED = 0
+        const val ERROR = 1
+        const val TIMED_OUT = 2
+        const val CANCELED = 3
+        const val STALL = 4
+        const val NO_DEVICE = 5
+        const val OVERFLOW = 6
+    }
+
+    internal object TransferFlags {
+        const val SHORT_NOT_OK = 0x1
+        const val FREE_BUFFER = 0x2
+        const val FREE_TRANSFER = 0x4
+        const val ADD_ZERO_PACKET = 0x8
+    }
+
+    internal object TransferType {
+        const val CONTROL: UByte = 0u
+        const val ISOCHRONOUS: UByte = 1u
+        const val BULK: UByte = 2u
+        const val INTERRUPT: UByte = 3u
+        const val BULK_STREAM: UByte = 4u
+    }
+
     internal object DeviceDescriptor {
         val LAYOUT = cStructLayout(
             JAVA_BYTE.withName("bLength"),

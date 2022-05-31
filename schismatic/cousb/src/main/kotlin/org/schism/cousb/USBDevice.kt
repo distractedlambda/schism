@@ -1,5 +1,7 @@
 package org.schism.cousb
 
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import org.schism.cousb.Libusb.DeviceDescriptor
 import org.schism.cousb.Libusb.DeviceDescriptor.BCD_DEVICE
 import org.schism.cousb.Libusb.DeviceDescriptor.BCD_USB
@@ -22,6 +24,9 @@ import org.schism.cousb.Libusb.unrefDevice
 import java.lang.foreign.MemoryAddress
 import java.lang.foreign.MemorySession
 import java.lang.foreign.ValueLayout.ADDRESS
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind.EXACTLY_ONCE
+import kotlin.contracts.contract
 
 public class USBDevice internal constructor(handle: MemoryAddress) {
     init {
@@ -75,6 +80,21 @@ public class USBDevice internal constructor(handle: MemoryAddress) {
                     }
                 }
             }
+        }
+    }
+
+    @OptIn(ExperimentalContracts::class)
+    public suspend inline fun <R> connect(block: (USBDeviceConnection) -> R): R {
+        contract {
+            callsInPlace(block, EXACTLY_ONCE)
+        }
+
+        val connection = USBDeviceConnection(this@USBDevice)
+
+        try {
+            return block(connection)
+        } finally {
+            connection.close()
         }
     }
 
