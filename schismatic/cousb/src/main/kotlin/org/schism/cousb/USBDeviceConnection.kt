@@ -7,22 +7,28 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.schism.bytes.HeapSegmentAllocator
 import org.schism.cousb.Libusb.Transfer
+import org.schism.cousb.Libusb.TransferFlags
 import org.schism.cousb.Libusb.TransferStatus
 import org.schism.cousb.Libusb.TransferType
+import org.schism.cousb.Libusb.cancelTransfer
 import org.schism.cousb.Libusb.checkReturnCode
+import org.schism.cousb.Libusb.freeTransfer
+import org.schism.cousb.Libusb.submitTransfer
 import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.Linker
 import java.lang.foreign.MemoryAddress
 import java.lang.foreign.MemorySegment
 import java.lang.foreign.MemorySession
+import java.lang.foreign.SegmentAllocator
 import java.lang.foreign.ValueLayout.ADDRESS
+import java.lang.foreign.ValueLayout.JAVA_LONG
+import java.lang.invoke.MethodHandle
 import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
-import java.lang.ref.Reference.reachabilityFence
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.Continuation
-import kotlin.coroutines.resume
 
 public class USBDeviceConnection @PublishedApi internal constructor(public val device: USBDevice) {
     private var handle: MemoryAddress? =
@@ -54,113 +60,131 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
         }
     }
 
-    private suspend fun submitAndSuspendOnTransfer(memorySession: MemorySession, transfer: MemoryAddress) {
+    public suspend fun sendPacket(endpoint: USBBulkTransferOutEndpoint, data: MemorySegment) {
+        require(endpoint.device === device)
+        require(data.byteSize() <= endpoint.maxPacketSize.toLong())
+
+        val libusbTransfer = Libusb.allocTransfer(0) as MemoryAddress
+
+        if (libusbTransfer == MemoryAddress.NULL) {
+            throw OutOfMemoryError("Failed to allocate transfer")
+        }
+
+        Transfer.FLAGS.set(TransferFlags.FREE_TRANSFER or TransferFlags.FREE_BUFFER or TransferFlags.SHORT_NOT_OK)
+        Transfer.ENDPOINT.set(libusbTransfer, endpoint.address.toByte())
+        Transfer.TYPE.set(libusbTransfer, TransferType.BULK)
+        Transfer.TIMEOUT.set(libusbTransfer, 0)
+        Transfer.LENGTH.set(libusbTransfer, data.byteSize().toInt())
+        Transfer.CALLBACK.set(libusbTransfer, OUT_TRANSFER_CALLBACK)
+
+        if (data.byteSize() != 0L) {
+            val buffer = malloc(data.byteSize()) as MemoryAddress
+
+            if (buffer == MemoryAddress.NULL) {
+                freeTransfer(libusbTransfer)
+                throw OutOfMemoryError("Failed to allocate buffer")
+            }
+
+            MemorySegment.ofAddress(buffer, data.byteSize(), MemorySession.global()).copyFrom(data)
+            Transfer.BUFFER.set(libusbTransfer, buffer)
+        } else {
+            Transfer.BUFFER.set(libusbTransfer, MemoryAddress.NULL)
+        }
+
         mutex.lock()
 
-        suspendCancellableCoroutine<Unit> { continuation ->
-            // FIXME: can we safely throw exceptions out of here?
+        return suspendCancellableCoroutine { continuation ->
             try {
-                Transfer.DEV_HANDLE.set(transfer, checkNotNull(handle))
+                val handle = handle ?: kotlin.run {
+                    freeTransfer(libusbTransfer)
+                    throw IllegalStateException("Connection is closed")
+                }
 
-                transfers[transfer] = continuation to memorySession
+                Transfer.DEV_HANDLE.set(libusbTransfer, handle)
 
-                when (val returnCode = Libusb.submitTransfer(transfer) as Int) {
+                val transfer = OutTransfer(continuation)
+                outTransfers[libusbTransfer] = transfer
+
+                when (val returnCode = submitTransfer(libusbTransfer) as Int) {
                     0 -> continuation.invokeOnCancellation {
-                        try {
-                            Libusb.cancelTransfer(transfer)
-                        } finally {
-                            reachabilityFence(memorySession)
+                        synchronized(transfer) {
+                            if (transfer.continuation != null) {
+                                cancelTransfer(transfer)
+                            }
                         }
                     }
 
                     else -> {
-                        transfers.remove(transfer)
+                        outTransfers.remove(libusbTransfer)
+                        freeTransfer(libusbTransfer)
                         throw LibusbErrorException(returnCode)
                     }
                 }
             } finally {
-                reachabilityFence(memorySession)
                 mutex.unlock()
             }
         }
     }
 
-    public suspend fun transfer(endpoint: USBBulkTransferOutEndpoint, data: MemorySegment): Int {
+    public suspend fun receivePacket(
+        endpoint: USBBulkTransferInEndpoint,
+        allocator: SegmentAllocator = HeapSegmentAllocator,
+    ): MemorySegment {
         require(endpoint.device === device)
 
-        val transfer = Libusb.allocTransfer(0) as MemoryAddress
+        val libusbTransfer = Libusb.allocTransfer(0) as MemoryAddress
 
-        if (transfer == MemoryAddress.NULL) {
+        if (libusbTransfer == MemoryAddress.NULL) {
             throw OutOfMemoryError("Failed to allocate transfer")
         }
 
-        val memorySession = MemorySession.openImplicit()
-        memorySession.addCloseAction { Libusb.freeTransfer(transfer) }
+        val buffer = malloc(endpoint.maxPacketSize.toLong()) as MemoryAddress
 
-        try {
-            Transfer.ENDPOINT.set(transfer, endpoint.address.toByte())
-            Transfer.TYPE.set(transfer, TransferType.BULK)
-            Transfer.TIMEOUT.set(transfer, 0)
-            Transfer.LENGTH.set(transfer, Math.toIntExact(data.byteSize()))
-            Transfer.CALLBACK.set(transfer, TRANSFER_CALLBACK)
+        if (buffer == MemoryAddress.NULL) {
+            freeTransfer(libusbTransfer)
+            throw OutOfMemoryError("Failed to allocate packet buffer")
+        }
 
-            if (data.byteSize() != 0L) {
-                val buffer = MemorySegment.allocateNative(data.byteSize(), memorySession)
-                buffer.copyFrom(data)
-                Transfer.BUFFER.set(transfer, buffer)
-            } else {
-                Transfer.BUFFER.set(transfer, MemoryAddress.NULL)
+        Transfer.FLAGS.set(TransferFlags.FREE_TRANSFER or TransferFlags.FREE_BUFFER)
+        Transfer.ENDPOINT.set(libusbTransfer, endpoint.address.toByte())
+        Transfer.TYPE.set(libusbTransfer, TransferType.BULK)
+        Transfer.TIMEOUT.set(libusbTransfer, 0)
+        Transfer.LENGTH.set(libusbTransfer, endpoint.maxPacketSize.toInt())
+        Transfer.CALLBACK.set(libusbTransfer, IN_TRANSFER_CALLBACK)
+        Transfer.BUFFER.set(libusbTransfer, buffer)
+
+        mutex.lock()
+
+        return suspendCancellableCoroutine { continuation ->
+            try {
+                val handle = handle ?: kotlin.run {
+                    freeTransfer(libusbTransfer)
+                    throw IllegalStateException("Connection is closed")
+                }
+
+                Transfer.DEV_HANDLE.set(libusbTransfer, handle)
+
+                val transfer = InTransfer(continuation, allocator)
+                inTransfers[libusbTransfer] = transfer
+
+                when (val returnCode = submitTransfer(libusbTransfer) as Int) {
+                    0 -> continuation.invokeOnCancellation {
+                        synchronized(transfer) {
+                            if (transfer.continuation != null) {
+                                cancelTransfer(transfer)
+                            }
+                        }
+                    }
+
+                    else -> {
+                        outTransfers.remove(libusbTransfer)
+                        freeTransfer(libusbTransfer)
+                        throw LibusbErrorException(returnCode)
+                    }
+                }
+            } finally {
+                mutex.unlock()
             }
-        } finally {
-            reachabilityFence(memorySession)
-        }
-
-        submitAndSuspendOnTransfer(memorySession, transfer)
-
-        try {
-            checkTransferStatus(transfer)
-            return Transfer.ACTUAL_LENGTH[transfer] as Int
-        } finally {
-            reachabilityFence(memorySession)
-        }
-    }
-
-    public suspend fun transfer(endpoint: USBBulkTransferInEndpoint): ByteArray {
-        require(endpoint.device === device)
-
-        val transfer = Libusb.allocTransfer(0) as MemoryAddress
-
-        if (transfer == MemoryAddress.NULL) {
-            throw OutOfMemoryError("Failed to allocate transfer")
-        }
-
-        val memorySession = MemorySession.openImplicit()
-        memorySession.addCloseAction { Libusb.freeTransfer(transfer) }
-
-
-        val buffer = if (bufferSize != 0L) {
-            MemorySegment.allocateNative(bufferSize, memorySession)
-        } else {
-            NULL_SEGMENT
-        }
-
-        try {
-            Transfer.ENDPOINT.set(transfer, endpoint.address.toByte())
-            Transfer.TYPE.set(transfer, TransferType.BULK)
-            Transfer.TIMEOUT.set(transfer, 0)
-            Transfer.LENGTH.set(transfer, Math.toIntExact(buffer.byteSize()))
-            Transfer.CALLBACK.set(transfer, TRANSFER_CALLBACK)
-            Transfer.BUFFER.set(transfer, buffer)
-        } finally {
-            reachabilityFence(memorySession)
-        }
-
-        submitAndSuspendOnTransfer(memorySession, transfer)
-
-        try {
-            checkTransferStatus(transfer)
-        } finally {
-            reachabilityFence(memorySession)
         }
     }
 
@@ -173,23 +197,20 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
         }
     }
 
+    private class OutTransfer(continuation: Continuation<Unit>) {
+        var continuation: Continuation<Unit>? = continuation
+    }
+
+    private class InTransfer(continuation: Continuation<MemorySegment>, val allocator: SegmentAllocator) {
+        var continuation: Continuation<MemorySegment>? = continuation
+    }
+
     public companion object {
-        private val transfers = ConcurrentHashMap<MemoryAddress, Pair<Continuation<Unit>, MemorySession>>()
+        private val outTransfers = ConcurrentHashMap<MemoryAddress, OutTransfer>()
+        private val inTransfers = ConcurrentHashMap<MemoryAddress, InTransfer>()
 
-        private val NULL_SEGMENT = MemorySegment.ofAddress(MemoryAddress.NULL, 0, MemorySession.global())
-
-        @[Suppress("UNUSED") JvmStatic]
-        private fun transferCallback(transfer: MemoryAddress) {
-            val (continuation, memorySession) = checkNotNull(transfers.remove(transfer))
-            try {
-                continuation.resume(Unit)
-            } finally {
-                reachabilityFence(memorySession)
-            }
-        }
-
-        private fun checkTransferStatus(transfer: MemoryAddress) {
-            when (Transfer.STATUS[transfer] as Int) {
+        private fun checkTransferStatus(libusbTransfer: MemoryAddress) {
+            when (val status = Transfer.STATUS[libusbTransfer] as Int) {
                 TransferStatus.COMPLETED -> Unit
                 TransferStatus.ERROR -> throw USBTransferException("Transfer error")
                 TransferStatus.TIMED_OUT -> throw USBTransferException("Transfer timed out")
@@ -197,18 +218,70 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
                 TransferStatus.STALL -> throw USBTransferException("Transfer stalled")
                 TransferStatus.NO_DEVICE -> throw USBTransferException("Device is no longer attached")
                 TransferStatus.OVERFLOW -> throw USBTransferException("Transfer overflowed")
-                else -> throw USBTransferException("Unknown transfer error")
+                else -> throw USBTransferException("Unknown transfer error (status code $status)")
             }
         }
 
-        private val TRANSFER_CALLBACK: MemorySegment =
-            Linker.nativeLinker().upcallStub(
+        @[Suppress("UNUSED") JvmStatic]
+        private fun outTransferCallback(libusbTransfer: MemoryAddress) {
+            val transfer = checkNotNull(outTransfers.remove(libusbTransfer))
+
+            val continuation = synchronized(transfer) {
+                (transfer.continuation ?: return).also { transfer.continuation = null }
+            }
+
+            continuation.resumeWith(kotlin.runCatching {
+                checkTransferStatus(libusbTransfer)
+            })
+        }
+
+        @[Suppress("UNUSED") JvmStatic]
+        private fun inTransferCallback(libusbTransfer: MemoryAddress) {
+            val transfer = checkNotNull(inTransfers.remove(libusbTransfer))
+
+            val continuation = synchronized(transfer) {
+                (transfer.continuation ?: return).also { transfer.continuation = null }
+            }
+
+            continuation.resumeWith(kotlin.runCatching {
+                checkTransferStatus(libusbTransfer)
+                val buffer = Transfer.BUFFER[libusbTransfer] as MemoryAddress
+                val actualLength = Transfer.ACTUAL_LENGTH[libusbTransfer] as Int
+                val segment = transfer.allocator.allocate(actualLength.toLong())
+                segment.copyFrom(MemorySegment.ofAddress(buffer, actualLength.toLong(), MemorySession.global()))
+                segment
+            })
+        }
+
+        private val OUT_TRANSFER_CALLBACK: MemorySegment
+        private val IN_TRANSFER_CALLBACK: MemorySegment
+        private val malloc: MethodHandle
+
+        init {
+            val linker = Linker.nativeLinker()
+
+            OUT_TRANSFER_CALLBACK = linker.upcallStub(
                 MethodHandles.lookup().findStatic(
-                    USBDeviceConnection::class.java, "transferCallback",
+                    USBDeviceConnection::class.java, "outTransferCallback",
                     MethodType.methodType(Void.TYPE, MemoryAddress::class.java),
                 ),
                 FunctionDescriptor.ofVoid(ADDRESS),
                 MemorySession.global(),
             )
+
+            IN_TRANSFER_CALLBACK = linker.upcallStub(
+                MethodHandles.lookup().findStatic(
+                    USBDeviceConnection::class.java, "inTransferCallback",
+                    MethodType.methodType(Void.TYPE, MemoryAddress::class.java),
+                ),
+                FunctionDescriptor.ofVoid(ADDRESS),
+                MemorySession.global(),
+            )
+
+            malloc = linker.downcallHandle(
+                linker.defaultLookup().lookup("malloc").orElseThrow(),
+                FunctionDescriptor.of(ADDRESS, JAVA_LONG), // FIXME: handle 32-bit size_t
+            )
+        }
     }
 }
