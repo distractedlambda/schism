@@ -7,5 +7,5 @@ public class LibusbErrorException(public val code: Int) : Exception(errorMessage
 }
 
 private fun errorMessage(code: Int): String {
-    return (Libusb.strerror.invokeExact(code) as MemoryAddress).getUtf8String(0)
+    return (Libusb.strerror(code) as MemoryAddress).getUtf8String(0)
 }

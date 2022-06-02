@@ -12,10 +12,6 @@ import org.schism.cousb.Libusb.Transfer
 import org.schism.cousb.Libusb.TransferFlags
 import org.schism.cousb.Libusb.TransferStatus
 import org.schism.cousb.Libusb.TransferType
-import org.schism.cousb.Libusb.cancelTransfer
-import org.schism.cousb.Libusb.checkReturnCode
-import org.schism.cousb.Libusb.freeTransfer
-import org.schism.cousb.Libusb.submitTransfer
 import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.Linker
 import java.lang.foreign.MemoryAddress
@@ -23,10 +19,12 @@ import java.lang.foreign.MemorySegment
 import java.lang.foreign.MemorySession
 import java.lang.foreign.SegmentAllocator
 import java.lang.foreign.ValueLayout.ADDRESS
+import java.lang.foreign.ValueLayout.JAVA_CHAR
 import java.lang.foreign.ValueLayout.JAVA_LONG
 import java.lang.invoke.MethodHandle
 import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
+import java.nio.ByteOrder.LITTLE_ENDIAN
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.Continuation
 
@@ -34,7 +32,7 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
     private var handle: MemoryAddress? =
         MemorySession.openConfined().use { memorySession ->
             val connectionHandleStorage = memorySession.allocate(ADDRESS)
-            checkReturnCode(Libusb.open(device.handle, connectionHandleStorage) as Int)
+            Libusb.checkReturn(Libusb.open(device.handle, connectionHandleStorage) as Int)
             connectionHandleStorage[ADDRESS, 0]
         }
 
@@ -45,7 +43,7 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
 
         mutex.withLock {
             val handle = checkNotNull(handle) { "Connection is closed" }
-            checkReturnCode(Libusb.claimInterface(handle, iface.number.toInt()) as Int)
+            Libusb.checkReturn(Libusb.claimInterface(handle, iface.number.toInt()) as Int)
         }
     }
 
@@ -55,7 +53,30 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
         mutex.withLock {
             val handle = checkNotNull(handle) { "Connection is closed" }
             withContext(Dispatchers.IO) {
-                checkReturnCode(Libusb.releaseInterface(handle, iface.number.toInt()) as Int)
+                Libusb.checkReturn(Libusb.releaseInterface(handle, iface.number.toInt()) as Int)
+            }
+        }
+    }
+
+    public suspend fun getString(index: USBStringDescriptorIndex): String {
+        return mutex.withLock {
+            val handle = checkNotNull(handle) { "Connection is closed" }
+            withContext(Dispatchers.IO) {
+                MemorySession.openConfined().use { memorySession ->
+                    val buffer = MemorySegment.allocateNative(246, memorySession)
+
+                    val byteCount = Libusb.checkSize(
+                        Libusb.getStringDescriptor(
+                            handle,
+                            index.toUByte(),
+                            0.toShort(),
+                            buffer,
+                            buffer.byteSize().toInt()
+                        ) as Int
+                    )
+
+                    String(buffer.asSlice(0, byteCount.toLong()).toArray(JAVA_CHAR.withOrder(LITTLE_ENDIAN)))
+                }
             }
         }
     }
@@ -81,7 +102,7 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
             val buffer = malloc(data.byteSize()) as MemoryAddress
 
             if (buffer == MemoryAddress.NULL) {
-                freeTransfer(libusbTransfer)
+                Libusb.freeTransfer(libusbTransfer)
                 throw OutOfMemoryError("Failed to allocate buffer")
             }
 
@@ -96,7 +117,7 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
         return suspendCancellableCoroutine { continuation ->
             try {
                 val handle = handle ?: kotlin.run {
-                    freeTransfer(libusbTransfer)
+                    Libusb.freeTransfer(libusbTransfer)
                     throw IllegalStateException("Connection is closed")
                 }
 
@@ -105,18 +126,18 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
                 val transfer = OutTransfer(continuation)
                 outTransfers[libusbTransfer] = transfer
 
-                when (val returnCode = submitTransfer(libusbTransfer) as Int) {
+                when (val returnCode = Libusb.submitTransfer(libusbTransfer) as Int) {
                     0 -> continuation.invokeOnCancellation {
                         synchronized(transfer) {
                             if (transfer.continuation != null) {
-                                cancelTransfer(transfer)
+                                Libusb.cancelTransfer(transfer)
                             }
                         }
                     }
 
                     else -> {
                         outTransfers.remove(libusbTransfer)
-                        freeTransfer(libusbTransfer)
+                        Libusb.freeTransfer(libusbTransfer)
                         throw LibusbErrorException(returnCode)
                     }
                 }
@@ -141,7 +162,7 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
         val buffer = malloc(endpoint.maxPacketSize.toLong()) as MemoryAddress
 
         if (buffer == MemoryAddress.NULL) {
-            freeTransfer(libusbTransfer)
+            Libusb.freeTransfer(libusbTransfer)
             throw OutOfMemoryError("Failed to allocate packet buffer")
         }
 
@@ -158,7 +179,7 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
         return suspendCancellableCoroutine { continuation ->
             try {
                 val handle = handle ?: kotlin.run {
-                    freeTransfer(libusbTransfer)
+                    Libusb.freeTransfer(libusbTransfer)
                     throw IllegalStateException("Connection is closed")
                 }
 
@@ -167,18 +188,18 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
                 val transfer = InTransfer(continuation, allocator)
                 inTransfers[libusbTransfer] = transfer
 
-                when (val returnCode = submitTransfer(libusbTransfer) as Int) {
+                when (val returnCode = Libusb.submitTransfer(libusbTransfer) as Int) {
                     0 -> continuation.invokeOnCancellation {
                         synchronized(transfer) {
                             if (transfer.continuation != null) {
-                                cancelTransfer(transfer)
+                                Libusb.cancelTransfer(transfer)
                             }
                         }
                     }
 
                     else -> {
                         outTransfers.remove(libusbTransfer)
-                        freeTransfer(libusbTransfer)
+                        Libusb.freeTransfer(libusbTransfer)
                         throw LibusbErrorException(returnCode)
                     }
                 }
@@ -243,7 +264,7 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
                 (transfer.continuation ?: return).also { transfer.continuation = null }
             }
 
-            continuation.resumeWith(kotlin.runCatching {
+            continuation.resumeWith(runCatching {
                 checkTransferStatus(libusbTransfer)
                 val buffer = Transfer.BUFFER[libusbTransfer] as MemoryAddress
                 val actualLength = Transfer.ACTUAL_LENGTH[libusbTransfer] as Int

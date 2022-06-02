@@ -31,6 +31,7 @@ internal object Libusb {
     val getDeviceAddress: MethodHandle
     val getDeviceDescriptor: MethodHandle
     val getDeviceList: MethodHandle
+    val getStringDescriptor: MethodHandle
     val handleEvents: MethodHandle
     val init: MethodHandle
     val interruptEventHandler: MethodHandle
@@ -57,36 +58,74 @@ internal object Libusb {
         }
 
         allocTransfer = link("alloc_transfer", JAVA_INT, returning = ADDRESS)
+
         cancelTransfer = link("cancel_transfer", ADDRESS, returning = JAVA_INT)
+
         claimInterface = link("claim_interface", ADDRESS, JAVA_INT, returning = JAVA_INT)
+
         clearHalt = link("clear_halt", ADDRESS, JAVA_BYTE, returning = JAVA_INT)
+
         close = link("close", ADDRESS)
+
         exit = link("exit", ADDRESS)
+
         freeConfigDescriptor = link("free_config_descriptor", ADDRESS)
+
         freeDeviceList = link("free_device_list", ADDRESS, JAVA_INT)
+
         freeTransfer = link("free_transfer", ADDRESS)
+
         getActiveConfigDescriptor = link("get_active_config_descriptor", ADDRESS, ADDRESS, returning = JAVA_INT)
+
         getBusNumber = link("get_bus_number", ADDRESS, returning = JAVA_BYTE)
+
         getConfigDescriptor = link("get_config_descriptor", ADDRESS, JAVA_BYTE, ADDRESS, returning = JAVA_INT)
+
         getDeviceAddress = link("get_device_address", ADDRESS, returning = JAVA_BYTE)
+
         getDeviceDescriptor = link("get_device_descriptor", ADDRESS, ADDRESS, returning = JAVA_INT)
+
         getDeviceList = link("get_device_list", ADDRESS, ADDRESS, returning = JAVA_LONG) // FIXME: 32-bit ssize_t?
+
+        getStringDescriptor = link(
+            "get_string_descriptor",
+            ADDRESS, JAVA_BYTE, JAVA_SHORT, ADDRESS, JAVA_INT,
+            returning = JAVA_INT,
+        )
+
         handleEvents = link("handle_events", ADDRESS, returning = JAVA_INT)
+
         init = link("init", ADDRESS, returning = JAVA_INT)
+
         interruptEventHandler = link("interrupt_event_handler", ADDRESS)
+
         open = link("open", ADDRESS, ADDRESS, returning = JAVA_INT)
+
         refDevice = link("ref_device", ADDRESS, returning = ADDRESS)
+
         releaseInterface = link("release_interface", ADDRESS, JAVA_INT, returning = JAVA_INT)
+
         resetDevice = link("reset_device", ADDRESS, returning = JAVA_INT)
+
         strerror = link("strerror", JAVA_INT, returning = ADDRESS)
+
         submitTransfer = link("submit_transfer", ADDRESS, returning = JAVA_INT)
+
         unrefDevice = link("unref_device", ADDRESS)
     }
 
-    fun checkReturnCode(code: Int) {
+    fun checkReturn(code: Int) {
         if (code != 0) {
             throw LibusbErrorException(code)
         }
+    }
+
+    fun checkSize(size: Int): Int {
+        if (size < 0) {
+            throw LibusbErrorException(size)
+        }
+
+        return size
     }
 
     fun checkSize(size: Long): Long {
@@ -113,18 +152,18 @@ internal object Libusb {
             JAVA_INT.withName("num_iso_packets"),
         )
 
-        val DEV_HANDLE = LAYOUT.varHandle(groupElement("dev_handle"))
-        val FLAGS = LAYOUT.varHandle(groupElement("flags"))
-        val ENDPOINT = LAYOUT.varHandle(groupElement("endpoint"))
-        val TYPE = LAYOUT.varHandle(groupElement("type"))
-        val TIMEOUT = LAYOUT.varHandle(groupElement("timeout"))
-        val STATUS = LAYOUT.varHandle(groupElement("status"))
-        val LENGTH = LAYOUT.varHandle(groupElement("length"))
-        val ACTUAL_LENGTH = LAYOUT.varHandle(groupElement("actual_length"))
-        val CALLBACK = LAYOUT.varHandle(groupElement("callback"))
-        val USER_DATA = LAYOUT.varHandle(groupElement("user_data"))
-        val BUFFER = LAYOUT.varHandle(groupElement("buffer"))
-        val NUM_ISO_PACKETS = LAYOUT.varHandle(groupElement("num_iso_packets"))
+        val DEV_HANDLE = LAYOUT.varHandle(groupElement("dev_handle"))!!
+        val FLAGS = LAYOUT.varHandle(groupElement("flags"))!!
+        val ENDPOINT = LAYOUT.varHandle(groupElement("endpoint"))!!
+        val TYPE = LAYOUT.varHandle(groupElement("type"))!!
+        val TIMEOUT = LAYOUT.varHandle(groupElement("timeout"))!!
+        val STATUS = LAYOUT.varHandle(groupElement("status"))!!
+        val LENGTH = LAYOUT.varHandle(groupElement("length"))!!
+        val ACTUAL_LENGTH = LAYOUT.varHandle(groupElement("actual_length"))!!
+        val CALLBACK = LAYOUT.varHandle(groupElement("callback"))!!
+        val USER_DATA = LAYOUT.varHandle(groupElement("user_data"))!!
+        val BUFFER = LAYOUT.varHandle(groupElement("buffer"))!!
+        val NUM_ISO_PACKETS = LAYOUT.varHandle(groupElement("num_iso_packets"))!!
     }
 
     internal object TransferStatus {
@@ -170,18 +209,18 @@ internal object Libusb {
             JAVA_BYTE.withName("bNumConfigurations"),
         )
 
-        val BCD_USB = LAYOUT.varHandle(groupElement("bcdUSB"))
-        val B_DEVICE_CLASS = LAYOUT.varHandle(groupElement("bDeviceClass"))
-        val B_DEVICE_SUB_CLASS = LAYOUT.varHandle(groupElement("bDeviceSubClass"))
-        val B_DEVICE_PROTOCOL = LAYOUT.varHandle(groupElement("bDeviceProtocol"))
-        val B_MAX_PACKET_SIZE_0 = LAYOUT.varHandle(groupElement("bMaxPacketSize0"))
-        val ID_VENDOR = LAYOUT.varHandle(groupElement("idVendor"))
-        val ID_PRODUCT = LAYOUT.varHandle(groupElement("idProduct"))
-        val BCD_DEVICE = LAYOUT.varHandle(groupElement("bcdDevice"))
-        val I_MANUFACTURER = LAYOUT.varHandle(groupElement("iManufacturer"))
-        val I_PRODUCT = LAYOUT.varHandle(groupElement("iProduct"))
-        val I_SERIAL_NUMBER = LAYOUT.varHandle(groupElement("iSerialNumber"))
-        val B_NUM_CONFIGURATIONS = LAYOUT.varHandle(groupElement("bNumConfigurations"))
+        val BCD_USB = LAYOUT.varHandle(groupElement("bcdUSB"))!!
+        val B_DEVICE_CLASS = LAYOUT.varHandle(groupElement("bDeviceClass"))!!
+        val B_DEVICE_SUB_CLASS = LAYOUT.varHandle(groupElement("bDeviceSubClass"))!!
+        val B_DEVICE_PROTOCOL = LAYOUT.varHandle(groupElement("bDeviceProtocol"))!!
+        val B_MAX_PACKET_SIZE_0 = LAYOUT.varHandle(groupElement("bMaxPacketSize0"))!!
+        val ID_VENDOR = LAYOUT.varHandle(groupElement("idVendor"))!!
+        val ID_PRODUCT = LAYOUT.varHandle(groupElement("idProduct"))!!
+        val BCD_DEVICE = LAYOUT.varHandle(groupElement("bcdDevice"))!!
+        val I_MANUFACTURER = LAYOUT.varHandle(groupElement("iManufacturer"))!!
+        val I_PRODUCT = LAYOUT.varHandle(groupElement("iProduct"))!!
+        val I_SERIAL_NUMBER = LAYOUT.varHandle(groupElement("iSerialNumber"))!!
+        val B_NUM_CONFIGURATIONS = LAYOUT.varHandle(groupElement("bNumConfigurations"))!!
     }
 
     internal object ConfigDescriptor {
@@ -199,14 +238,14 @@ internal object Libusb {
             JAVA_INT.withName("extra_length"),
         )
 
-        val B_NUM_INTERFACES = LAYOUT.varHandle(groupElement("bNumInterfaces"))
-        val B_CONFIGURATION_VALUE = LAYOUT.varHandle(groupElement("bConfigurationValue"))
-        val I_CONFIGURATION = LAYOUT.varHandle(groupElement("iConfiguration"))
-        val BM_ATTRIBUTES = LAYOUT.varHandle(groupElement("bmAttributes"))
-        val MAX_POWER = LAYOUT.varHandle(groupElement("MaxPower"))
-        val INTERFACE = LAYOUT.varHandle(groupElement("interface"))
-        val EXTRA = LAYOUT.varHandle(groupElement("extra"))
-        val EXTRA_LENGTH = LAYOUT.varHandle(groupElement("extra_length"))
+        val B_NUM_INTERFACES = LAYOUT.varHandle(groupElement("bNumInterfaces"))!!
+        val B_CONFIGURATION_VALUE = LAYOUT.varHandle(groupElement("bConfigurationValue"))!!
+        val I_CONFIGURATION = LAYOUT.varHandle(groupElement("iConfiguration"))!!
+        val BM_ATTRIBUTES = LAYOUT.varHandle(groupElement("bmAttributes"))!!
+        val MAX_POWER = LAYOUT.varHandle(groupElement("MaxPower"))!!
+        val INTERFACE = LAYOUT.varHandle(groupElement("interface"))!!
+        val EXTRA = LAYOUT.varHandle(groupElement("extra"))!!
+        val EXTRA_LENGTH = LAYOUT.varHandle(groupElement("extra_length"))!!
     }
 
     internal object Interface {
@@ -215,8 +254,8 @@ internal object Libusb {
             JAVA_INT.withName("num_altsetting"),
         )
 
-        val ALTSETTING = LAYOUT.varHandle(groupElement("altsetting"))
-        val NUM_ALTSETTING = LAYOUT.varHandle(groupElement("num_altsetting"))
+        val ALTSETTING = LAYOUT.varHandle(groupElement("altsetting"))!!
+        val NUM_ALTSETTING = LAYOUT.varHandle(groupElement("num_altsetting"))!!
     }
 
     internal object InterfaceDescriptor {
@@ -235,16 +274,16 @@ internal object Libusb {
             JAVA_INT.withName("extra_length"),
         )
 
-        val B_INTERFACE_NUMBER = LAYOUT.varHandle(groupElement("bInterfaceNumber"))
-        val B_ALTERNATE_SETTING = LAYOUT.varHandle(groupElement("bAlternateSetting"))
-        val B_NUM_ENDPOINTS = LAYOUT.varHandle(groupElement("bNumEndpoints"))
-        val B_INTERFACE_CLASS = LAYOUT.varHandle(groupElement("bInterfaceClass"))
-        val B_INTERFACE_SUB_CLASS = LAYOUT.varHandle(groupElement("bInterfaceSubClass"))
-        val B_INTERFACE_PROTOCOL = LAYOUT.varHandle(groupElement("bInterfaceProtocol"))
-        val I_INTERFACE = LAYOUT.varHandle(groupElement("iInterface"))
-        val ENDPOINT = LAYOUT.varHandle(groupElement("endpoint"))
-        val EXTRA = LAYOUT.varHandle(groupElement("extra"))
-        val EXTRA_LENGTH = LAYOUT.varHandle(groupElement("extra_length"))
+        val B_INTERFACE_NUMBER = LAYOUT.varHandle(groupElement("bInterfaceNumber"))!!
+        val B_ALTERNATE_SETTING = LAYOUT.varHandle(groupElement("bAlternateSetting"))!!
+        val B_NUM_ENDPOINTS = LAYOUT.varHandle(groupElement("bNumEndpoints"))!!
+        val B_INTERFACE_CLASS = LAYOUT.varHandle(groupElement("bInterfaceClass"))!!
+        val B_INTERFACE_SUB_CLASS = LAYOUT.varHandle(groupElement("bInterfaceSubClass"))!!
+        val B_INTERFACE_PROTOCOL = LAYOUT.varHandle(groupElement("bInterfaceProtocol"))!!
+        val I_INTERFACE = LAYOUT.varHandle(groupElement("iInterface"))!!
+        val ENDPOINT = LAYOUT.varHandle(groupElement("endpoint"))!!
+        val EXTRA = LAYOUT.varHandle(groupElement("extra"))!!
+        val EXTRA_LENGTH = LAYOUT.varHandle(groupElement("extra_length"))!!
     }
 
     internal object EndpointDescriptor {
@@ -261,14 +300,14 @@ internal object Libusb {
             JAVA_INT.withName("extra_length")
         )
 
-        val B_ENDPOINT_ADDRESS = LAYOUT.varHandle(groupElement("bEndpointAddress"))
-        val BM_ATTRIBUTES = LAYOUT.varHandle(groupElement("bmAttributes"))
-        val W_MAX_PACKET_SIZE = LAYOUT.varHandle(groupElement("wMaxPacketSize"))
-        val B_INTERVAL = LAYOUT.varHandle(groupElement("bInterval"))
-        val B_REFRESH = LAYOUT.varHandle(groupElement("bRefresh"))
-        val B_SYNCH_ADDRESS = LAYOUT.varHandle(groupElement("bSynchAddress"))
-        val EXTRA = LAYOUT.varHandle(groupElement("extra"))
-        val EXTRA_LENGTH = LAYOUT.varHandle(groupElement("extra_length"))
+        val B_ENDPOINT_ADDRESS = LAYOUT.varHandle(groupElement("bEndpointAddress"))!!
+        val BM_ATTRIBUTES = LAYOUT.varHandle(groupElement("bmAttributes"))!!
+        val W_MAX_PACKET_SIZE = LAYOUT.varHandle(groupElement("wMaxPacketSize"))!!
+        val B_INTERVAL = LAYOUT.varHandle(groupElement("bInterval"))!!
+        val B_REFRESH = LAYOUT.varHandle(groupElement("bRefresh"))!!
+        val B_SYNCH_ADDRESS = LAYOUT.varHandle(groupElement("bSynchAddress"))!!
+        val EXTRA = LAYOUT.varHandle(groupElement("extra"))!!
+        val EXTRA_LENGTH = LAYOUT.varHandle(groupElement("extra_length"))!!
     }
 }
 
