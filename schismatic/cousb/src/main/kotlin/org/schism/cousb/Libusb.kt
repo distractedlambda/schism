@@ -1,8 +1,8 @@
 package org.schism.cousb
 
+import org.schism.bytes.cStructLayout
 import java.lang.Math.toIntExact
 import java.lang.foreign.FunctionDescriptor
-import java.lang.foreign.GroupLayout
 import java.lang.foreign.Linker
 import java.lang.foreign.MemoryLayout
 import java.lang.foreign.MemoryLayout.PathElement.groupElement
@@ -14,6 +14,7 @@ import java.lang.foreign.ValueLayout.JAVA_INT
 import java.lang.foreign.ValueLayout.JAVA_LONG
 import java.lang.foreign.ValueLayout.JAVA_SHORT
 import java.lang.invoke.MethodHandle
+import kotlin.io.path.Path
 
 internal object Libusb {
     val allocTransfer: MethodHandle
@@ -31,7 +32,6 @@ internal object Libusb {
     val getDeviceAddress: MethodHandle
     val getDeviceDescriptor: MethodHandle
     val getDeviceList: MethodHandle
-    val getStringDescriptor: MethodHandle
     val handleEvents: MethodHandle
     val init: MethodHandle
     val interruptEventHandler: MethodHandle
@@ -44,7 +44,7 @@ internal object Libusb {
     val unrefDevice: MethodHandle
 
     init {
-        val lib = SymbolLookup.libraryLookup("usb-1.0", MemorySession.openImplicit())
+        val lib = SymbolLookup.libraryLookup(Path("/opt/homebrew/lib/libusb-1.0.dylib"), MemorySession.openImplicit())
         val linker = Linker.nativeLinker()
 
         fun link(name: String, vararg argumentLayouts: MemoryLayout, returning: MemoryLayout? = null): MethodHandle {
@@ -87,12 +87,6 @@ internal object Libusb {
 
         getDeviceList = link("get_device_list", ADDRESS, ADDRESS, returning = JAVA_LONG) // FIXME: 32-bit ssize_t?
 
-        getStringDescriptor = link(
-            "get_string_descriptor",
-            ADDRESS, JAVA_BYTE, JAVA_SHORT, ADDRESS, JAVA_INT,
-            returning = JAVA_INT,
-        )
-
         handleEvents = link("handle_events", ADDRESS, returning = JAVA_INT)
 
         init = link("init", ADDRESS, returning = JAVA_INT)
@@ -118,14 +112,6 @@ internal object Libusb {
         if (code != 0) {
             throw LibusbErrorException(code)
         }
-    }
-
-    fun checkSize(size: Int): Int {
-        if (size < 0) {
-            throw LibusbErrorException(size)
-        }
-
-        return size
     }
 
     fun checkSize(size: Long): Long {
@@ -309,8 +295,4 @@ internal object Libusb {
         val EXTRA = LAYOUT.varHandle(groupElement("extra"))!!
         val EXTRA_LENGTH = LAYOUT.varHandle(groupElement("extra_length"))!!
     }
-}
-
-private fun cStructLayout(vararg elements: MemoryLayout): GroupLayout {
-    TODO()
 }

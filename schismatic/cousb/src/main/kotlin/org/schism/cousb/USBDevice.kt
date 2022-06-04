@@ -1,9 +1,12 @@
 package org.schism.cousb
 
+import org.schism.bytes.newConfinedMemorySession
+import org.schism.bytes.segment
+import org.schism.cousb.Libusb.ConfigDescriptor
 import org.schism.cousb.Libusb.DeviceDescriptor
 import java.lang.foreign.MemoryAddress
-import java.lang.foreign.MemorySession
 import java.lang.foreign.ValueLayout.ADDRESS
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind.EXACTLY_ONCE
 import kotlin.contracts.contract
@@ -15,6 +18,8 @@ public class USBDevice internal constructor(handle: MemoryAddress) {
     }
 
     internal val handle = handle
+
+    public val transientID: ULong = nextID.getAndIncrement().toULong()
 
     public val usbVersion: UShort
     public val deviceClass: UByte
@@ -30,7 +35,7 @@ public class USBDevice internal constructor(handle: MemoryAddress) {
     public val configurations: List<USBConfiguration>
 
     init {
-        MemorySession.openConfined().use { memorySession ->
+        newConfinedMemorySession().use { memorySession ->
             val descriptor = memorySession.allocate(DeviceDescriptor.LAYOUT)
             Libusb.checkReturn(Libusb.getDeviceDescriptor(handle, descriptor) as Int)
 
@@ -54,7 +59,12 @@ public class USBDevice internal constructor(handle: MemoryAddress) {
                     Libusb.checkReturn(Libusb.getConfigDescriptor(handle, i.toByte(), configDescriptorStorage) as Int)
                     val configDescriptor = configDescriptorStorage[ADDRESS, 0]
                     try {
-                        add(USBConfiguration(this@USBDevice, configDescriptor))
+                        add(
+                            USBConfiguration(
+                                this@USBDevice,
+                                ConfigDescriptor.LAYOUT.segment(configDescriptor),
+                            )
+                        )
                     } finally {
                         Libusb.freeConfigDescriptor(configDescriptor)
                     }
@@ -78,5 +88,7 @@ public class USBDevice internal constructor(handle: MemoryAddress) {
         }
     }
 
-    public companion object
+    public companion object {
+        private val nextID = AtomicLong()
+    }
 }

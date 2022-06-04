@@ -1,8 +1,9 @@
+import org.jetbrains.compose.compose
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import org.gradle.kotlin.dsl.kotlin
 
 plugins {
-    kotlin("jvm") version "1.6.21"
+    kotlin("jvm") version "1.6.10"
+    id("org.jetbrains.compose") version "1.1.0"
 }
 
 group = "org.schism"
@@ -25,12 +26,24 @@ allprojects {
 
     tasks.withType<KotlinCompile> {
         kotlinOptions {
-            jvmTarget = "18"
+            jvmTarget = "17"
             freeCompilerArgs += listOf("-opt-in=kotlin.RequiresOptIn")
         }
     }
 }
 
+repositories {
+    maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+    google()
+}
+
 dependencies {
     implementation(project(":cousb"))
+    implementation(compose.desktop.currentOs)
+}
+
+compose.desktop {
+    application {
+        mainClass = "org.schism.schismatic.Schismatic"
+    }
 }

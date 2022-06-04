@@ -8,6 +8,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.schism.bytes.HeapSegmentAllocator
+import org.schism.bytes.copyFrom
+import org.schism.bytes.newConfinedMemorySession
 import org.schism.cousb.Libusb.Transfer
 import org.schism.cousb.Libusb.TransferFlags
 import org.schism.cousb.Libusb.TransferStatus
@@ -19,18 +21,16 @@ import java.lang.foreign.MemorySegment
 import java.lang.foreign.MemorySession
 import java.lang.foreign.SegmentAllocator
 import java.lang.foreign.ValueLayout.ADDRESS
-import java.lang.foreign.ValueLayout.JAVA_CHAR
 import java.lang.foreign.ValueLayout.JAVA_LONG
 import java.lang.invoke.MethodHandle
 import java.lang.invoke.MethodHandles
-import java.lang.invoke.MethodType
-import java.nio.ByteOrder.LITTLE_ENDIAN
+import java.lang.invoke.MethodType.methodType
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.Continuation
 
 public class USBDeviceConnection @PublishedApi internal constructor(public val device: USBDevice) {
     private var handle: MemoryAddress? =
-        MemorySession.openConfined().use { memorySession ->
+        newConfinedMemorySession().use { memorySession ->
             val connectionHandleStorage = memorySession.allocate(ADDRESS)
             Libusb.checkReturn(Libusb.open(device.handle, connectionHandleStorage) as Int)
             connectionHandleStorage[ADDRESS, 0]
@@ -54,29 +54,6 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
             val handle = checkNotNull(handle) { "Connection is closed" }
             withContext(Dispatchers.IO) {
                 Libusb.checkReturn(Libusb.releaseInterface(handle, iface.number.toInt()) as Int)
-            }
-        }
-    }
-
-    public suspend fun getString(index: USBStringDescriptorIndex): String {
-        return mutex.withLock {
-            val handle = checkNotNull(handle) { "Connection is closed" }
-            withContext(Dispatchers.IO) {
-                MemorySession.openConfined().use { memorySession ->
-                    val buffer = MemorySegment.allocateNative(246, memorySession)
-
-                    val byteCount = Libusb.checkSize(
-                        Libusb.getStringDescriptor(
-                            handle,
-                            index.toUByte(),
-                            0.toShort(),
-                            buffer,
-                            buffer.byteSize().toInt()
-                        ) as Int
-                    )
-
-                    String(buffer.asSlice(0, byteCount.toLong()).toArray(JAVA_CHAR.withOrder(LITTLE_ENDIAN)))
-                }
             }
         }
     }
@@ -106,7 +83,7 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
                 throw OutOfMemoryError("Failed to allocate buffer")
             }
 
-            MemorySegment.ofAddress(buffer, data.byteSize(), MemorySession.global()).copyFrom(data)
+            buffer.copyFrom(data)
             Transfer.BUFFER.set(libusbTransfer, buffer)
         } else {
             Transfer.BUFFER.set(libusbTransfer, MemoryAddress.NULL)
@@ -284,7 +261,7 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
             OUT_TRANSFER_CALLBACK = linker.upcallStub(
                 MethodHandles.lookup().findStatic(
                     USBDeviceConnection::class.java, "outTransferCallback",
-                    MethodType.methodType(Void.TYPE, MemoryAddress::class.java),
+                    methodType(Void.TYPE, MemoryAddress::class.java),
                 ),
                 FunctionDescriptor.ofVoid(ADDRESS),
                 MemorySession.global(),
@@ -293,7 +270,7 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
             IN_TRANSFER_CALLBACK = linker.upcallStub(
                 MethodHandles.lookup().findStatic(
                     USBDeviceConnection::class.java, "inTransferCallback",
-                    MethodType.methodType(Void.TYPE, MemoryAddress::class.java),
+                    methodType(Void.TYPE, MemoryAddress::class.java),
                 ),
                 FunctionDescriptor.ofVoid(ADDRESS),
                 MemorySession.global(),
