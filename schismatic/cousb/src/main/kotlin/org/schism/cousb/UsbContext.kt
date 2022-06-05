@@ -10,8 +10,8 @@ import kotlin.Result.Companion.failure
 import kotlin.Result.Companion.success
 import kotlin.concurrent.thread
 
-internal object USBContext {
-    val attachedDevices = MutableStateFlow<List<USBDevice>>(emptyList())
+internal object UsbContext {
+    val attachedDevices = MutableStateFlow<List<UsbDevice>>(emptyList())
 
     val handle: MemoryAddress =
         newConfinedMemorySession().use {
@@ -35,7 +35,7 @@ internal object USBContext {
         }
 
         thread(isDaemon = true, name = "libusb device enumerator") {
-            var devicesByHandle = hashMapOf<MemoryAddress, Result<USBDevice>>()
+            var devicesByHandle = hashMapOf<MemoryAddress, Result<UsbDevice>>()
 
             newConfinedMemorySession().use { memorySession ->
                 val listStorage = memorySession.allocate(ADDRESS)
@@ -43,14 +43,14 @@ internal object USBContext {
                 while (true) {
                     val listSize = Libusb.checkSize(Libusb.getDeviceList(handle, listStorage) as Long)
                     val list = listStorage[ADDRESS, 0]
-                    val newDevicesByHandle = hashMapOf<MemoryAddress, Result<USBDevice>>()
+                    val newDevicesByHandle = hashMapOf<MemoryAddress, Result<UsbDevice>>()
 
                     try {
                         for (i in 0 until listSize) {
                             val deviceHandle = list.getAtIndex(ADDRESS, i)
                             newDevicesByHandle[deviceHandle] = devicesByHandle[deviceHandle]
                                 ?: try {
-                                    success(USBDevice(deviceHandle))
+                                    success(UsbDevice(deviceHandle))
                                 } catch (exception: LibusbErrorException) {
                                     failure(exception)
                                 }
@@ -63,7 +63,7 @@ internal object USBContext {
 
                     attachedDevices.value = devicesByHandle.values
                         .mapNotNull { it.getOrNull() }
-                        .sortedBy(USBDevice::transientID)
+                        .sortedBy(UsbDevice::transientID)
 
                     sleep(500)
                 }

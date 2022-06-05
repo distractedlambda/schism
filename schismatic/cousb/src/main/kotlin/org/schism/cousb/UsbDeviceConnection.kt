@@ -28,7 +28,7 @@ import java.lang.invoke.MethodType.methodType
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.Continuation
 
-public class USBDeviceConnection @PublishedApi internal constructor(public val device: USBDevice) {
+public class UsbDeviceConnection @PublishedApi internal constructor(public val device: UsbDevice) {
     private var handle: MemoryAddress? =
         newConfinedMemorySession().use { memorySession ->
             val connectionHandleStorage = memorySession.allocate(ADDRESS)
@@ -38,7 +38,7 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
 
     private val mutex = Mutex()
 
-    public suspend fun claimInterface(iface: USBInterface) {
+    public suspend fun claimInterface(iface: UsbInterface) {
         require(iface.device === device)
 
         mutex.withLock {
@@ -47,7 +47,7 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
         }
     }
 
-    public suspend fun releaseInterface(iface: USBInterface) {
+    public suspend fun releaseInterface(iface: UsbInterface) {
         require(iface.device === device)
 
         mutex.withLock {
@@ -58,7 +58,7 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
         }
     }
 
-    public suspend fun sendPacket(endpoint: USBBulkTransferOutEndpoint, data: MemorySegment) {
+    public suspend fun sendPacket(endpoint: UsbBulkTransferOutEndpoint, data: MemorySegment) {
         require(endpoint.device === device)
         require(data.byteSize() <= endpoint.maxPacketSize.toLong())
 
@@ -125,7 +125,7 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
     }
 
     public suspend fun receivePacket(
-        endpoint: USBBulkTransferInEndpoint,
+        endpoint: UsbBulkTransferInEndpoint,
         allocator: SegmentAllocator = HeapSegmentAllocator,
     ): MemorySegment {
         require(endpoint.device === device)
@@ -210,13 +210,13 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
         private fun checkTransferStatus(libusbTransfer: MemoryAddress) {
             when (val status = Transfer.STATUS[libusbTransfer] as Int) {
                 TransferStatus.COMPLETED -> Unit
-                TransferStatus.ERROR -> throw USBTransferException("Transfer error")
-                TransferStatus.TIMED_OUT -> throw USBTransferException("Transfer timed out")
+                TransferStatus.ERROR -> throw UsbTransferException("Transfer error")
+                TransferStatus.TIMED_OUT -> throw UsbTransferException("Transfer timed out")
                 TransferStatus.CANCELED -> throw CancellationException("Transfer cancelled")
-                TransferStatus.STALL -> throw USBTransferException("Transfer stalled")
-                TransferStatus.NO_DEVICE -> throw USBTransferException("Device is no longer attached")
-                TransferStatus.OVERFLOW -> throw USBTransferException("Transfer overflowed")
-                else -> throw USBTransferException("Unknown transfer error (status code $status)")
+                TransferStatus.STALL -> throw UsbTransferException("Transfer stalled")
+                TransferStatus.NO_DEVICE -> throw UsbTransferException("Device is no longer attached")
+                TransferStatus.OVERFLOW -> throw UsbTransferException("Transfer overflowed")
+                else -> throw UsbTransferException("Unknown transfer error (status code $status)")
             }
         }
 
@@ -260,7 +260,7 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
 
             OUT_TRANSFER_CALLBACK = linker.upcallStub(
                 MethodHandles.lookup().findStatic(
-                    USBDeviceConnection::class.java, "outTransferCallback",
+                    UsbDeviceConnection::class.java, "outTransferCallback",
                     methodType(Void.TYPE, MemoryAddress::class.java),
                 ),
                 FunctionDescriptor.ofVoid(ADDRESS),
@@ -269,7 +269,7 @@ public class USBDeviceConnection @PublishedApi internal constructor(public val d
 
             IN_TRANSFER_CALLBACK = linker.upcallStub(
                 MethodHandles.lookup().findStatic(
-                    USBDeviceConnection::class.java, "inTransferCallback",
+                    UsbDeviceConnection::class.java, "inTransferCallback",
                     methodType(Void.TYPE, MemoryAddress::class.java),
                 ),
                 FunctionDescriptor.ofVoid(ADDRESS),

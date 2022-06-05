@@ -7,7 +7,7 @@ import org.schism.cousb.Libusb.InterfaceDescriptor
 import java.lang.foreign.MemoryAddress
 import java.lang.foreign.MemorySegment
 
-public class USBInterface internal constructor(public val configuration: USBConfiguration, descriptor: MemorySegment) {
+public class UsbInterface internal constructor(public val configuration: UsbConfiguration, descriptor: MemorySegment) {
     internal val number: UByte =
         (InterfaceDescriptor.B_INTERFACE_NUMBER[descriptor] as Byte).toUByte()
 
@@ -23,10 +23,10 @@ public class USBInterface internal constructor(public val configuration: USBConf
     public val interfaceProtocol: UByte =
         (InterfaceDescriptor.B_INTERFACE_PROTOCOL[descriptor] as Byte).toUByte()
 
-    public val name: USBStringDescriptorIndex =
-        USBStringDescriptorIndex((InterfaceDescriptor.I_INTERFACE[descriptor] as Byte).toUByte())
+    public val name: UsbStringDescriptorIndex =
+        UsbStringDescriptorIndex((InterfaceDescriptor.I_INTERFACE[descriptor] as Byte).toUByte())
 
-    public val endpoints: List<USBEndpoint> =
+    public val endpoints: List<UsbEndpoint> =
         buildList {
             EndpointDescriptor.LAYOUT
                 .sequence((InterfaceDescriptor.B_NUM_ENDPOINTS[descriptor] as Byte).toUByte().toLong())
@@ -36,11 +36,11 @@ public class USBInterface internal constructor(public val configuration: USBConf
                     val attributes = (EndpointDescriptor.BM_ATTRIBUTES[endpointDescriptor] as Byte).toInt()
                     val maxPacketSize = (EndpointDescriptor.W_MAX_PACKET_SIZE[endpointDescriptor] as Short).toUShort()
                     add(when (attributes and 0b11) {
-                        0 -> USBControlEndpoint(this@USBInterface, address, maxPacketSize)
+                        0 -> UsbControlEndpoint(this@UsbInterface, address, maxPacketSize)
                         1 -> return@forEach // TODO: isochronous endpoints
                         2 -> when (address.toUInt() shr 7) {
-                            0u -> USBBulkTransferOutEndpoint(this@USBInterface, address, maxPacketSize)
-                            1u -> USBBulkTransferOutEndpoint(this@USBInterface, address, maxPacketSize)
+                            0u -> UsbBulkTransferOutEndpoint(this@UsbInterface, address, maxPacketSize)
+                            1u -> UsbBulkTransferOutEndpoint(this@UsbInterface, address, maxPacketSize)
                             else -> throw AssertionError()
                         }
                         3 -> return@forEach // TODO: interrupt endpoints
@@ -49,7 +49,7 @@ public class USBInterface internal constructor(public val configuration: USBConf
                 }
         }
 
-    public val device: USBDevice
+    public val device: UsbDevice
         get() = configuration.device
 
     public companion object

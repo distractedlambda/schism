@@ -1,14 +1,14 @@
 package org.schism.cousb
 
-public sealed class USBEndpoint(
-    public val iface: USBInterface,
+public sealed class UsbEndpoint(
+    public val iface: UsbInterface,
     internal val address: UByte,
     public val maxPacketSize: UShort,
 ) {
-    public val configuration: USBConfiguration
+    public val configuration: UsbConfiguration
         get() = iface.configuration
 
-    public val device: USBDevice
+    public val device: UsbDevice
         get() = iface.device
 
     public companion object

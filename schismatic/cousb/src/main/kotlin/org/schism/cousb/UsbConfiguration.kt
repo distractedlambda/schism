@@ -8,12 +8,12 @@ import org.schism.cousb.Libusb.InterfaceDescriptor
 import java.lang.foreign.MemoryAddress
 import java.lang.foreign.MemorySegment
 
-public class USBConfiguration internal constructor(public val device: USBDevice, descriptor: MemorySegment) {
+public class UsbConfiguration internal constructor(public val device: UsbDevice, descriptor: MemorySegment) {
     internal val value: UByte =
         (ConfigDescriptor.B_CONFIGURATION_VALUE[descriptor] as Byte).toUByte()
 
-    public val name: USBStringDescriptorIndex =
-        USBStringDescriptorIndex((ConfigDescriptor.I_CONFIGURATION[descriptor] as Byte).toUByte())
+    public val name: UsbStringDescriptorIndex =
+        UsbStringDescriptorIndex((ConfigDescriptor.I_CONFIGURATION[descriptor] as Byte).toUByte())
 
     public val selfPowered: Boolean =
         (ConfigDescriptor.BM_ATTRIBUTES[descriptor] as Byte).toInt() shr 6 and 1 != 0
@@ -24,7 +24,7 @@ public class USBConfiguration internal constructor(public val device: USBDevice,
     public val maxPowerMilliamps: Int =
         (ConfigDescriptor.MAX_POWER[descriptor] as Byte).toUByte().toInt() * 2
 
-    public val interfaces: List<USBInterface> =
+    public val interfaces: List<UsbInterface> =
         buildList {
             Interface.LAYOUT
                 .sequence((ConfigDescriptor.B_NUM_INTERFACES[descriptor] as Byte).toUByte().toLong())
@@ -34,7 +34,7 @@ public class USBConfiguration internal constructor(public val device: USBDevice,
                         .sequence((Interface.NUM_ALTSETTING[iface] as Int).toLong())
                         .elementSegmentList(Interface.ALTSETTING[iface] as MemoryAddress)
                         .forEach { interfaceDescriptor ->
-                            add(USBInterface(this@USBConfiguration, interfaceDescriptor))
+                            add(UsbInterface(this@UsbConfiguration, interfaceDescriptor))
                         }
                 }
         }
