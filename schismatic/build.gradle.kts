@@ -39,8 +39,12 @@ repositories {
 }
 
 dependencies {
+    implementation(project(":bytes"))
     implementation(project(":cousb"))
     implementation(compose.desktop.currentOs)
+
+    @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+    implementation(compose.desktop.components.splitPane)
 }
 
 compose.desktop {
