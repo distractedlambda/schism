@@ -8,5 +8,5 @@ pluginManagement {
 rootProject.name = "schismatic"
 
 include("bytes")
-include("coroutines")
-include("cousb")
+include("concurrent")
+include("usb")

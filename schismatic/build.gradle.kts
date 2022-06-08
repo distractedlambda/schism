@@ -40,7 +40,7 @@ repositories {
 
 dependencies {
     implementation(project(":bytes"))
-    implementation(project(":cousb"))
+    implementation(project(":usb"))
     implementation(compose.desktop.currentOs)
 
     @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)

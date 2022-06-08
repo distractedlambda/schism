@@ -1,38 +1,45 @@
 package org.schism.schismatic
 
 import org.schism.bytes.ByteSink
-import org.schism.bytes.HeapSegmentAllocator
 import org.schism.bytes.byteSinkInto
+import org.schism.bytes.newConfinedMemorySession
 import org.schism.bytes.takeFirst
 import org.schism.bytes.takeLast
 import org.schism.bytes.writeUByte
 import org.schism.bytes.writeUInt
-import org.schism.cousb.UsbBulkTransferInEndpoint
-import org.schism.cousb.UsbBulkTransferOutEndpoint
-import org.schism.cousb.UsbDevice
+import org.schism.usb.UsbBulkTransferInEndpoint
+import org.schism.usb.UsbBulkTransferOutEndpoint
+import org.schism.usb.UsbDevice
+import org.schism.usb.UsbDeviceConnection
 import java.nio.ByteOrder.LITTLE_ENDIAN
 
 internal data class PicobootEndpoints(
     val inEndpoint: UsbBulkTransferInEndpoint,
     val outEndpoint: UsbBulkTransferOutEndpoint,
 ) {
-    private suspend fun sendCommand(id: UByte, transferLength: UInt, encodeArgs: suspend ByteSink.() -> Unit) {
-        val commandBuffer = HeapSegmentAllocator.allocate(32)
+    private fun UsbDeviceConnection.sendCommand(id: UByte, transferLength: UInt, encodeArgs: ByteSink.() -> Unit) {
+        newConfinedMemorySession().use { memorySession ->
+            val commandBuffer = memorySession.allocate(32)
 
-        val argsSize = byteSinkInto(commandBuffer.takeLast(16)).run {
-            encodeArgs()
-            countWritten
-        }
+            val argsSize = byteSinkInto(commandBuffer.takeLast(16)).run {
+                encodeArgs()
+                countWritten
+            }
 
-        byteSinkInto(commandBuffer.takeFirst(16)).run {
-            writeUInt(0x431fd10bu, LITTLE_ENDIAN)
-            skip(4)
-            writeUByte(id)
-            writeUByte(argsSize.toUByte())
-            skip(2)
-            writeUInt(transferLength)
+            byteSinkInto(commandBuffer.takeFirst(16)).run {
+                writeUInt(0x431fd10bu, LITTLE_ENDIAN)
+                skip(4)
+                writeUByte(id)
+                writeUByte(argsSize.toUByte())
+                skip(2)
+                writeUInt(transferLength)
+            }
+
+            sendExact(outEndpoint, commandBuffer)
         }
     }
+
+    
 
     companion object {
         fun find(device: UsbDevice): PicobootEndpoints? {
