@@ -1,5 +1,6 @@
 package org.schism.schismatic
 
+import androidx.compose.foundation.defaultScrollbarStyle
 import org.schism.bytes.ByteSink
 import org.schism.bytes.byteSinkInto
 import org.schism.bytes.newConfinedMemorySession
@@ -11,6 +12,7 @@ import org.schism.usb.UsbBulkTransferInEndpoint
 import org.schism.usb.UsbBulkTransferOutEndpoint
 import org.schism.usb.UsbDevice
 import org.schism.usb.UsbDeviceConnection
+import java.lang.foreign.MemorySegment
 import java.nio.ByteOrder.LITTLE_ENDIAN
 
 internal data class PicobootEndpoints(
@@ -39,7 +41,66 @@ internal data class PicobootEndpoints(
         }
     }
 
-    
+    fun UsbDeviceConnection.setExclusivity(exclusivity: PicobootExclusivity) {
+        sendCommand(0x01u, 0u) {
+            writeByte(exclusivity.ordinal.toByte())
+        }
+
+        receiveZeroLength(inEndpoint)
+    }
+
+    fun UsbDeviceConnection.eraseFlash(deviceAddress: UInt, byteCount: UInt) {
+        // FIXME: bounds-check against RP2040 address space?
+
+        require(deviceAddress % 4096u == 0u)
+        require(byteCount % 4096u == 0u)
+        require(byteCount != 0u)
+
+        sendCommand(0x03u, 0u) {
+            writeUInt(deviceAddress)
+            writeUInt(byteCount)
+        }
+
+        receiveZeroLength(inEndpoint)
+    }
+
+    fun UsbDeviceConnection.readMemory(deviceAddress: UInt, destination: MemorySegment) {
+        // FIXME: bounds-check against RP2040 address space?
+
+        require(destination.byteSize() in 1 .. UInt.MAX_VALUE.toLong())
+
+        sendCommand(0x84u, destination.byteSize().toUInt()) {
+            writeUInt(deviceAddress)
+            writeUInt(destination.byteSize().toUInt())
+        }
+
+        receiveExact(inEndpoint, destination)
+        sendZeroLength(outEndpoint)
+    }
+
+    fun UsbDeviceConnection.writeMemory(deviceAddress: UInt, data: MemorySegment) {
+        // FIXME: bounds-check against RP2040 address space?
+
+        require(data.byteSize() in 1 .. UInt.MAX_VALUE.toLong())
+
+        sendCommand(0x05u, data.byteSize().toUInt()) {
+            writeUInt(deviceAddress)
+            writeUInt(data.byteSize().toUInt())
+        }
+
+        sendExact(outEndpoint, data)
+        receiveZeroLength(inEndpoint)
+    }
+
+    fun UsbDeviceConnection.exitXip() {
+        sendCommand(0x06u, 0u) {}
+        receiveZeroLength(inEndpoint)
+    }
+
+    fun UsbDeviceConnection.enterXip() {
+        sendCommand(0x07u, 0u) {}
+        receiveZeroLength(inEndpoint)
+    }
 
     companion object {
         fun find(device: UsbDevice): PicobootEndpoints? {
@@ -91,6 +152,12 @@ internal data class PicobootEndpoints(
             return null
         }
     }
+}
+
+internal enum class PicobootExclusivity {
+    NotExclusive,
+    Exclusive,
+    ExclusiveAndEject,
 }
 
 private const val VENDOR_ID: UShort = 0x2E8Au

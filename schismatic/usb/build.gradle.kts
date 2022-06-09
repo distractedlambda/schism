@@ -7,7 +7,7 @@ plugins {
 
 dependencies {
     implementation(project(":bytes"))
-    implementation(project(":concurrent"))
+    api(project(":concurrent"))
 }
 
 val downloadUsbIds by tasks.registering(Download::class) {
@@ -20,6 +20,6 @@ tasks.processResources {
     dependsOn(downloadUsbIds)
 
     from(downloadUsbIds.get().outputFiles.single()) {
-        into("org/schism/cousb/")
+        into("org/schism/usb/")
     }
 }

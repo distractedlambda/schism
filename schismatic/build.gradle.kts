@@ -41,10 +41,8 @@ repositories {
 dependencies {
     implementation(project(":bytes"))
     implementation(project(":usb"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1")
     implementation(compose.desktop.currentOs)
-
-    @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
-    implementation(compose.desktop.components.splitPane)
 }
 
 compose.desktop {

@@ -48,7 +48,7 @@ private fun ApplicationScope.MainWindow() {
 
 @Composable
 private fun DeviceList(selectedDevice: MutableState<UsbDevice?>) {
-    val devices = attachedUsbDevices().collectAsState()
+    val devices = attachedUsbDevices().observeAsState()
 
     Surface(
         Modifier.width(300.dp),

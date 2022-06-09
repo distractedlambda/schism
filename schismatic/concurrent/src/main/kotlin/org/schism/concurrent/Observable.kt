@@ -7,9 +7,6 @@ import java.util.concurrent.locks.LockSupport.park
 import java.util.concurrent.locks.LockSupport.unpark
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
-import kotlin.contracts.ExperimentalContracts
-import kotlin.contracts.InvocationKind
-import kotlin.contracts.contract
 
 public sealed interface Observable<T> {
     public val value: T
@@ -19,7 +16,7 @@ public sealed interface Observable<T> {
     public interface Subscription<T> : AutoCloseable {
         public val ownerThread: Thread
 
-        public fun nextPotentiallyDistinct(): T
+        public fun next(): T
     }
 }
 
@@ -28,59 +25,6 @@ public sealed interface MutableObservable<T> : Observable<T> {
 }
 
 public fun <T> MutableObservable(initialValue: T): MutableObservable<T> = ObservableImpl(initialValue)
-
-public fun <T> Observable.Subscription<T>.nextDistinctFrom(lastValue: T): T {
-    var nextValue: T
-    do nextValue = nextPotentiallyDistinct() while (nextValue == lastValue)
-    return nextValue
-}
-
-@OptIn(ExperimentalContracts::class)
-public inline fun <T> Observable.Subscription<T>.forEachPotentiallyDistinct(action: (T) -> Unit): Nothing {
-    contract {
-        callsInPlace(action, InvocationKind.AT_LEAST_ONCE)
-    }
-
-    while (true) {
-        action(nextPotentiallyDistinct())
-    }
-}
-
-@OptIn(ExperimentalContracts::class)
-public inline fun <T> Observable<T>.forEachPotentiallyDistinct(action: (T) -> Unit): Nothing {
-    contract {
-        callsInPlace(action, InvocationKind.AT_LEAST_ONCE)
-    }
-
-    subscribe().use {
-        it.forEachPotentiallyDistinct(action)
-    }
-}
-
-@OptIn(ExperimentalContracts::class)
-public inline fun <T> Observable.Subscription<T>.forEachDistinct(action: (T) -> Unit): Nothing {
-    contract {
-        callsInPlace(action, InvocationKind.AT_LEAST_ONCE)
-    }
-
-    var value = nextPotentiallyDistinct()
-
-    while (true) {
-        action(value)
-        value = nextDistinctFrom(value)
-    }
-}
-
-@OptIn(ExperimentalContracts::class)
-public inline fun <T> Observable<T>.forEachDistinct(action: (T) -> Unit): Nothing {
-    contract {
-        callsInPlace(action, InvocationKind.AT_LEAST_ONCE)
-    }
-
-    subscribe().use {
-        it.forEachDistinct(action)
-    }
-}
 
 @Suppress("UNCHECKED_CAST")
 internal class ObservableImpl<T>(initialValue: T) : MutableObservable<T> {
@@ -140,14 +84,14 @@ internal class ObservableImpl<T>(initialValue: T) : MutableObservable<T> {
 
         private var closed = false
 
-        @Volatile private var newValue: Any? = NoValue
+        @Volatile private var newValue: Any? = observable.storedValue
 
         fun publish(value: T) {
             newValue = value
             unpark(ownerThread)
         }
 
-        override fun nextPotentiallyDistinct(): T {
+        override fun next(): T {
             check(currentThread() === ownerThread)
             check(!closed)
 
