@@ -1,7 +1,7 @@
 package org.schism.usb
 
 import org.schism.bytes.newConfinedMemorySession
-import org.schism.concurrent.MutableObservable
+import org.schism.concurrent.MutableBlockingStateFlow
 import java.lang.Thread.sleep
 import java.lang.foreign.MemoryAddress
 import java.lang.foreign.ValueLayout.ADDRESS
@@ -11,7 +11,8 @@ import kotlin.Result.Companion.success
 import kotlin.concurrent.thread
 
 internal object UsbContext {
-    val attachedDevices = MutableObservable<List<UsbDevice>>(emptyList())
+    val attachedDevices =
+        MutableBlockingStateFlow<List<UsbDevice>>(emptyList())
 
     val handle: MemoryAddress =
         newConfinedMemorySession().use {

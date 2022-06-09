@@ -15,7 +15,6 @@ import androidx.compose.material.Text
 import androidx.compose.material.primarySurface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -48,7 +47,7 @@ private fun ApplicationScope.MainWindow() {
 
 @Composable
 private fun DeviceList(selectedDevice: MutableState<UsbDevice?>) {
-    val devices = attachedUsbDevices().observeAsState()
+    val devices = attachedUsbDevices().collectAsState()
 
     Surface(
         Modifier.width(300.dp),
