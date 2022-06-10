@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 @Composable
-public fun SchismaticMaterialTheme(content: @Composable () -> Unit) {
+internal fun SchismaticMaterialTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colors = if (isSystemInDarkTheme()) DarkColors else LightColors,
         content = content,

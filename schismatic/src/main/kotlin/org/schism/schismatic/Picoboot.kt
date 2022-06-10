@@ -1,6 +1,5 @@
 package org.schism.schismatic
 
-import androidx.compose.foundation.defaultScrollbarStyle
 import org.schism.bytes.ByteSink
 import org.schism.bytes.byteSinkInto
 import org.schism.bytes.newConfinedMemorySession
