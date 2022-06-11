@@ -8,7 +8,7 @@ import androidx.compose.runtime.remember
 import org.schism.concurrent.BlockingFlow
 import org.schism.concurrent.BlockingStateFlow
 import org.schism.concurrent.collect
-import java.lang.Thread.startVirtualThread
+import org.schism.concurrent.virtualThread
 
 @Composable
 internal fun <T> BlockingFlow<T>.collectAsState(initialValue: T): State<T> {
@@ -19,7 +19,7 @@ internal fun <T> BlockingFlow<T>.collectAsState(initialValue: T): State<T> {
             private var collectionThread: Thread? = null
 
             override fun onRemembered() {
-                collectionThread = startVirtualThread {
+                collectionThread = virtualThread {
                     try {
                         collect { state.value = it }
                     } catch (_: InterruptedException) {}
