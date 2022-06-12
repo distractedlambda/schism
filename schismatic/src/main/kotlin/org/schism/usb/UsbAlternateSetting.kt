@@ -3,6 +3,12 @@ package org.schism.usb
 interface UsbAlternateSetting {
     val `interface`: UsbInterface
 
+    val interfaceClass: UByte
+
+    val interfaceSubClass: UByte
+
+    val interfaceProtocol: UByte
+
     val endpoints: List<UsbEndpoint>
 }
 

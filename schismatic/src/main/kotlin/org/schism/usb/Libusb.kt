@@ -106,7 +106,7 @@ object Libusb : UsbBackend {
     }
 
     private class DeviceConnection(override val device: Device) : UsbDeviceConnection {
-        private val handle = NativeBuffer.withUnmanaged(ADDRESS) { handleBuffer ->
+        val handle = NativeBuffer.withUnmanaged(ADDRESS) { handleBuffer ->
             checkReturn(
                 nativeOpen.invokeExact(
                     device.handle.toMemoryAddress(),
@@ -117,34 +117,7 @@ object Libusb : UsbBackend {
             handleBuffer[ADDRESS]
         }
 
-        private val lifetime = SharedLifetime()
-
-        fun claimInterface(`interface`: UsbInterface) {
-            require(`interface` is Interface)
-            require(`interface`.associatedDevice === device)
-
-            lifetime.withRetained {
-                checkReturn(
-                    nativeClaimInterface.invokeExact(
-                        handle.toMemoryAddress(),
-                        `interface`.number.toInt()
-                    ) as Int
-                )
-            }
-        }
-
-        suspend fun releaseInterface(`interface`: UsbInterface) {
-            require(`interface` is Interface)
-            require(`interface`.associatedDevice === device)
-
-            lifetime.withRetained {
-                withContext(NonCancellable) {
-                    withContext(Dispatchers.IO) {
-                        checkReturn(nativeReleaseInterface.invokeExact(handle, `interface`.number.toInt()) as Int)
-                    }
-                }
-            }
-        }
+        val lifetime = SharedLifetime()
 
         suspend fun transfer(endpointAddress: UByte, buffer: NativeBuffer): Long {
             lifetime.withRetained {
@@ -207,40 +180,10 @@ object Libusb : UsbBackend {
             }
         }
 
-        suspend fun send(endpoint: UsbBulkTransferOutEndpoint, source: NativeBuffer): Long {
-            require(endpoint is BulkTransferOutEndpoint)
-            require(endpoint.associatedDevice === device)
-            return transfer(endpoint.address, source)
-        }
-
-        suspend fun receive(endpoint: UsbBulkTransferInEndpoint, destination: NativeBuffer): Long {
-            require(endpoint is BulkTransferInEndpoint)
-            require(endpoint.associatedDevice === device)
-            return transfer(endpoint.address, destination)
-        }
-
         override suspend fun close() {
             if (lifetime.end()) {
                 nativeClose.invokeExact(handle)
             }
-        }
-
-        private companion object {
-            private val inFlightTransfers = ConcurrentHashMap<NativeAddress, Continuation<Unit>>()
-
-            @[Suppress("UNUSED") JvmStatic]
-            private fun transferCallback(nativeTransfer: MemoryAddress) {
-                checkNotNull(inFlightTransfers.remove(nativeTransfer.nativeAddress())).resume(Unit)
-            }
-
-            private val nativeTransferCallback = nativeLinker().upcallStub(
-                MethodHandles.lookup().findStatic(
-                    DeviceConnection::class.java, "transferCallback",
-                    methodType(Void.TYPE, MemoryAddress::class.java),
-                ),
-                FunctionDescriptor.ofVoid(ADDRESS),
-                MemorySession.global(),
-            ).nativeAddress()
         }
     }
 
@@ -283,26 +226,24 @@ object Libusb : UsbBackend {
                 val numConfigurations = descriptor[NativeDeviceDescriptor.bNumConfigurations].toUByte()
 
                 NativeBuffer.withUnmanaged(ADDRESS) { configDescriptorAddressBuffer ->
-                    configurations = buildList {
-                        for (i in 0 until numConfigurations.toInt()) {
-                            checkReturn(
-                                nativeGetConfigDescriptor.invokeExact(
-                                    handle.toMemoryAddress(),
-                                    i.toByte(),
-                                    configDescriptorAddressBuffer.start.toMemoryAddress(),
-                                ) as Int
-                            )
+                    configurations = List(numConfigurations.toInt()) { configIndex ->
+                        checkReturn(
+                            nativeGetConfigDescriptor.invokeExact(
+                                handle.toMemoryAddress(),
+                                configIndex.toByte(),
+                                configDescriptorAddressBuffer.start.toMemoryAddress(),
+                            ) as Int
+                        )
 
-                            val configDescriptor = NativeBuffer.unmanaged(
-                                configDescriptorAddressBuffer[ADDRESS],
-                                NativeConfigDescriptor.layout.size,
-                            )
+                        val configDescriptor = NativeBuffer.unmanaged(
+                            configDescriptorAddressBuffer[ADDRESS],
+                            NativeConfigDescriptor.layout.size,
+                        )
 
-                            try {
-                                add(Configuration(this@Device, configDescriptor))
-                            } finally {
-                                nativeFreeConfigDescriptor.invokeExact(configDescriptor.start.toMemoryAddress())
-                            }
+                        try {
+                            Configuration(this@Device, configDescriptor)
+                        } finally {
+                            nativeFreeConfigDescriptor.invokeExact(configDescriptor.start.toMemoryAddress())
                         }
                     }
                 }
@@ -319,104 +260,162 @@ object Libusb : UsbBackend {
             NativeBuffer.unmanagedArrayElements(
                 descriptor[NativeConfigDescriptor.`interface`],
                 NativeInterface.layout,
-                descriptor[NativeConfigDescriptor.bNumInterfaces].toUByte().toLong()
-            ).flatMap { nativeInterface ->
-                NativeBuffer.unmanagedArrayElements(
-                    nativeInterface[NativeInterface.altsetting],
-                    NativeInterfaceDescriptor.layout,
-                    nativeInterface[NativeInterface.numAltsetting].toLong(),
-                )
-            }.map { interfaceDescriptor ->
-                Interface(this@Configuration, interfaceDescriptor)
-            }.toList()
+                descriptor[NativeConfigDescriptor.bNumInterfaces].toUByte().toInt(),
+            ).map {
+                Interface(this@Configuration, it)
+            }
     }
 
-    private class Interface(override val configuration: Configuration, descriptor: NativeBuffer) : UsbInterface {
-        val number = descriptor[NativeInterfaceDescriptor.bInterfaceNumber].toUByte()
+    private class Interface(override val configuration: Configuration, native: NativeBuffer) : UsbInterface {
+        val number: UByte
 
-        val alternateSetting = descriptor[NativeInterfaceDescriptor.bAlternateSetting].toUByte()
+        override val alternateSettings: List<AlternateSetting> =
+            NativeBuffer.unmanagedArrayElements(
+                native[NativeInterface.altsetting],
+                NativeInterfaceDescriptor.layout,
+                native[NativeInterface.numAltsetting],
+            ).let { interfaceDescriptors ->
+                number = interfaceDescriptors.first()[NativeInterfaceDescriptor.bInterfaceNumber].toUByte()
 
-        val interfaceClass = descriptor[NativeInterfaceDescriptor.bInterfaceClass].toUByte()
+                interfaceDescriptors.map { interfaceDescriptor ->
+                    check(interfaceDescriptor[NativeInterfaceDescriptor.bInterfaceNumber].toUByte() == number)
+                    AlternateSetting(this@Interface, interfaceDescriptor)
+                }
+            }
 
-        val interfaceSubClass = descriptor[NativeInterfaceDescriptor.bInterfaceSubClass].toUByte()
+        context (UsbDeviceConnection) override fun claim() {
+            require(this@UsbDeviceConnection is DeviceConnection)
+            require(device === this@UsbDeviceConnection.device)
 
-        val interfaceProtocol = descriptor[NativeInterfaceDescriptor.bInterfaceProtocol].toUByte()
+            this@UsbDeviceConnection.lifetime.withRetained {
+                checkReturn(nativeClaimInterface.invokeExact(handle.toMemoryAddress(), number.toInt()) as Int)
+            }
+        }
 
-        val name = descriptor[NativeInterfaceDescriptor.iInterface].toUByte()
+        context (UsbDeviceConnection) override suspend fun release() {
+            require(this@UsbDeviceConnection is DeviceConnection)
+            require(device === this@UsbDeviceConnection.device)
 
-        val endpoints: List<UsbEndpoint> =
+            this@UsbDeviceConnection.lifetime.withRetained {
+                withContext(NonCancellable) {
+                    withContext(Dispatchers.IO) {
+                        checkReturn(nativeReleaseInterface.invokeExact(handle, number.toInt()) as Int)
+                    }
+                }
+            }
+        }
+    }
+
+    private class AlternateSetting(
+        override val `interface`: Interface,
+        descriptor: NativeBuffer,
+    ) : UsbAlternateSetting {
+        val value = descriptor[NativeInterfaceDescriptor.bAlternateSetting].toUByte()
+
+        override val interfaceClass = descriptor[NativeInterfaceDescriptor.bInterfaceClass].toUByte()
+        override val interfaceSubClass = descriptor[NativeInterfaceDescriptor.bInterfaceSubClass].toUByte()
+        override val interfaceProtocol = descriptor[NativeInterfaceDescriptor.bInterfaceProtocol].toUByte()
+
+        override val endpoints: List<Endpoint> =
             NativeBuffer.unmanagedArrayElements(
                 descriptor[NativeInterfaceDescriptor.endpoint],
                 NativeEndpointDescriptor.layout,
-                descriptor[NativeInterfaceDescriptor.bNumEndpoints].toUByte().toLong(),
+                descriptor[NativeInterfaceDescriptor.bNumEndpoints].toUByte().toInt(),
             ).mapNotNull { endpointDescriptor ->
                 val address = endpointDescriptor[NativeEndpointDescriptor.bEndpointAddress].toUByte()
                 val attributes = endpointDescriptor[NativeEndpointDescriptor.bmAttributes].toUByte().toInt()
                 val maxPacketSize = endpointDescriptor[NativeEndpointDescriptor.wMaxPacketSize].toUShort()
                 when (attributes and 0b11) {
-                    0 -> ControlEndpoint(this@Interface, address, maxPacketSize)
+                    0 -> ControlEndpoint(this@AlternateSetting, maxPacketSize, address)
                     1 -> null
                     2 -> when (address.toUInt() shr 7) {
-                        0u -> BulkTransferOutEndpoint(this@Interface, address, maxPacketSize)
-                        1u -> BulkTransferOutEndpoint(this@Interface, address, maxPacketSize)
+                        0u -> BulkTransferOutEndpoint(this@AlternateSetting, maxPacketSize, address)
+                        1u -> BulkTransferOutEndpoint(this@AlternateSetting, maxPacketSize, address)
                         else -> throw AssertionError()
                     }
                     3 -> null
                     else -> throw AssertionError()
                 }
-            }.toList()
+            }
     }
 
-    private class AlternateSetting(override val `interface`: Interface) : UsbAlternateSetting {
-
-    }
-
-    private sealed class Endpoint(override val alternateSetting: AlternateSetting) : UsbEndpoint
+    private sealed class Endpoint(
+        override val alternateSetting: AlternateSetting,
+        override val maxPacketSize: UShort,
+        val address: UByte,
+    ) : UsbEndpoint
 
     private class ControlEndpoint(
-        iface: UsbInterface,
-        address: UByte,
+        alternateSetting: AlternateSetting,
         maxPacketSize: UShort,
-    ) : Endpoint(), UsbControlEndpoint
+        address: UByte,
+    ) : Endpoint(alternateSetting, maxPacketSize, address), UsbControlEndpoint
 
     private class BulkTransferInEndpoint(
-        iface: UsbInterface,
-        address: UByte,
+        alternateSetting: AlternateSetting,
         maxPacketSize: UShort,
-    ) : Endpoint(), UsbBulkTransferInEndpoint
-
+        address: UByte,
+    ) : Endpoint(alternateSetting, maxPacketSize, address), UsbBulkTransferInEndpoint {
+        context (UsbDeviceConnection) override suspend fun receive(destination: NativeBuffer): Long {
+            require(this@UsbDeviceConnection is DeviceConnection)
+            require(device === this@UsbDeviceConnection.device)
+            return this@UsbDeviceConnection.transfer(address, destination)
+        }
+    }
 
     private class BulkTransferOutEndpoint(
-        iface: UsbInterface,
-        address: UByte,
+        alternateSetting: AlternateSetting,
         maxPacketSize: UShort,
-    ) : Endpoint(), UsbBulkTransferOutEndpoint
+        address: UByte,
+    ) : Endpoint(alternateSetting, maxPacketSize, address), UsbBulkTransferOutEndpoint {
+        context (UsbDeviceConnection) override suspend fun send(source: NativeBuffer): Long {
+            require(this@UsbDeviceConnection is DeviceConnection)
+            require(device === this@UsbDeviceConnection.device)
+            return this@UsbDeviceConnection.transfer(address, source)
+        }
+    }
 
-    val nativeAllocTransfer: MethodHandle
-    val nativeCancelTransfer: MethodHandle
-    val nativeClaimInterface: MethodHandle
-    val mhClearHalt: MethodHandle
-    val nativeClose: MethodHandle
-    val mhExit: MethodHandle
-    val nativeFreeConfigDescriptor: MethodHandle
-    val nativeFreeDeviceList: MethodHandle
-    val nativeFreeTransfer: MethodHandle
-    val mhGetActiveConfigDescriptor: MethodHandle
-    val mhGetBusNumber: MethodHandle
-    val nativeGetConfigDescriptor: MethodHandle
-    val mhGetDeviceAddress: MethodHandle
-    val nativeGetDeviceDescriptor: MethodHandle
-    val nativeGetDeviceList: MethodHandle
-    val nativeHandleEvents: MethodHandle
-    val nativeInit: MethodHandle
-    val mhInterruptEventHandler: MethodHandle
-    val nativeOpen: MethodHandle
-    val nativeRefDevice: MethodHandle
-    val nativeReleaseInterface: MethodHandle
-    val mhResetDevice: MethodHandle
-    val mhStrerror: MethodHandle
-    val nativeSubmitTransfer: MethodHandle
-    val nativeUnrefDevice: MethodHandle
+    private val inFlightTransfers = ConcurrentHashMap<NativeAddress, Continuation<Unit>>()
+
+    @[Suppress("UNUSED") JvmStatic]
+    private fun transferCallback(nativeTransfer: MemoryAddress) {
+        checkNotNull(inFlightTransfers.remove(nativeTransfer.nativeAddress())).resume(Unit)
+    }
+
+    private val nativeTransferCallback = nativeLinker().upcallStub(
+        MethodHandles.lookup().findStatic(
+            DeviceConnection::class.java, "transferCallback",
+            methodType(Void.TYPE, MemoryAddress::class.java),
+        ),
+        FunctionDescriptor.ofVoid(ADDRESS),
+        MemorySession.global(),
+    ).nativeAddress()
+
+    private val nativeAllocTransfer: MethodHandle
+    private val nativeCancelTransfer: MethodHandle
+    private val nativeClaimInterface: MethodHandle
+    private val mhClearHalt: MethodHandle
+    private val nativeClose: MethodHandle
+    private val mhExit: MethodHandle
+    private val nativeFreeConfigDescriptor: MethodHandle
+    private val nativeFreeDeviceList: MethodHandle
+    private val nativeFreeTransfer: MethodHandle
+    private val mhGetActiveConfigDescriptor: MethodHandle
+    private val mhGetBusNumber: MethodHandle
+    private val nativeGetConfigDescriptor: MethodHandle
+    private val mhGetDeviceAddress: MethodHandle
+    private val nativeGetDeviceDescriptor: MethodHandle
+    private val nativeGetDeviceList: MethodHandle
+    private val nativeHandleEvents: MethodHandle
+    private val nativeInit: MethodHandle
+    private val mhInterruptEventHandler: MethodHandle
+    private val nativeOpen: MethodHandle
+    private val nativeRefDevice: MethodHandle
+    private val nativeReleaseInterface: MethodHandle
+    private val mhResetDevice: MethodHandle
+    private val mhStrerror: MethodHandle
+    private val nativeSubmitTransfer: MethodHandle
+    private val nativeUnrefDevice: MethodHandle
 
     init {
         val lib = libraryLookup(Path("/opt/homebrew/lib/libusb-1.0.dylib"), MemorySession.global())

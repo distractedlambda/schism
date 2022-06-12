@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
@@ -15,6 +14,7 @@ import androidx.compose.material.Text
 import androidx.compose.material.primarySurface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -22,10 +22,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import org.schism.usb.Libusb
 import org.schism.usb.UsbDevice
-import org.schism.usb.attachedUsbDevices
 
-public fun main() {
+fun main() {
     System.setProperty("apple.awt.application.appearance", "system")
     application { MainWindow() }
 }
@@ -47,7 +47,7 @@ private fun ApplicationScope.MainWindow() {
 
 @Composable
 private fun DeviceList(selectedDevice: MutableState<UsbDevice?>) {
-    val devices = attachedUsbDevices().collectAsState()
+    val devices = Libusb.attachedDevices.collectAsState()
 
     Surface(
         Modifier.width(300.dp),
@@ -55,9 +55,9 @@ private fun DeviceList(selectedDevice: MutableState<UsbDevice?>) {
         elevation = 1.dp,
     ) {
         LazyColumn(Modifier.fillMaxSize()) {
-            items(devices.value, key = UsbDevice::transientID) { device ->
-                DeviceListEntry(device, selectedDevice)
-            }
+            /// /items(devices.value, key = UsbDevice::transientID) { device ->
+            /// /    DeviceListEntry(device, selectedDevice)
+            /// /}
         }
     }
 }
@@ -71,24 +71,24 @@ private fun DeviceListEntry(device: UsbDevice, selectedDevice: MutableState<UsbD
         onClick = { selectedDevice.value = device },
         elevation = if (isSelected) 2.dp else 0.dp,
     ) {
-        Column {
-            Text(
-                device.knownProductName ?: "Unknown Device",
-                style = MaterialTheme.typography.h6,
-            )
+        // Column {
+        //     Text(
+        //         device.knownProductName ?: "Unknown Device",
+        //         style = MaterialTheme.typography.h6,
+        //     )
 
-            Row {
-                fun hex4(value: UShort): String {
-                    return value.toString(16).padStart(4, '0')
-                }
+        //     Row {
+        //         fun hex4(value: UShort): String {
+        //             return value.toString(16).padStart(4, '0')
+        //         }
 
-                Text("${hex4(device.vendorId)}:${hex4(device.productId)}")
+        //         Text("${hex4(device.vendorId)}:${hex4(device.productId)}")
 
-                device.knownVendorName?.let {
-                    Text(it)
-                }
-            }
-        }
+        //         device.knownVendorName?.let {
+        //             Text(it)
+        //         }
+        //     }
+        // }
     }
 }
 

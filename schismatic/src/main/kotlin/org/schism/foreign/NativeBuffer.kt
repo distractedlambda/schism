@@ -2,6 +2,7 @@
 
 package org.schism.foreign
 
+import org.schism.collections.listBy
 import java.lang.Math.multiplyExact
 import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.Linker.nativeLinker
@@ -73,19 +74,20 @@ class NativeBuffer private constructor(
         return slice(layout.toNativeLayout(), index)
     }
 
-    fun slices(elementLayout: NativeLayout): Sequence<NativeBuffer> {
+    fun sliceList(elementLayout: NativeLayout): List<NativeBuffer> {
         start.requireAlignedTo(elementLayout.alignment)
         require(size % elementLayout.stride == 0L)
 
-        return sequence {
-            for (i in 0 until size / elementLayout.stride) {
-                yield(slice(elementLayout, i.index))
-            }
+        val sliceCount = size / elementLayout.stride
+        require(sliceCount <= Int.MAX_VALUE)
+
+        return listBy(sliceCount.toInt()) {
+            slice(elementLayout, it.toLong().index)
         }
     }
 
-    fun slices(elementLayout: MemoryLayout): Sequence<NativeBuffer> {
-        return slices(elementLayout.toNativeLayout())
+    fun sliceList(elementLayout: MemoryLayout): List<NativeBuffer> {
+        return sliceList(elementLayout.toNativeLayout())
     }
 
     fun fill(value: Byte) {
@@ -416,16 +418,16 @@ class NativeBuffer private constructor(
         fun unmanagedArrayElements(
             start: NativeAddress,
             element: NativeLayout,
-            elementCount: Long,
-        ): Sequence<NativeBuffer> {
-            return unmanagedArray(start, element, elementCount).slices(element)
+            elementCount: Int,
+        ): List<NativeBuffer> {
+            return unmanagedArray(start, element, elementCount.toLong()).sliceList(element)
         }
 
         fun unmanagedArrayElements(
             start: NativeAddress,
             element: MemoryLayout,
-            elementCount: Long,
-        ): Sequence<NativeBuffer> {
+            elementCount: Int,
+        ): List<NativeBuffer> {
             return unmanagedArrayElements(start, element.toNativeLayout(), elementCount)
         }
 
