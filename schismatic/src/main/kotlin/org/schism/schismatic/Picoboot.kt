@@ -1,12 +1,9 @@
 package org.schism.schismatic
 
-import org.schism.bytes.ByteSink
 import org.schism.bytes.byteSinkInto
-import org.schism.bytes.newConfinedMemorySession
-import org.schism.bytes.takeFirst
-import org.schism.bytes.takeLast
-import org.schism.bytes.writeUByte
-import org.schism.bytes.writeUInt
+import org.schism.foreign.newConfinedMemorySession
+import org.schism.foreign.takeFirst
+import org.schism.foreign.takeLast
 import org.schism.usb.UsbBulkTransferInEndpoint
 import org.schism.usb.UsbBulkTransferOutEndpoint
 import org.schism.usb.UsbDevice

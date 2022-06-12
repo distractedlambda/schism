@@ -6,7 +6,3 @@ pluginManagement {
 }
 
 rootProject.name = "schismatic"
-
-include("bytes")
-include("concurrent")
-include("usb")

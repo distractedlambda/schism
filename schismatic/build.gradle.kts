@@ -2,8 +2,8 @@ import org.jetbrains.compose.compose
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.6.10"
-    id("org.jetbrains.compose") version "1.1.0"
+    kotlin("jvm") version "1.6.21"
+    id("org.jetbrains.compose") version "1.2.0-alpha01-dev709"
     id("de.undercouch.download") version "5.1.0" apply false
 }
 
@@ -21,14 +21,12 @@ allprojects {
         jvmToolchain {
             (this as JavaToolchainSpec).languageVersion.set(JavaLanguageVersion.of(19))
         }
-
-        explicitApi()
     }
 
     tasks.withType<KotlinCompile> {
         kotlinOptions {
             jvmTarget = "17"
-            freeCompilerArgs += listOf("-opt-in=kotlin.RequiresOptIn")
+            freeCompilerArgs += listOf("-opt-in=kotlin.RequiresOptIn", "-Xcontext-receivers")
         }
     }
 }
@@ -39,9 +37,7 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":bytes"))
-    implementation(project(":usb"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2")
     implementation(compose.desktop.currentOs)
 }
 
