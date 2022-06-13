@@ -4,6 +4,8 @@ sealed interface UsbEndpoint {
     val alternateSetting: UsbAlternateSetting
 
     val maxPacketSize: UShort
+
+    context (UsbDeviceConnection) suspend fun clearHalt()
 }
 
 val UsbEndpoint.`interface`: UsbInterface

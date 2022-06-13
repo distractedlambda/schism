@@ -120,6 +120,8 @@ object Libusb : UsbBackend {
         val lifetime = SharedLifetime()
 
         suspend fun transfer(endpointAddress: UByte, buffer: NativeBuffer): Long {
+            currentCoroutineContext().ensureActive()
+
             lifetime.withRetained {
                 val nativeTransferAddress = (nativeAllocTransfer.invokeExact(0) as MemoryAddress).nativeAddress()
 
@@ -253,9 +255,60 @@ object Libusb : UsbBackend {
         override fun connect(): DeviceConnection {
             return DeviceConnection(this)
         }
+
+        context (UsbDeviceConnection) override suspend fun getActiveConfiguration(): UsbConfiguration? {
+            currentCoroutineContext().ensureActive()
+
+            val connection = this@UsbDeviceConnection
+
+            require(connection is DeviceConnection)
+            require(connection.device === device)
+
+            val activeValue = connection.lifetime.withRetained {
+                withContext(NonCancellable) {
+                    withContext(Dispatchers.IO) {
+                        NativeBuffer.withUnmanaged(JAVA_INT) { configurationValueBuffer ->
+                            checkReturn(
+                                nativeGetConfiguration.invokeExact(
+                                    connection.handle.toMemoryAddress(),
+                                    configurationValueBuffer.start.toMemoryAddress(),
+                                ) as Int
+                            )
+
+                            configurationValueBuffer[JAVA_INT].toUByte()
+                        }
+                    }
+                }
+            }
+
+            currentCoroutineContext().ensureActive()
+
+            return configurations.firstOrNull { it.value == activeValue }
+        }
+
+        context (UsbDeviceConnection) override suspend fun reset() {
+            currentCoroutineContext().ensureActive()
+
+            val connection = this@UsbDeviceConnection
+
+            require(connection is DeviceConnection)
+            require(connection.device === device)
+
+            connection.lifetime.withRetained {
+                withContext(NonCancellable) {
+                    withContext(Dispatchers.IO) {
+                        checkReturn(nativeResetDevice.invokeExact(connection.handle.toMemoryAddress()) as Int)
+                    }
+                }
+            }
+
+            currentCoroutineContext().ensureActive()
+        }
     }
 
     private class Configuration(override val device: Device, descriptor: NativeBuffer) : UsbConfiguration {
+        val value = descriptor[NativeConfigDescriptor.bConfigurationValue].toUByte()
+
         override val interfaces: List<UsbInterface> =
             NativeBuffer.unmanagedArrayElements(
                 descriptor[NativeConfigDescriptor.`interface`],
@@ -284,25 +337,33 @@ object Libusb : UsbBackend {
             }
 
         context (UsbDeviceConnection) override fun claim() {
-            require(this@UsbDeviceConnection is DeviceConnection)
-            require(device === this@UsbDeviceConnection.device)
+            val connection = this@UsbDeviceConnection
 
-            this@UsbDeviceConnection.lifetime.withRetained {
+            require(connection is DeviceConnection)
+            require(device === connection.device)
+
+            connection.lifetime.withRetained {
                 checkReturn(nativeClaimInterface.invokeExact(handle.toMemoryAddress(), number.toInt()) as Int)
             }
         }
 
         context (UsbDeviceConnection) override suspend fun release() {
-            require(this@UsbDeviceConnection is DeviceConnection)
-            require(device === this@UsbDeviceConnection.device)
+            currentCoroutineContext().ensureActive()
 
-            this@UsbDeviceConnection.lifetime.withRetained {
+            val connection = this@UsbDeviceConnection
+
+            require(connection is DeviceConnection)
+            require(device === connection.device)
+
+            connection.lifetime.withRetained {
                 withContext(NonCancellable) {
                     withContext(Dispatchers.IO) {
                         checkReturn(nativeReleaseInterface.invokeExact(handle, number.toInt()) as Int)
                     }
                 }
             }
+
+            currentCoroutineContext().ensureActive()
         }
     }
 
@@ -337,13 +398,62 @@ object Libusb : UsbBackend {
                     else -> throw AssertionError()
                 }
             }
+
+        context (UsbDeviceConnection) override suspend fun makeActive() {
+            currentCoroutineContext().ensureActive()
+
+            val connection = this@UsbDeviceConnection
+
+            require(connection is DeviceConnection)
+            require(connection.device === device)
+
+            connection.lifetime.withRetained {
+                withContext(NonCancellable) {
+                    withContext(Dispatchers.IO) {
+                        checkReturn(
+                            nativeSetInterfaceAltSetting.invokeExact(
+                                connection.handle.toMemoryAddress(),
+                                `interface`.number.toInt(),
+                                value.toInt(),
+                            ) as Int
+                        )
+                    }
+                }
+            }
+
+            currentCoroutineContext().ensureActive()
+        }
     }
 
     private sealed class Endpoint(
         override val alternateSetting: AlternateSetting,
         override val maxPacketSize: UShort,
         val address: UByte,
-    ) : UsbEndpoint
+    ) : UsbEndpoint {
+        context (UsbDeviceConnection) final override suspend fun clearHalt() {
+            currentCoroutineContext().ensureActive()
+
+            val connection = this@UsbDeviceConnection
+
+            require(connection is DeviceConnection)
+            require(connection.device === device)
+
+            connection.lifetime.withRetained {
+                withContext(NonCancellable) {
+                    withContext(Dispatchers.IO) {
+                        checkReturn(
+                            nativeClearHalt.invokeExact(
+                                connection.handle.toMemoryAddress(),
+                                address.toByte(),
+                            ) as Int
+                        )
+                    }
+                }
+            }
+
+            currentCoroutineContext().ensureActive()
+        }
+    }
 
     private class ControlEndpoint(
         alternateSetting: AlternateSetting,
@@ -394,26 +504,25 @@ object Libusb : UsbBackend {
     private val nativeAllocTransfer: MethodHandle
     private val nativeCancelTransfer: MethodHandle
     private val nativeClaimInterface: MethodHandle
-    private val mhClearHalt: MethodHandle
+    private val nativeClearHalt: MethodHandle
     private val nativeClose: MethodHandle
-    private val mhExit: MethodHandle
     private val nativeFreeConfigDescriptor: MethodHandle
     private val nativeFreeDeviceList: MethodHandle
     private val nativeFreeTransfer: MethodHandle
-    private val mhGetActiveConfigDescriptor: MethodHandle
-    private val mhGetBusNumber: MethodHandle
+    private val nativeGetBusNumber: MethodHandle
     private val nativeGetConfigDescriptor: MethodHandle
-    private val mhGetDeviceAddress: MethodHandle
+    private val nativeGetConfiguration: MethodHandle
+    private val nativeGetDeviceAddress: MethodHandle
     private val nativeGetDeviceDescriptor: MethodHandle
     private val nativeGetDeviceList: MethodHandle
     private val nativeHandleEvents: MethodHandle
     private val nativeInit: MethodHandle
-    private val mhInterruptEventHandler: MethodHandle
     private val nativeOpen: MethodHandle
     private val nativeRefDevice: MethodHandle
     private val nativeReleaseInterface: MethodHandle
-    private val mhResetDevice: MethodHandle
-    private val mhStrerror: MethodHandle
+    private val nativeResetDevice: MethodHandle
+    private val nativeSetInterfaceAltSetting: MethodHandle
+    private val nativeStrerror: MethodHandle
     private val nativeSubmitTransfer: MethodHandle
     private val nativeUnrefDevice: MethodHandle
 
@@ -421,9 +530,9 @@ object Libusb : UsbBackend {
         val lib = libraryLookup(Path("/opt/homebrew/lib/libusb-1.0.dylib"), MemorySession.global())
         val linker = nativeLinker()
 
-        fun link(name: String, vararg argumentLayouts: MemoryLayout, returning: MemoryLayout? = null): MethodHandle {
-            val descriptor = if (returning != null) {
-                FunctionDescriptor.of(returning, *argumentLayouts)
+        fun link(name: String, vararg argumentLayouts: MemoryLayout, ret: MemoryLayout? = null): MethodHandle {
+            val descriptor = if (ret != null) {
+                FunctionDescriptor.of(ret, *argumentLayouts)
             } else {
                 FunctionDescriptor.ofVoid(*argumentLayouts)
             }
@@ -431,30 +540,29 @@ object Libusb : UsbBackend {
             return linker.downcallHandle(lib.lookup("libusb_$name").orElseThrow(), descriptor)
         }
 
-        nativeAllocTransfer = link("alloc_transfer", JAVA_INT, returning = ADDRESS)
-        nativeCancelTransfer = link("cancel_transfer", ADDRESS, returning = JAVA_INT)
-        nativeClaimInterface = link("claim_interface", ADDRESS, JAVA_INT, returning = JAVA_INT)
-        mhClearHalt = link("clear_halt", ADDRESS, JAVA_BYTE, returning = JAVA_INT)
+        nativeAllocTransfer = link("alloc_transfer", JAVA_INT, ret = ADDRESS)
+        nativeCancelTransfer = link("cancel_transfer", ADDRESS, ret = JAVA_INT)
+        nativeClaimInterface = link("claim_interface", ADDRESS, JAVA_INT, ret = JAVA_INT)
+        nativeClearHalt = link("clear_halt", ADDRESS, JAVA_BYTE, ret = JAVA_INT)
         nativeClose = link("close", ADDRESS)
-        mhExit = link("exit", ADDRESS)
         nativeFreeConfigDescriptor = link("free_config_descriptor", ADDRESS)
         nativeFreeDeviceList = link("free_device_list", ADDRESS, JAVA_INT)
         nativeFreeTransfer = link("free_transfer", ADDRESS)
-        mhGetActiveConfigDescriptor = link("get_active_config_descriptor", ADDRESS, ADDRESS, returning = JAVA_INT)
-        mhGetBusNumber = link("get_bus_number", ADDRESS, returning = JAVA_BYTE)
-        nativeGetConfigDescriptor = link("get_config_descriptor", ADDRESS, JAVA_BYTE, ADDRESS, returning = JAVA_INT)
-        mhGetDeviceAddress = link("get_device_address", ADDRESS, returning = JAVA_BYTE)
-        nativeGetDeviceDescriptor = link("get_device_descriptor", ADDRESS, ADDRESS, returning = JAVA_INT)
-        nativeGetDeviceList = link("get_device_list", ADDRESS, ADDRESS, returning = JAVA_LONG) // FIXME: 32-bit ssize_t?
-        nativeHandleEvents = link("handle_events", ADDRESS, returning = JAVA_INT)
-        nativeInit = link("init", ADDRESS, returning = JAVA_INT)
-        mhInterruptEventHandler = link("interrupt_event_handler", ADDRESS)
-        nativeOpen = link("open", ADDRESS, ADDRESS, returning = JAVA_INT)
-        nativeRefDevice = link("ref_device", ADDRESS, returning = ADDRESS)
-        nativeReleaseInterface = link("release_interface", ADDRESS, JAVA_INT, returning = JAVA_INT)
-        mhResetDevice = link("reset_device", ADDRESS, returning = JAVA_INT)
-        mhStrerror = link("strerror", JAVA_INT, returning = ADDRESS)
-        nativeSubmitTransfer = link("submit_transfer", ADDRESS, returning = JAVA_INT)
+        nativeGetBusNumber = link("get_bus_number", ADDRESS, ret = JAVA_BYTE)
+        nativeGetConfigDescriptor = link("get_config_descriptor", ADDRESS, JAVA_BYTE, ADDRESS, ret = JAVA_INT)
+        nativeGetConfiguration = link("get_configuration", ADDRESS, ADDRESS, ret = JAVA_INT)
+        nativeGetDeviceAddress = link("get_device_address", ADDRESS, ret = JAVA_BYTE)
+        nativeGetDeviceDescriptor = link("get_device_descriptor", ADDRESS, ADDRESS, ret = JAVA_INT)
+        nativeGetDeviceList = link("get_device_list", ADDRESS, ADDRESS, ret = JAVA_LONG) // FIXME: 32-bit ssize_t?
+        nativeHandleEvents = link("handle_events", ADDRESS, ret = JAVA_INT)
+        nativeInit = link("init", ADDRESS, ret = JAVA_INT)
+        nativeOpen = link("open", ADDRESS, ADDRESS, ret = JAVA_INT)
+        nativeRefDevice = link("ref_device", ADDRESS, ret = ADDRESS)
+        nativeReleaseInterface = link("release_interface", ADDRESS, JAVA_INT, ret = JAVA_INT)
+        nativeResetDevice = link("reset_device", ADDRESS, ret = JAVA_INT)
+        nativeSetInterfaceAltSetting = link("set_interface_alt_setting", ADDRESS, JAVA_INT, JAVA_INT, ret = JAVA_INT)
+        nativeStrerror = link("strerror", JAVA_INT, ret = ADDRESS)
+        nativeSubmitTransfer = link("submit_transfer", ADDRESS, ret = JAVA_INT)
         nativeUnrefDevice = link("unref_device", ADDRESS)
     }
 
@@ -473,7 +581,7 @@ object Libusb : UsbBackend {
     }
 
     private fun errorMessage(code: Int): String {
-        return (mhStrerror(code) as MemoryAddress).getUtf8String(0)
+        return (nativeStrerror(code) as MemoryAddress).getUtf8String(0)
     }
 
     private object NativeTransfer {

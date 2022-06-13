@@ -10,6 +10,8 @@ interface UsbAlternateSetting {
     val interfaceProtocol: UByte
 
     val endpoints: List<UsbEndpoint>
+
+    context (UsbDeviceConnection) suspend fun makeActive()
 }
 
 val UsbAlternateSetting.configuration: UsbConfiguration
