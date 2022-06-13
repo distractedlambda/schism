@@ -20,8 +20,4 @@ interface UsbDevice {
     val configurations: List<UsbConfiguration>
 
     fun connect(): UsbDeviceConnection
-
-    context (UsbDeviceConnection) suspend fun getActiveConfiguration(): UsbConfiguration?
-
-    context (UsbDeviceConnection) suspend fun reset()
 }

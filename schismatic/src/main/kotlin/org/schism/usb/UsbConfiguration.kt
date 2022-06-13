@@ -8,7 +8,3 @@ interface UsbConfiguration {
 
 val UsbConfiguration.backend: UsbBackend
     get() = device.backend
-
-context (UsbDeviceConnection) suspend inline fun UsbConfiguration.isActive(): Boolean {
-    return device.getActiveConfiguration() === this@UsbConfiguration
-}

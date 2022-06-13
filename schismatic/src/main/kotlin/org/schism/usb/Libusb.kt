@@ -119,6 +119,126 @@ object Libusb : UsbBackend {
 
         val lifetime = SharedLifetime()
 
+        override suspend fun getActiveConfiguration(): UsbConfiguration? {
+            currentCoroutineContext().ensureActive()
+
+            val activeValue = lifetime.withRetained {
+                withContext(NonCancellable) {
+                    withContext(Dispatchers.IO) {
+                        NativeBuffer.withUnmanaged(JAVA_INT) { configurationValueBuffer ->
+                            checkReturn(
+                                nativeGetConfiguration.invokeExact(
+                                    handle.toMemoryAddress(),
+                                    configurationValueBuffer.start.toMemoryAddress(),
+                                ) as Int
+                            )
+
+                            configurationValueBuffer[JAVA_INT].toUByte()
+                        }
+                    }
+                }
+            }
+
+            currentCoroutineContext().ensureActive()
+
+            return device.configurations.firstOrNull { it.value == activeValue }
+        }
+
+        override suspend fun resetDevice() {
+            currentCoroutineContext().ensureActive()
+
+            lifetime.withRetained {
+                withContext(NonCancellable) {
+                    withContext(Dispatchers.IO) {
+                        checkReturn(nativeResetDevice.invokeExact(handle.toMemoryAddress()) as Int)
+                    }
+                }
+            }
+
+            currentCoroutineContext().ensureActive()
+        }
+
+        override fun UsbInterface.claim() {
+            require(this@UsbInterface is Interface)
+            require(this@UsbInterface.device === this@DeviceConnection.device)
+
+            lifetime.withRetained {
+                checkReturn(
+                    nativeClaimInterface.invokeExact(
+                        handle.toMemoryAddress(),
+                        this@UsbInterface.number.toInt(),
+                    ) as Int
+                )
+            }
+        }
+
+        override suspend fun UsbInterface.release() {
+            currentCoroutineContext().ensureActive()
+
+            require(this@UsbInterface is Interface)
+            require(this@UsbInterface.device === this@DeviceConnection.device)
+
+            lifetime.withRetained {
+                withContext(NonCancellable) {
+                    withContext(Dispatchers.IO) {
+                        checkReturn(
+                            nativeReleaseInterface.invokeExact(
+                                handle,
+                                this@UsbInterface.number.toInt(),
+                            ) as Int
+                        )
+                    }
+                }
+            }
+
+            currentCoroutineContext().ensureActive()
+        }
+
+        override suspend fun UsbAlternateSetting.makeActive() {
+            currentCoroutineContext().ensureActive()
+
+            require(this@UsbAlternateSetting is AlternateSetting)
+            require(this@UsbAlternateSetting.device === this@DeviceConnection.device)
+
+            lifetime.withRetained {
+                withContext(NonCancellable) {
+                    withContext(Dispatchers.IO) {
+                        checkReturn(
+                            nativeSetInterfaceAltSetting.invokeExact(
+                                handle.toMemoryAddress(),
+                                `interface`.number.toInt(),
+                                value.toInt(),
+                            ) as Int
+                        )
+                    }
+                }
+            }
+
+            currentCoroutineContext().ensureActive()
+        }
+
+        override suspend fun UsbEndpoint.clearHalt() {
+            currentCoroutineContext().ensureActive()
+
+            require(this@UsbEndpoint is Endpoint)
+            require(this@UsbEndpoint.device === this@DeviceConnection.device)
+
+            lifetime.withRetained {
+                withContext(NonCancellable) {
+                    withContext(Dispatchers.IO) {
+                        checkReturn(
+                            nativeClearHalt.invokeExact(
+                                handle.toMemoryAddress(),
+                                this@UsbEndpoint.address.toByte(),
+                            ) as Int
+                        )
+                    }
+                }
+            }
+
+            currentCoroutineContext().ensureActive()
+        }
+
         suspend fun transfer(endpointAddress: UByte, buffer: NativeBuffer): Long {
             currentCoroutineContext().ensureActive()
 
@@ -180,6 +300,18 @@ object Libusb : UsbBackend {
                     nativeFreeTransfer.invokeExact(nativeTransferAddress)
                 }
             }
+        }
+
+        override suspend fun UsbBulkTransferInEndpoint.receive(destination: NativeBuffer): Long {
+            require(this@UsbBulkTransferInEndpoint is BulkTransferInEndpoint)
+            require(this@UsbBulkTransferInEndpoint.device === this@DeviceConnection.device)
+            return transfer(this@UsbBulkTransferInEndpoint.address, destination)
+        }
+
+        override suspend fun UsbBulkTransferOutEndpoint.send(source: NativeBuffer): Long {
+            require(this@UsbBulkTransferOutEndpoint is BulkTransferOutEndpoint)
+            require(this@UsbBulkTransferOutEndpoint.device === this@DeviceConnection.device)
+            return transfer(this@UsbBulkTransferOutEndpoint.address, source)
         }
 
         override suspend fun close() {
@@ -255,55 +387,6 @@ object Libusb : UsbBackend {
         override fun connect(): DeviceConnection {
             return DeviceConnection(this)
         }
-
-        context (UsbDeviceConnection) override suspend fun getActiveConfiguration(): UsbConfiguration? {
-            currentCoroutineContext().ensureActive()
-
-            val connection = this@UsbDeviceConnection
-
-            require(connection is DeviceConnection)
-            require(connection.device === device)
-
-            val activeValue = connection.lifetime.withRetained {
-                withContext(NonCancellable) {
-                    withContext(Dispatchers.IO) {
-                        NativeBuffer.withUnmanaged(JAVA_INT) { configurationValueBuffer ->
-                            checkReturn(
-                                nativeGetConfiguration.invokeExact(
-                                    connection.handle.toMemoryAddress(),
-                                    configurationValueBuffer.start.toMemoryAddress(),
-                                ) as Int
-                            )
-
-                            configurationValueBuffer[JAVA_INT].toUByte()
-                        }
-                    }
-                }
-            }
-
-            currentCoroutineContext().ensureActive()
-
-            return configurations.firstOrNull { it.value == activeValue }
-        }
-
-        context (UsbDeviceConnection) override suspend fun reset() {
-            currentCoroutineContext().ensureActive()
-
-            val connection = this@UsbDeviceConnection
-
-            require(connection is DeviceConnection)
-            require(connection.device === device)
-
-            connection.lifetime.withRetained {
-                withContext(NonCancellable) {
-                    withContext(Dispatchers.IO) {
-                        checkReturn(nativeResetDevice.invokeExact(connection.handle.toMemoryAddress()) as Int)
-                    }
-                }
-            }
-
-            currentCoroutineContext().ensureActive()
-        }
     }
 
     private class Configuration(override val device: Device, descriptor: NativeBuffer) : UsbConfiguration {
@@ -335,36 +418,6 @@ object Libusb : UsbBackend {
                     AlternateSetting(this@Interface, interfaceDescriptor)
                 }
             }
-
-        context (UsbDeviceConnection) override fun claim() {
-            val connection = this@UsbDeviceConnection
-
-            require(connection is DeviceConnection)
-            require(device === connection.device)
-
-            connection.lifetime.withRetained {
-                checkReturn(nativeClaimInterface.invokeExact(handle.toMemoryAddress(), number.toInt()) as Int)
-            }
-        }
-
-        context (UsbDeviceConnection) override suspend fun release() {
-            currentCoroutineContext().ensureActive()
-
-            val connection = this@UsbDeviceConnection
-
-            require(connection is DeviceConnection)
-            require(device === connection.device)
-
-            connection.lifetime.withRetained {
-                withContext(NonCancellable) {
-                    withContext(Dispatchers.IO) {
-                        checkReturn(nativeReleaseInterface.invokeExact(handle, number.toInt()) as Int)
-                    }
-                }
-            }
-
-            currentCoroutineContext().ensureActive()
-        }
     }
 
     private class AlternateSetting(
@@ -398,62 +451,13 @@ object Libusb : UsbBackend {
                     else -> throw AssertionError()
                 }
             }
-
-        context (UsbDeviceConnection) override suspend fun makeActive() {
-            currentCoroutineContext().ensureActive()
-
-            val connection = this@UsbDeviceConnection
-
-            require(connection is DeviceConnection)
-            require(connection.device === device)
-
-            connection.lifetime.withRetained {
-                withContext(NonCancellable) {
-                    withContext(Dispatchers.IO) {
-                        checkReturn(
-                            nativeSetInterfaceAltSetting.invokeExact(
-                                connection.handle.toMemoryAddress(),
-                                `interface`.number.toInt(),
-                                value.toInt(),
-                            ) as Int
-                        )
-                    }
-                }
-            }
-
-            currentCoroutineContext().ensureActive()
-        }
     }
 
     private sealed class Endpoint(
         override val alternateSetting: AlternateSetting,
         override val maxPacketSize: UShort,
         val address: UByte,
-    ) : UsbEndpoint {
-        context (UsbDeviceConnection) final override suspend fun clearHalt() {
-            currentCoroutineContext().ensureActive()
-
-            val connection = this@UsbDeviceConnection
-
-            require(connection is DeviceConnection)
-            require(connection.device === device)
-
-            connection.lifetime.withRetained {
-                withContext(NonCancellable) {
-                    withContext(Dispatchers.IO) {
-                        checkReturn(
-                            nativeClearHalt.invokeExact(
-                                connection.handle.toMemoryAddress(),
-                                address.toByte(),
-                            ) as Int
-                        )
-                    }
-                }
-            }
-
-            currentCoroutineContext().ensureActive()
-        }
-    }
+    ) : UsbEndpoint
 
     private class ControlEndpoint(
         alternateSetting: AlternateSetting,
@@ -465,25 +469,13 @@ object Libusb : UsbBackend {
         alternateSetting: AlternateSetting,
         maxPacketSize: UShort,
         address: UByte,
-    ) : Endpoint(alternateSetting, maxPacketSize, address), UsbBulkTransferInEndpoint {
-        context (UsbDeviceConnection) override suspend fun receive(destination: NativeBuffer): Long {
-            require(this@UsbDeviceConnection is DeviceConnection)
-            require(device === this@UsbDeviceConnection.device)
-            return this@UsbDeviceConnection.transfer(address, destination)
-        }
-    }
+    ) : Endpoint(alternateSetting, maxPacketSize, address), UsbBulkTransferInEndpoint
 
     private class BulkTransferOutEndpoint(
         alternateSetting: AlternateSetting,
         maxPacketSize: UShort,
         address: UByte,
-    ) : Endpoint(alternateSetting, maxPacketSize, address), UsbBulkTransferOutEndpoint {
-        context (UsbDeviceConnection) override suspend fun send(source: NativeBuffer): Long {
-            require(this@UsbDeviceConnection is DeviceConnection)
-            require(device === this@UsbDeviceConnection.device)
-            return this@UsbDeviceConnection.transfer(address, source)
-        }
-    }
+    ) : Endpoint(alternateSetting, maxPacketSize, address), UsbBulkTransferOutEndpoint
 
     private val inFlightTransfers = ConcurrentHashMap<NativeAddress, Continuation<Unit>>()
 
