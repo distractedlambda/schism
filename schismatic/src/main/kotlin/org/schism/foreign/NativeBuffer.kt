@@ -12,7 +12,12 @@ import java.lang.foreign.MemorySegment
 import java.lang.foreign.MemorySession
 import java.lang.foreign.ValueLayout
 import java.lang.foreign.ValueLayout.ADDRESS
+import java.lang.foreign.ValueLayout.JAVA_BYTE
+import java.lang.foreign.ValueLayout.JAVA_DOUBLE
+import java.lang.foreign.ValueLayout.JAVA_FLOAT
+import java.lang.foreign.ValueLayout.JAVA_INT
 import java.lang.foreign.ValueLayout.JAVA_LONG
+import java.lang.foreign.ValueLayout.JAVA_SHORT
 import java.lang.invoke.MethodHandle
 import java.lang.ref.Cleaner
 import java.lang.ref.Reference.reachabilityFence
@@ -391,6 +396,10 @@ class NativeBuffer private constructor(
         return Encoder(start.toMemoryAddress(), size, attachment)
     }
 
+    fun decoder(): MeteredBufferDecoder {
+        return Decoder(start.toMemoryAddress(), size, attachment)
+    }
+
     override fun equals(other: Any?): Boolean {
         return other is NativeBuffer && start == other.start && size == other.size
     }
@@ -436,7 +445,7 @@ class NativeBuffer private constructor(
 
         override fun putByte(value: Byte) {
             write(1) { offset ->
-                set(ValueLayout.JAVA_BYTE, offset, value)
+                set(JAVA_BYTE, offset, value)
             }
         }
 
@@ -497,6 +506,105 @@ class NativeBuffer private constructor(
         override fun putBeDouble(value: Double) {
             write(8) { offset ->
                 set(unalignedBeDouble, offset, value)
+            }
+        }
+    }
+
+    private class Decoder(
+        private val address: MemoryAddress,
+        private val limit: Long,
+        private val attachment: Any?,
+    ) : MeteredBufferDecoder {
+        override var bytesRead: Long = 0
+            private set
+
+        @OptIn(ExperimentalContracts::class)
+        private inline fun <R> read(size: Long, block: MemoryAddress.(offset: Long) -> R): R {
+            contract {
+                callsInPlace(block, InvocationKind.EXACTLY_ONCE)
+            }
+
+            val offset = bytesRead
+
+            checkFromIndexSize(offset, size, limit)
+
+            val result = try {
+                address.block(offset)
+            } finally {
+                reachabilityFence(attachment)
+            }
+
+            bytesRead = offset + size
+            return result
+        }
+
+        override fun skip(count: Long) {
+            read(count) {}
+        }
+
+        override fun nextByte(): Byte {
+            return read(1) { offset ->
+                get(JAVA_BYTE, offset)
+            }
+        }
+
+        override fun nextLeShort(): Short {
+            return read(2) { offset ->
+                get(unalignedLeShort, offset)
+            }
+        }
+
+        override fun nextBeShort(): Short {
+            return read(2) { offset ->
+                get(unalignedBeShort, offset)
+            }
+        }
+
+        override fun nextLeInt(): Int {
+            return read(4) { offset ->
+                get(unalignedLeInt, offset)
+            }
+        }
+
+        override fun nextBeInt(): Int {
+            return read(4) { offset ->
+                get(unalignedBeInt, offset)
+            }
+        }
+
+        override fun nextLeLong(): Long {
+            return read(8) { offset ->
+                get(unalignedLeLong, offset)
+            }
+        }
+
+        override fun nextBeLong(): Long {
+            return read(8) { offset ->
+                get(unalignedBeLong, offset)
+            }
+        }
+
+        override fun nextLeFloat(): Float {
+            return read(4) { offset ->
+                get(unalignedLeFloat, offset)
+            }
+        }
+
+        override fun nextBeFloat(): Float {
+            return read(4) { offset ->
+                get(unalignedBeFloat, offset)
+            }
+        }
+
+        override fun nextLeDouble(): Double {
+            return read(8) { offset ->
+                get(unalignedLeDouble, offset)
+            }
+        }
+
+        override fun nextBeDouble(): Double {
+            return read(8) { offset ->
+                get(unalignedBeDouble, offset)
             }
         }
     }
@@ -722,13 +830,13 @@ class NativeBuffer private constructor(
     }
 }
 
-private val unalignedLeShort = ValueLayout.JAVA_SHORT.withBitAlignment(8).withOrder(ByteOrder.LITTLE_ENDIAN)
-private val unalignedBeShort = ValueLayout.JAVA_SHORT.withBitAlignment(8).withOrder(ByteOrder.BIG_ENDIAN)
-private val unalignedLeInt = ValueLayout.JAVA_INT.withBitAlignment(8).withOrder(ByteOrder.LITTLE_ENDIAN)
-private val unalignedBeInt = ValueLayout.JAVA_INT.withBitAlignment(8).withOrder(ByteOrder.BIG_ENDIAN)
+private val unalignedLeShort = JAVA_SHORT.withBitAlignment(8).withOrder(ByteOrder.LITTLE_ENDIAN)
+private val unalignedBeShort = JAVA_SHORT.withBitAlignment(8).withOrder(ByteOrder.BIG_ENDIAN)
+private val unalignedLeInt = JAVA_INT.withBitAlignment(8).withOrder(ByteOrder.LITTLE_ENDIAN)
+private val unalignedBeInt = JAVA_INT.withBitAlignment(8).withOrder(ByteOrder.BIG_ENDIAN)
 private val unalignedLeLong = JAVA_LONG.withBitAlignment(8).withOrder(ByteOrder.LITTLE_ENDIAN)
 private val unalignedBeLong = JAVA_LONG.withBitAlignment(8).withOrder(ByteOrder.BIG_ENDIAN)
-private val unalignedLeFloat = ValueLayout.JAVA_FLOAT.withBitAlignment(8).withOrder(ByteOrder.LITTLE_ENDIAN)
-private val unalignedBeFloat = ValueLayout.JAVA_FLOAT.withBitAlignment(8).withOrder(ByteOrder.BIG_ENDIAN)
-private val unalignedLeDouble = ValueLayout.JAVA_DOUBLE.withBitAlignment(8).withOrder(ByteOrder.LITTLE_ENDIAN)
-private val unalignedBeDouble = ValueLayout.JAVA_DOUBLE.withBitAlignment(8).withOrder(ByteOrder.BIG_ENDIAN)
+private val unalignedLeFloat = JAVA_FLOAT.withBitAlignment(8).withOrder(ByteOrder.LITTLE_ENDIAN)
+private val unalignedBeFloat = JAVA_FLOAT.withBitAlignment(8).withOrder(ByteOrder.BIG_ENDIAN)
+private val unalignedLeDouble = JAVA_DOUBLE.withBitAlignment(8).withOrder(ByteOrder.LITTLE_ENDIAN)
+private val unalignedBeDouble = JAVA_DOUBLE.withBitAlignment(8).withOrder(ByteOrder.BIG_ENDIAN)
