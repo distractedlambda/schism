@@ -1,145 +1,166 @@
 package org.schism.schismatic
 
+import org.schism.foreign.BufferEncoder
+import org.schism.foreign.NativeBuffer
+import org.schism.foreign.byteOffset
+import org.schism.foreign.putLeUInt
+import org.schism.foreign.putUByte
 import org.schism.usb.UsbBulkTransferInEndpoint
 import org.schism.usb.UsbBulkTransferOutEndpoint
+import org.schism.usb.UsbDevice
+import org.schism.usb.UsbDeviceConnection
+import org.schism.usb.receiveExact
+import org.schism.usb.receiveZeroLength
+import org.schism.usb.sendExact
+import org.schism.usb.sendZeroLength
 
 internal data class PicobootEndpoints(
     val inEndpoint: UsbBulkTransferInEndpoint,
     val outEndpoint: UsbBulkTransferOutEndpoint,
 ) {
-    // private fun UsbDeviceConnection.sendCommand(id: UByte, transferLength: UInt) {
-    //     // newConfinedMemorySession().use { memorySession ->
-    //     //     val commandBuffer = memorySession.allocate(32)
+    context (UsbDeviceConnection) private suspend fun sendCommand(
+        id: UByte,
+        transferLength: UInt,
+        fillArgs: BufferEncoder.() -> Unit,
+    ) {
+        NativeBuffer.withUnmanaged(32) { commandBuffer ->
+            val commandSize = commandBuffer.slice(16.byteOffset).encoder().run {
+                fillArgs()
+                bytesWritten
+            }
 
-    //     //     // val argsSize = byteSinkInto(commandBuffer.takeLast(16)).run {
-    //     //     //     encodeArgs()
-    //     //     //     countWritten
-    //     //     // }
+            commandBuffer.encoder().run {
+                putLeUInt(0x431fd10bu)
+                skip(4)
+                putUByte(id)
+                putUByte(commandSize.toUByte())
+                skip(4)
+                putLeUInt(transferLength)
+            }
 
-    //     //     // byteSinkInto(commandBuffer.takeFirst(16)).run {
-    //     //     //     writeUInt(0x431fd10bu, LITTLE_ENDIAN)
-    //     //     //     skip(4)
-    //     //     //     writeUByte(id)
-    //     //     //     writeUByte(argsSize.toUByte())
-    //     //     //     skip(2)
-    //     //     //     writeUInt(transferLength)
-    //     //     // }
+            outEndpoint.sendExact(commandBuffer)
+        }
+    }
 
-    //     //     // sendExact(outEndpoint, commandBuffer)
-    //     // }
-    // }
+    context (UsbDeviceConnection) suspend fun setExclusivity(exclusivity: PicobootExclusivity) {
+        sendCommand(id = 0x01u, transferLength = 0u) {
+            putUByte(exclusivity.ordinal.toUByte())
+        }
 
-    // fun UsbDeviceConnection.setExclusivity(exclusivity: PicobootExclusivity) {
-    //     sendCommand(0x01u, 0u) {
-    //         writeByte(exclusivity.ordinal.toByte())
-    //     }
+        inEndpoint.receiveZeroLength()
+    }
 
-    //     // receiveZeroLength(inEndpoint)
-    // }
+    context (UsbDeviceConnection) suspend fun eraseFlash(deviceAddress: UInt, byteCount: UInt) {
+        // FIXME: bounds-check against RP2040 address space?
 
-    // fun UsbDeviceConnection.eraseFlash(deviceAddress: UInt, byteCount: UInt) {
-    //     // FIXME: bounds-check against RP2040 address space?
+        require(deviceAddress % 4096u == 0u)
+        require(byteCount % 4096u == 0u)
+        require(byteCount != 0u)
 
-    //     require(deviceAddress % 4096u == 0u)
-    //     require(byteCount % 4096u == 0u)
-    //     require(byteCount != 0u)
+        sendCommand(id = 0x03u, transferLength = 0u) {
+            putLeUInt(deviceAddress)
+            putLeUInt(byteCount)
+        }
 
-    //     sendCommand(0x03u, 0u) {
-    //         writeUInt(deviceAddress)
-    //         writeUInt(byteCount)
-    //     }
+        inEndpoint.receiveZeroLength()
+    }
 
-    //     // receiveZeroLength(inEndpoint)
-    // }
+    context (UsbDeviceConnection) suspend fun readMemory(deviceAddress: UInt, destination: NativeBuffer) {
+        // FIXME: bounds-check against RP2040 address space?
 
-    // fun UsbDeviceConnection.readMemory(deviceAddress: UInt, destination: MemorySegment) {
-    //     // FIXME: bounds-check against RP2040 address space?
+        require(destination.size in 1 .. UInt.MAX_VALUE.toLong())
 
-    //     require(destination.byteSize() in 1 .. UInt.MAX_VALUE.toLong())
+        sendCommand(id = 0x84u, transferLength = destination.size.toUInt()) {
+            putLeUInt(deviceAddress)
+            putLeUInt(destination.size.toUInt())
+        }
 
-    //     sendCommand(0x84u, destination.byteSize().toUInt()) {
-    //         writeUInt(deviceAddress)
-    //         writeUInt(destination.byteSize().toUInt())
-    //     }
+        inEndpoint.receiveExact(destination)
+        outEndpoint.sendZeroLength()
+    }
 
-    //     // receiveExact(inEndpoint, destination)
-    //     // sendZeroLength(outEndpoint)
-    // }
+    context (UsbDeviceConnection) suspend fun readMemory(deviceAddress: UInt, byteCount: UInt): NativeBuffer {
+        return NativeBuffer.allocateUninitialized(byteCount.toLong()).also {
+            readMemory(deviceAddress, it)
+        }
+    }
 
-    // fun UsbDeviceConnection.writeMemory(deviceAddress: UInt, data: MemorySegment) {
-    //     // FIXME: bounds-check against RP2040 address space?
+    context (UsbDeviceConnection) suspend fun writeMemory(deviceAddress: UInt, data: NativeBuffer) {
+        // FIXME: bounds-check against RP2040 address space?
 
-    //     require(data.byteSize() in 1 .. UInt.MAX_VALUE.toLong())
+        require(data.size in 1 .. UInt.MAX_VALUE.toLong())
 
-    //     sendCommand(0x05u, data.byteSize().toUInt()) {
-    //         writeUInt(deviceAddress)
-    //         writeUInt(data.byteSize().toUInt())
-    //     }
+        sendCommand(id = 0x05u, transferLength = data.size.toUInt()) {
+            putLeUInt(deviceAddress)
+            putLeUInt(data.size.toUInt())
+        }
 
-    //     // sendExact(outEndpoint, data)
-    //     // receiveZeroLength(inEndpoint)
-    // }
+        outEndpoint.sendExact(data)
+        inEndpoint.receiveZeroLength()
+    }
 
-    // fun UsbDeviceConnection.exitXip() {
-    //     sendCommand(0x06u, 0u) {}
-    //     // receiveZeroLength(inEndpoint)
-    // }
+    context (UsbDeviceConnection) suspend fun exitXip() {
+        sendCommand(id = 0x06u, transferLength = 0u) {}
+        inEndpoint.receiveZeroLength()
+    }
 
-    // fun UsbDeviceConnection.enterXip() {
-    //     sendCommand(0x07u, 0u) {}
-    //     // receiveZeroLength(inEndpoint)
-    // }
+    context (UsbDeviceConnection) suspend fun enterXip() {
+        sendCommand(id = 0x07u, transferLength = 0u) {}
+        inEndpoint.receiveZeroLength()
+    }
 
-    // companion object {
-    //     fun find(device: UsbDevice): PicobootEndpoints? {
-    //         if (device.vendorId != VENDOR_ID) {
-    //             return null
-    //         }
+    companion object {
+        fun find(device: UsbDevice): PicobootEndpoints? {
+            if (device.vendorId != VENDOR_ID) {
+                return null
+            }
 
-    //         if (device.productId != PRODUCT_ID) {
-    //             return null
-    //         }
+            if (device.productId != PRODUCT_ID) {
+                return null
+            }
 
-    //         // for (configuration in device.configurations) {
-    //         //     for (iface in configuration.interfaces) {
-    //         //         if (iface.interfaceClass != INTERFACE_CLASS) {
-    //         //             continue
-    //         //         }
+            for (configuration in device.configurations) {
+                for (`interface` in configuration.interfaces) {
+                    for (alternateSetting in `interface`.alternateSettings) {
+                        if (alternateSetting.interfaceClass != INTERFACE_CLASS) {
+                            continue
+                        }
 
-    //         //         if (iface.interfaceSubClass != INTERFACE_SUB_CLASS) {
-    //         //             continue
-    //         //         }
+                        if (alternateSetting.interfaceSubClass != INTERFACE_SUB_CLASS) {
+                            continue
+                        }
 
-    //         //         if (iface.interfaceProtocol != INTERFACE_PROTOCOL) {
-    //         //             continue
-    //         //         }
+                        if (alternateSetting.interfaceProtocol != INTERFACE_PROTOCOL) {
+                            continue
+                        }
 
-    //         //         var inEndpoint: UsbBulkTransferInEndpoint? = null
-    //         //         var outEndpoint: UsbBulkTransferOutEndpoint? = null
+                        var inEndpoint: UsbBulkTransferInEndpoint? = null
+                        var outEndpoint: UsbBulkTransferOutEndpoint? = null
 
-    //         //         for (endpoint in iface.endpoints) {
-    //         //             when (endpoint) {
-    //         //                 is UsbBulkTransferInEndpoint -> {
-    //         //                     inEndpoint = endpoint
-    //         //                 }
+                        for (endpoint in alternateSetting.endpoints) {
+                            when (endpoint) {
+                                is UsbBulkTransferInEndpoint -> {
+                                    inEndpoint = endpoint
+                                }
 
-    //         //                 is UsbBulkTransferOutEndpoint -> {
-    //         //                     outEndpoint = endpoint
-    //         //                 }
+                                is UsbBulkTransferOutEndpoint -> {
+                                    outEndpoint = endpoint
+                                }
 
-    //         //                 else -> {}
-    //         //             }
-    //         //         }
+                                else -> {}
+                            }
+                        }
 
-    //         //         if (inEndpoint != null && outEndpoint != null) {
-    //         //             return PicobootEndpoints(inEndpoint, outEndpoint)
-    //         //         }
-    //         //     }
-    //         // }
+                        if (inEndpoint != null && outEndpoint != null) {
+                            return PicobootEndpoints(inEndpoint, outEndpoint)
+                        }
+                    }
+                }
+            }
 
-    //         return null
-    //     }
-    // }
+            return null
+        }
+    }
 }
 
 internal enum class PicobootExclusivity {

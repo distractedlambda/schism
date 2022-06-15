@@ -1,5 +1,6 @@
 package org.schism.foreign
 
+import java.lang.Math.addExact
 import java.lang.foreign.ValueLayout
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
@@ -17,6 +18,10 @@ class StructLayoutCalculator {
         return NativeMember(layout, size.byteOffset).also {
             size += layout.byteSize()
         }
+    }
+
+    fun skip(byteCount: Long) {
+        size = addExact(size, byteCount)
     }
 }
 

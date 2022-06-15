@@ -16,6 +16,7 @@ import java.lang.foreign.ValueLayout.JAVA_LONG
 import java.lang.invoke.MethodHandle
 import java.lang.ref.Cleaner
 import java.lang.ref.Reference.reachabilityFence
+import java.nio.ByteOrder
 import java.util.Objects.checkFromIndexSize
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
@@ -386,6 +387,10 @@ class NativeBuffer private constructor(
         nativeFree.invokeExact(start.toMemoryAddress())
     }
 
+    fun encoder(): MeteredBufferEncoder {
+        return Encoder(start.toMemoryAddress(), size, attachment)
+    }
+
     override fun equals(other: Any?): Boolean {
         return other is NativeBuffer && start == other.start && size == other.size
     }
@@ -396,6 +401,104 @@ class NativeBuffer private constructor(
 
     override fun toString(): String {
         return "NativeBuffer(start=$start, size=$size)"
+    }
+
+    private class Encoder(
+        private val address: MemoryAddress,
+        private val limit: Long,
+        private val attachment: Any?,
+    ) : MeteredBufferEncoder {
+        override var bytesWritten: Long = 0
+            private set
+
+        @OptIn(ExperimentalContracts::class)
+        private inline fun write(size: Long, block: MemoryAddress.(offset: Long) -> Unit) {
+            contract {
+                callsInPlace(block, InvocationKind.EXACTLY_ONCE)
+            }
+
+            val offset = bytesWritten
+
+            checkFromIndexSize(offset, size, limit)
+
+            try {
+                address.block(offset)
+            } finally {
+                reachabilityFence(attachment)
+            }
+
+            bytesWritten = offset + size
+        }
+
+        override fun skip(count: Long) {
+            write(count) {}
+        }
+
+        override fun putByte(value: Byte) {
+            write(1) { offset ->
+                set(ValueLayout.JAVA_BYTE, offset, value)
+            }
+        }
+
+        override fun putLeShort(value: Short) {
+            write(2) { offset ->
+                set(unalignedLeShort, offset, value)
+            }
+        }
+
+        override fun putBeShort(value: Short) {
+            write(2) { offset ->
+                set(unalignedBeShort, offset, value)
+            }
+        }
+
+        override fun putLeInt(value: Int) {
+            write(4) { offset ->
+                set(unalignedLeInt, offset, value)
+            }
+        }
+
+        override fun putBeInt(value: Int) {
+            write(4) { offset ->
+                set(unalignedBeInt, offset, value)
+            }
+        }
+
+        override fun putLeLong(value: Long) {
+            write(8) { offset ->
+                set(unalignedLeLong, offset, value)
+            }
+        }
+
+        override fun putBeLong(value: Long) {
+            write(8) { offset ->
+                set(unalignedBeLong, offset, value)
+            }
+        }
+
+        override fun putLeFloat(value: Float) {
+            write(4) { offset ->
+                set(unalignedLeFloat, offset, value)
+            }
+        }
+
+        override fun putBeFloat(value: Float) {
+            write(4) { offset ->
+                set(unalignedBeFloat, offset, value)
+            }
+        }
+
+        override fun putLeDouble(value: Double) {
+            write(8) { offset ->
+                set(unalignedLeDouble, offset, value)
+            }
+        }
+
+        override fun putBeDouble(value: Double) {
+            write(8) { offset ->
+                set(unalignedBeDouble, offset, value)
+            }
+        }
     }
 
     companion object {
@@ -510,7 +613,7 @@ class NativeBuffer private constructor(
         }
 
         @OptIn(ExperimentalContracts::class)
-        inline fun <R> withUnmanageg(size: Long, block: (NativeBuffer) -> R): R {
+        inline fun <R> withUnmanaged(size: Long, block: (NativeBuffer) -> R): R {
             contract {
                 callsInPlace(block, InvocationKind.EXACTLY_ONCE)
             }
@@ -618,3 +721,14 @@ class NativeBuffer private constructor(
         }
     }
 }
+
+private val unalignedLeShort = ValueLayout.JAVA_SHORT.withBitAlignment(8).withOrder(ByteOrder.LITTLE_ENDIAN)
+private val unalignedBeShort = ValueLayout.JAVA_SHORT.withBitAlignment(8).withOrder(ByteOrder.BIG_ENDIAN)
+private val unalignedLeInt = ValueLayout.JAVA_INT.withBitAlignment(8).withOrder(ByteOrder.LITTLE_ENDIAN)
+private val unalignedBeInt = ValueLayout.JAVA_INT.withBitAlignment(8).withOrder(ByteOrder.BIG_ENDIAN)
+private val unalignedLeLong = JAVA_LONG.withBitAlignment(8).withOrder(ByteOrder.LITTLE_ENDIAN)
+private val unalignedBeLong = JAVA_LONG.withBitAlignment(8).withOrder(ByteOrder.BIG_ENDIAN)
+private val unalignedLeFloat = ValueLayout.JAVA_FLOAT.withBitAlignment(8).withOrder(ByteOrder.LITTLE_ENDIAN)
+private val unalignedBeFloat = ValueLayout.JAVA_FLOAT.withBitAlignment(8).withOrder(ByteOrder.BIG_ENDIAN)
+private val unalignedLeDouble = ValueLayout.JAVA_DOUBLE.withBitAlignment(8).withOrder(ByteOrder.LITTLE_ENDIAN)
+private val unalignedBeDouble = ValueLayout.JAVA_DOUBLE.withBitAlignment(8).withOrder(ByteOrder.BIG_ENDIAN)
