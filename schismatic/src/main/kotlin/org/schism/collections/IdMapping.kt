@@ -7,6 +7,6 @@ class IdMapping<E : Any> {
     private val objectsToIds = WeakHashMap<E, Long>()
 
     operator fun get(value: E): Long = synchronized(objectsToIds) {
-        objectsToIds.getOrPut(value) { nextId++ }
+        return objectsToIds.getOrPut(value) { nextId++ }
     }
 }

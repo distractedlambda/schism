@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import org.schism.collections.IdMapping
 import org.schism.usb.Libusb
 import org.schism.usb.UsbDevice
 
@@ -48,6 +49,7 @@ private fun ApplicationScope.MainWindow() {
 @Composable
 private fun DeviceList(selectedDevice: MutableState<UsbDevice?>) {
     val devices = Libusb.attachedDevices.collectAsState()
+    val deviceIds = remember { IdMapping<UsbDevice>() }
 
     Surface(
         Modifier.width(300.dp),
@@ -55,9 +57,9 @@ private fun DeviceList(selectedDevice: MutableState<UsbDevice?>) {
         elevation = 1.dp,
     ) {
         LazyColumn(Modifier.fillMaxSize()) {
-            /// /items(devices.value, key = UsbDevice::transientID) { device ->
-            /// /    DeviceListEntry(device, selectedDevice)
-            /// /}
+            // items(devices.value, key = {  }) { device ->
+            //     DeviceListEntry(device, selectedDevice)
+            // }
         }
     }
 }

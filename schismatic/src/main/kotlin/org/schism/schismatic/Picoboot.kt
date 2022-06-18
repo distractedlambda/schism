@@ -14,10 +14,7 @@ import org.schism.usb.receiveZeroLength
 import org.schism.usb.sendExact
 import org.schism.usb.sendZeroLength
 
-internal data class PicobootEndpoints(
-    val inEndpoint: UsbBulkTransferInEndpoint,
-    val outEndpoint: UsbBulkTransferOutEndpoint,
-) {
+data class PicobootEndpoints(val inEndpoint: UsbBulkTransferInEndpoint, val outEndpoint: UsbBulkTransferOutEndpoint) {
     context (UsbDeviceConnection) private suspend fun sendCommand(
         id: UByte,
         transferLength: UInt,
@@ -163,7 +160,7 @@ internal data class PicobootEndpoints(
     }
 }
 
-internal enum class PicobootExclusivity {
+enum class PicobootExclusivity {
     NotExclusive,
     Exclusive,
     ExclusiveAndEject,
