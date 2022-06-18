@@ -22,6 +22,8 @@ interface UsbDevice {
 
     val deviceVersion: UShort
 
+    val portNumbers: List<UByte>
+
     val configurations: List<UsbConfiguration>
 
     fun connect(): UsbDeviceConnection

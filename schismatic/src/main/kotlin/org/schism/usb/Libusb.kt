@@ -1,5 +1,7 @@
 package org.schism.usb
 
+import kotlinx.collections.immutable.PersistentSet
+import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -7,11 +9,14 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
+import org.schism.coroutines.updateMutating
 import org.schism.foreign.NativeAddress
 import org.schism.foreign.NativeBuffer
 import org.schism.foreign.NativeLayout
 import org.schism.foreign.NativeMember
+import org.schism.foreign.byteOffset
 import org.schism.foreign.calculateCStructLayout
 import org.schism.foreign.index
 import org.schism.foreign.nativeAddress
@@ -44,7 +49,7 @@ import kotlin.coroutines.suspendCoroutine
 import kotlin.io.path.Path
 
 object Libusb : UsbBackend {
-    override val attachedDevices = MutableStateFlow<List<UsbDevice>>(emptyList())
+    override val attachedDevices: StateFlow<PersistentSet<UsbDevice>>
 
     private val handle = NativeBuffer.withUnmanaged(ADDRESS) { handleBuffer ->
         checkReturn(nativeInit.invokeExact(handleBuffer.start.toMemoryAddress()) as Int)
@@ -58,6 +63,8 @@ object Libusb : UsbBackend {
     )
 
     init {
+        attachedDevices = MutableStateFlow(persistentSetOf<Device>())
+
         thread(isDaemon = true, name = "libusb event handler") {
             while (true) {
                 checkReturn(nativeHandleEvents.invokeExact(handle) as Int)
@@ -65,7 +72,8 @@ object Libusb : UsbBackend {
         }
 
         thread(isDaemon = true, name = "libusb device enumerator") {
-            var devicesByHandle = hashMapOf<NativeAddress, Result<Device>>()
+            var devices = emptySet<Device>()
+            var devicesByHandle = emptyMap<NativeAddress, Result<Device>>()
 
             NativeBuffer.withUnmanaged(ADDRESS) { listBuffer ->
                 while (true) {
@@ -93,11 +101,22 @@ object Libusb : UsbBackend {
                         nativeFreeDeviceList.invokeExact(list.start.toMemoryAddress(), 1)
                     }
 
-                    devicesByHandle = newDevicesByHandle
+                    val newDevices = buildSet {
+                        newDevicesByHandle.values.forEach {
+                            it.getOrNull()?.let(::add)
+                        }
+                    }
 
-                    attachedDevices.value = devicesByHandle
-                        .values
-                        .mapNotNull { it.getOrNull() }
+                    val addedDevices = newDevices - devices
+                    val removedDevices = devices - newDevices
+
+                    attachedDevices.updateMutating {
+                        removeAll(removedDevices)
+                        addAll(addedDevices)
+                    }
+
+                    devicesByHandle = newDevicesByHandle
+                    devices = newDevices
 
                     Thread.sleep(500)
                 }
@@ -329,6 +348,8 @@ object Libusb : UsbBackend {
 
         val handle = handle
 
+        override val portNumbers: List<UByte>
+
         override val usbVersion: UShort
         override val deviceClass: UByte
         override val deviceSubClass: UByte
@@ -341,6 +362,20 @@ object Libusb : UsbBackend {
         override val backend get() = Libusb
 
         init {
+            NativeBuffer.withUnmanaged(7) { portNumbersBuffer ->
+                val portNumberCount = checkSize(
+                    nativeGetPortNumbers.invokeExact(
+                        handle.toMemoryAddress(),
+                        portNumbersBuffer.start.toMemoryAddress(),
+                        portNumbersBuffer.size.toInt(),
+                    ) as Int
+                )
+
+                portNumbers = List(portNumberCount) {
+                    portNumbersBuffer[JAVA_BYTE, it.byteOffset].toUByte()
+                }
+            }
+
             NativeBuffer.withUnmanaged(NativeDeviceDescriptor.layout) { descriptor ->
                 checkReturn(
                     nativeGetDeviceDescriptor.invokeExact(
@@ -507,6 +542,7 @@ object Libusb : UsbBackend {
     private val nativeGetDeviceAddress: MethodHandle
     private val nativeGetDeviceDescriptor: MethodHandle
     private val nativeGetDeviceList: MethodHandle
+    private val nativeGetPortNumbers: MethodHandle
     private val nativeHandleEvents: MethodHandle
     private val nativeInit: MethodHandle
     private val nativeOpen: MethodHandle
@@ -546,6 +582,7 @@ object Libusb : UsbBackend {
         nativeGetDeviceAddress = link("get_device_address", ADDRESS, ret = JAVA_BYTE)
         nativeGetDeviceDescriptor = link("get_device_descriptor", ADDRESS, ADDRESS, ret = JAVA_INT)
         nativeGetDeviceList = link("get_device_list", ADDRESS, ADDRESS, ret = JAVA_LONG) // FIXME: 32-bit ssize_t?
+        nativeGetPortNumbers = link("get_port_numbers", ADDRESS, ADDRESS, JAVA_INT, ret = JAVA_INT)
         nativeHandleEvents = link("handle_events", ADDRESS, ret = JAVA_INT)
         nativeInit = link("init", ADDRESS, ret = JAVA_INT)
         nativeOpen = link("open", ADDRESS, ADDRESS, ret = JAVA_INT)
@@ -562,6 +599,14 @@ object Libusb : UsbBackend {
         if (code != 0) {
             throw UsbException(errorMessage(code))
         }
+    }
+
+    private fun checkSize(value: Int): Int {
+        if (value < 0) {
+            throw UsbException(errorMessage(value))
+        }
+
+        return value
     }
 
     private fun checkSize(value: Long): Long {

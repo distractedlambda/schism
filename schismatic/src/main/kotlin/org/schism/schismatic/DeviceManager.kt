@@ -5,17 +5,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.schism.coroutines.Actor
 import org.schism.coroutines.launchWhileEachPresent
-import kotlinx.collections.immutable.plus
-import kotlinx.collections.immutable.minus
+import org.schism.coroutines.updateMutating
 import org.schism.usb.Libusb
+import org.schism.usb.UsbDevice
 import org.schism.usb.connect
 import org.schism.util.contextual
 
-class DeviceManager(private val scope: CoroutineScope) {
+class DeviceManager(scope: CoroutineScope) {
     val connectedDevices: StateFlow<Set<ConnectedDevice>>
 
     init {
@@ -28,14 +27,19 @@ class DeviceManager(private val scope: CoroutineScope) {
                         picobootEndpoints.setExclusivity(PicobootExclusivity.Exclusive)
 
                         val connectedDevice = object : Actor(contextual<CoroutineScope>()), ConnectedPicobootDevice {
-
+                            override val usbDevice get() = device
                         }
 
                         try {
-                            connectedDevices.update { it + connectedDevice }
+                            connectedDevices.updateMutating {
+                                add(connectedDevice)
+                            }
+
                             awaitCancellation()
                         } finally {
-                            connectedDevices.update { it - connectedDevice }
+                            connectedDevices.updateMutating {
+                                remove(connectedDevice)
+                            }
                         }
                     }
                 }
@@ -44,6 +48,8 @@ class DeviceManager(private val scope: CoroutineScope) {
     }
 }
 
-sealed interface ConnectedDevice
+sealed interface ConnectedDevice {
+    val usbDevice: UsbDevice
+}
 
 interface ConnectedPicobootDevice : ConnectedDevice
