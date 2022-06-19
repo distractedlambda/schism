@@ -1,9 +1,11 @@
-@file:Suppress("NOTHING_TO_INLINE")
+@file:Suppress("NOTHING_TO_INLINE", "INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
 
 package org.schism.foreign
 
+import kotlin.internal.InlineOnly
+
 interface BufferEncoder {
-    fun skip(count: Long)
+    fun putUndefined(count: Long)
 
     fun putByte(value: Byte)
 
@@ -28,38 +30,38 @@ interface BufferEncoder {
     fun putBeDouble(value: Double)
 }
 
-inline fun BufferEncoder.putUByte(value: UByte) {
+@InlineOnly inline fun BufferEncoder.putUByte(value: UByte) {
     putByte(value.toByte())
 }
 
-inline fun BufferEncoder.putLeChar(value: Char) {
+@InlineOnly inline fun BufferEncoder.putLeChar(value: Char) {
     putLeShort(value.code.toShort())
 }
 
-inline fun BufferEncoder.putBeChar(value: Char) {
+@InlineOnly inline fun BufferEncoder.putBeChar(value: Char) {
     putBeShort(value.code.toShort())
 }
 
-inline fun BufferEncoder.putLeUShort(value: UShort) {
+@InlineOnly inline fun BufferEncoder.putLeUShort(value: UShort) {
     putLeShort(value.toShort())
 }
 
-inline fun BufferEncoder.putBeUShort(value: UShort) {
+@InlineOnly inline fun BufferEncoder.putBeUShort(value: UShort) {
     putBeShort(value.toShort())
 }
 
-inline fun BufferEncoder.putLeUInt(value: UInt) {
+@InlineOnly inline fun BufferEncoder.putLeUInt(value: UInt) {
     putLeInt(value.toInt())
 }
 
-inline fun BufferEncoder.putBeUInt(value: UInt) {
+@InlineOnly inline fun BufferEncoder.putBeUInt(value: UInt) {
     putBeInt(value.toInt())
 }
 
-inline fun BufferEncoder.putLeULong(value: ULong) {
+@InlineOnly inline fun BufferEncoder.putLeULong(value: ULong) {
     putLeLong(value.toLong())
 }
 
-inline fun BufferEncoder.putBeULong(value: ULong) {
+@InlineOnly inline fun BufferEncoder.putBeULong(value: ULong) {
     putBeLong(value.toLong())
 }

@@ -1,7 +1,13 @@
+@file:Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
+
 package org.schism.foreign
+
+import kotlin.internal.InlineOnly
 
 @JvmInline value class ByteOffset(inline val value: Long)
 
-inline val Int.byteOffset: ByteOffset get() = ByteOffset(this.toLong())
+@InlineOnly inline val Int.byteOffset: ByteOffset
+    get() = ByteOffset(this.toLong())
 
-inline val Long.byteOffset: ByteOffset get() = ByteOffset(this)
+@InlineOnly inline val Long.byteOffset: ByteOffset
+    get() = ByteOffset(this)

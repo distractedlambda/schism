@@ -12,21 +12,20 @@ import org.schism.coroutines.updateMutating
 import org.schism.usb.Libusb
 import org.schism.usb.UsbDevice
 import org.schism.usb.connect
-import org.schism.util.contextual
 
-class DeviceManager(scope: CoroutineScope) {
+context (CoroutineScope) class DeviceManager {
     val connectedDevices: StateFlow<Set<ConnectedDevice>>
 
     init {
         connectedDevices = MutableStateFlow(persistentSetOf())
 
-        scope.launch {
+        launch {
             Libusb.attachedDevices.launchWhileEachPresent { device ->
                 PicobootEndpoints.find(device)?.let { picobootEndpoints ->
                     device.connect {
                         picobootEndpoints.setExclusivity(PicobootExclusivity.Exclusive)
 
-                        val connectedDevice = object : Actor(contextual<CoroutineScope>()), ConnectedPicobootDevice {
+                        val connectedDevice = object : Actor(), ConnectedPicobootDevice {
                             override val usbDevice get() = device
                         }
 

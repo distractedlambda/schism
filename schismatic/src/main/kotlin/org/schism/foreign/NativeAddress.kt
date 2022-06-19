@@ -1,4 +1,4 @@
-@file:Suppress("NOTHING_TO_INLINE")
+@file:Suppress("NOTHING_TO_INLINE", "INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
 
 package org.schism.foreign
 
@@ -6,29 +6,30 @@ import java.lang.Math.addExact
 import java.lang.Math.subtractExact
 import java.lang.foreign.Addressable
 import java.lang.foreign.MemoryAddress
+import kotlin.internal.InlineOnly
 
 @JvmInline value class NativeAddress(inline val numericValue: Long) {
-    inline fun toMemoryAddress(): MemoryAddress {
+    @InlineOnly inline fun toMemoryAddress(): MemoryAddress {
         return MemoryAddress.ofLong(numericValue)
     }
 
-    inline operator fun plus(offset: ByteOffset): NativeAddress {
+    @InlineOnly inline operator fun plus(offset: ByteOffset): NativeAddress {
         return NativeAddress(addExact(numericValue, offset.value))
     }
 
-    inline operator fun minus(offset: ByteOffset): NativeAddress {
+    @InlineOnly inline operator fun minus(offset: ByteOffset): NativeAddress {
         return NativeAddress(subtractExact(numericValue, offset.value))
     }
 
-    inline operator fun minus(other: NativeAddress): ByteOffset {
+    @InlineOnly inline operator fun minus(other: NativeAddress): ByteOffset {
         return ByteOffset(subtractExact(numericValue, other.numericValue))
     }
 
-    inline fun requireAlignedTo(alignment: Long) {
+    @InlineOnly inline fun requireAlignedTo(alignment: Long) {
         numericValue.requireAlignedTo(alignment)
     }
 
-    inline fun isNULL(): Boolean {
+    @InlineOnly inline fun isNULL(): Boolean {
         return numericValue == 0L
     }
 
@@ -37,10 +38,10 @@ import java.lang.foreign.MemoryAddress
     }
 
     companion object {
-        inline val NULL: NativeAddress get() = NativeAddress(0)
+        @InlineOnly inline val NULL: NativeAddress get() = NativeAddress(0)
     }
 }
 
-inline fun Addressable.nativeAddress(): NativeAddress {
+@InlineOnly inline fun Addressable.nativeAddress(): NativeAddress {
     return NativeAddress(address().toRawLongValue())
 }

@@ -21,14 +21,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.application
+import androidx.compose.ui.window.awaitApplication
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 import org.schism.collections.IdMapping
 import org.schism.usb.Libusb
 import org.schism.usb.UsbDevice
 
 fun main() {
     System.setProperty("apple.awt.application.appearance", "system")
-    application { MainWindow() }
+
+    runBlocking(Dispatchers.Default) {
+        val deviceManager = DeviceManager()
+
+        awaitApplication {
+            MainWindow()
+        }
+
+        cancel()
+    }
 }
 
 @Composable

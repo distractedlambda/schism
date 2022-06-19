@@ -1,17 +1,19 @@
-@file:Suppress("NOTHING_TO_INLINE")
+@file:Suppress("NOTHING_TO_INLINE", "INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
 
 package org.schism.foreign
 
 import java.lang.Math.multiplyExact
+import kotlin.internal.InlineOnly
 
 @JvmInline value class Index(inline val value: Long) {
-    inline fun toByteOffset(stride: Int): ByteOffset {
+    @InlineOnly inline fun toByteOffset(stride: Int): ByteOffset {
         return multiplyExact(value, stride).byteOffset
     }
 
-    inline fun toByteOffset(stride: Long): ByteOffset {
+    @InlineOnly inline fun toByteOffset(stride: Long): ByteOffset {
         return multiplyExact(value, stride).byteOffset
     }
 }
 
-inline val Long.index: Index get() = Index(this)
+@InlineOnly inline val Long.index: Index
+    get() = Index(this)

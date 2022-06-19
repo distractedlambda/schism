@@ -13,11 +13,19 @@ interface UsbDeviceConnection : SuspendingAutocloseable {
 
     suspend fun getActiveConfiguration(): UsbConfiguration?
 
+    suspend fun getManufacturerName(): String?
+
+    suspend fun getProductName(): String?
+
+    suspend fun getSerialNumber(): String?
+
     fun UsbInterface.claim()
 
     suspend fun UsbInterface.release()
 
     suspend fun UsbAlternateSetting.makeActive()
+
+    suspend fun UsbAlternateSetting.getName(): String?
 
     suspend fun UsbEndpoint.clearHalt()
 

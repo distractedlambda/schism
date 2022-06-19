@@ -1,9 +1,11 @@
-@file:Suppress("NOTHING_TO_INLINE")
+@file:Suppress("NOTHING_TO_INLINE", "INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
 
 package org.schism.foreign
 
+import kotlin.internal.InlineOnly
+
 interface BufferDecoder {
-    fun skip(count: Long)
+    fun discardNext(count: Long)
 
     fun nextByte(): Byte
 
@@ -28,38 +30,38 @@ interface BufferDecoder {
     fun nextBeDouble(): Double
 }
 
-inline fun BufferDecoder.nextUByte(): UByte {
+@InlineOnly inline fun BufferDecoder.nextUByte(): UByte {
     return nextByte().toUByte()
 }
 
-inline fun BufferDecoder.nextLeUShort(): UShort {
+@InlineOnly inline fun BufferDecoder.nextLeUShort(): UShort {
     return nextLeShort().toUShort()
 }
 
-inline fun BufferDecoder.nextBeUShort(): UShort {
+@InlineOnly inline fun BufferDecoder.nextBeUShort(): UShort {
     return nextBeShort().toUShort()
 }
 
-inline fun BufferDecoder.nextLeChar(): Char {
+@InlineOnly inline fun BufferDecoder.nextLeChar(): Char {
     return Char(nextLeUShort())
 }
 
-inline fun BufferDecoder.nextBeChar(): Char {
+@InlineOnly inline fun BufferDecoder.nextBeChar(): Char {
     return Char(nextBeUShort())
 }
 
-inline fun BufferDecoder.nextLeUInt(): UInt {
+@InlineOnly inline fun BufferDecoder.nextLeUInt(): UInt {
     return nextLeInt().toUInt()
 }
 
-inline fun BufferDecoder.nextBeUInt(): UInt {
+@InlineOnly inline fun BufferDecoder.nextBeUInt(): UInt {
     return nextBeInt().toUInt()
 }
 
-inline fun BufferDecoder.nextLeULong(): ULong {
+@InlineOnly inline fun BufferDecoder.nextLeULong(): ULong {
     return nextLeLong().toULong()
 }
 
-inline fun BufferDecoder.nextBeULong(): ULong {
+@InlineOnly inline fun BufferDecoder.nextBeULong(): ULong {
     return nextBeLong().toULong()
 }

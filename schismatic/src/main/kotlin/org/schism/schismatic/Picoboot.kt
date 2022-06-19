@@ -28,10 +28,10 @@ data class PicobootEndpoints(val inEndpoint: UsbBulkTransferInEndpoint, val outE
 
             commandBuffer.encoder().run {
                 putLeUInt(0x431fd10bu)
-                skip(4)
+                putUndefined(4)
                 putUByte(id)
                 putUByte(commandSize.toUByte())
-                skip(4)
+                putUndefined(4)
                 putLeUInt(transferLength)
             }
 

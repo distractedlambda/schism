@@ -17,12 +17,12 @@ import kotlin.coroutines.Continuation
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
-open class Actor(scope: CoroutineScope) {
+context (CoroutineScope) open class Actor {
     private val workItems = Channel<WorkItem<*>>(Channel.UNLIMITED)
 
     init {
         @OptIn(ExperimentalCoroutinesApi::class)
-        scope.launch(start = CoroutineStart.ATOMIC) {
+        launch(start = CoroutineStart.ATOMIC) {
             var cause: Throwable? = null
             try {
                 for (workItem in workItems) {
