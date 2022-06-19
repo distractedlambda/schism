@@ -3,6 +3,7 @@ package org.schism.schismatic
 import org.schism.foreign.BufferEncoder
 import org.schism.foreign.NativeBuffer
 import org.schism.foreign.byteOffset
+import org.schism.foreign.positionalDifference
 import org.schism.foreign.putLeUInt
 import org.schism.foreign.putUByte
 import org.schism.usb.UsbBulkTransferInEndpoint
@@ -21,17 +22,16 @@ data class PicobootEndpoints(val inEndpoint: UsbBulkTransferInEndpoint, val outE
         fillArgs: BufferEncoder.() -> Unit,
     ) {
         NativeBuffer.withUnmanaged(32) { commandBuffer ->
-            val commandSize = commandBuffer.slice(16.byteOffset).encoder().run {
+            val commandSize = commandBuffer.slice(16.byteOffset).encoder().positionalDifference {
                 fillArgs()
-                bytesWritten
             }
 
             commandBuffer.encoder().run {
                 putLeUInt(0x431fd10bu)
-                putUndefined(4)
+                skip(4)
                 putUByte(id)
                 putUByte(commandSize.toUByte())
-                putUndefined(4)
+                skip(4)
                 putLeUInt(transferLength)
             }
 

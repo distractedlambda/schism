@@ -20,6 +20,9 @@ import org.schism.foreign.byteOffset
 import org.schism.foreign.calculateCStructLayout
 import org.schism.foreign.index
 import org.schism.foreign.nativeAddress
+import org.schism.foreign.nextLeUtf16
+import org.schism.foreign.putLeUShort
+import org.schism.foreign.putUByte
 import org.schism.util.SharedLifetime
 import java.lang.Math.toIntExact
 import java.lang.foreign.FunctionDescriptor
@@ -125,7 +128,7 @@ object Libusb : UsbBackend {
     }
 
     private class DeviceConnection(override val device: Device) : UsbDeviceConnection {
-        val handle = NativeBuffer.withUnmanaged(ADDRESS) { handleBuffer ->
+        private val handle = NativeBuffer.withUnmanaged(ADDRESS) { handleBuffer ->
             checkReturn(
                 nativeOpen.invokeExact(
                     device.handle.toMemoryAddress(),
@@ -136,7 +139,91 @@ object Libusb : UsbBackend {
             handleBuffer[ADDRESS]
         }
 
-        val lifetime = SharedLifetime()
+        private val lifetime = SharedLifetime()
+
+        private suspend fun transfer(endpointAddress: UByte, buffer: NativeBuffer): Int {
+            currentCoroutineContext().ensureActive()
+
+            lifetime.withRetained {
+                val nativeTransferAddress = (nativeAllocTransfer.invokeExact(0) as MemoryAddress).nativeAddress()
+
+                if (nativeTransferAddress.isNULL()) {
+                    throw OutOfMemoryError("Failed to allocate transfer")
+                }
+
+                try {
+                    val nativeTransfer = NativeBuffer.unmanaged(nativeTransferAddress, NativeTransfer.layout.size)
+
+                    nativeTransfer[NativeTransfer.devHandle] = handle
+                    nativeTransfer[NativeTransfer.endpoint] = endpointAddress.toByte()
+                    nativeTransfer[NativeTransfer.type] = NativeTransferType.BULK.toByte()
+                    nativeTransfer[NativeTransfer.timeout] = 0
+                    nativeTransfer[NativeTransfer.length] = minOf(buffer.size, Int.MAX_VALUE.toLong()).toInt()
+                    nativeTransfer[NativeTransfer.callback] = nativeTransferCallback
+                    nativeTransfer[NativeTransfer.buffer] = buffer.start
+
+                    buffer.keepAlive {
+                        suspendCoroutine<Unit> { continuation ->
+                            inFlightTransfers[nativeTransferAddress] = continuation
+
+                            when (val returnCode = nativeSubmitTransfer.invokeExact(nativeTransferAddress) as Int) {
+                                0 -> Unit
+                                else -> {
+                                    inFlightTransfers.remove(nativeTransferAddress)
+                                    throw UsbException(errorMessage(returnCode))
+                                }
+                            }
+
+                            @OptIn(InternalCoroutinesApi::class)
+                            continuation.context[Job]?.invokeOnCompletion(
+                                onCancelling = true,
+                                invokeImmediately = true,
+                            ) {
+                                nativeCancelTransfer.invokeExact(nativeTransferAddress)
+                            }
+                        }
+                    }
+
+                    currentCoroutineContext().ensureActive()
+
+                    when (nativeTransfer[NativeTransfer.status]) {
+                        NativeTransferStatus.COMPLETED -> Unit
+                        NativeTransferStatus.ERROR -> throw UsbException("Transfer error")
+                        NativeTransferStatus.TIMED_OUT -> throw UsbException("Transfer timed out")
+                        NativeTransferStatus.CANCELED -> throw UsbException("Transfer cancelled")
+                        NativeTransferStatus.STALL -> throw UsbException("Transfer stalled")
+                        NativeTransferStatus.NO_DEVICE -> throw UsbException("Device is no longer attached")
+                        NativeTransferStatus.OVERFLOW -> throw UsbException("Transfer overflowed")
+                        else -> throw UsbException("Unknown transfer error")
+                    }
+
+                    return nativeTransfer[NativeTransfer.actualLength]
+                } finally {
+                    nativeFreeTransfer.invokeExact(nativeTransferAddress)
+                }
+            }
+        }
+
+        private suspend fun getString(index: UByte): String? {
+            if (index == 0.toUByte()) {
+                return null
+            }
+
+            NativeBuffer.withUnmanagedUninitialized(8 + 255) { buffer ->
+                buffer.slice(size = 8).encoder().run {
+                    putUByte(0x80u)
+                    putUByte(0x06u)
+                    putUByte(index)
+                    putUByte(0x03u)
+                    putNativeShort(0)
+                    putLeUShort(255u)
+                }
+
+                val actualLength = transfer(0u, buffer)
+
+                return buffer.slice(10.byteOffset).decoder().nextLeUtf16(actualLength - 2)
+            }
+        }
 
         override suspend fun getActiveConfiguration(): UsbConfiguration? {
             currentCoroutineContext().ensureActive()
@@ -175,6 +262,18 @@ object Libusb : UsbBackend {
             }
 
             currentCoroutineContext().ensureActive()
+        }
+
+        override suspend fun getManufacturerName(): String? {
+            return getString(device.iManufacturer)
+        }
+
+        override suspend fun getProductName(): String? {
+            return getString(device.iProduct)
+        }
+
+        override suspend fun getSerialNumber(): String? {
+            return getString(device.iSerialNumber)
         }
 
         override fun UsbInterface.claim() {
@@ -236,6 +335,12 @@ object Libusb : UsbBackend {
             currentCoroutineContext().ensureActive()
         }
 
+        override suspend fun UsbAlternateSetting.getName(): String? {
+            require(this@UsbAlternateSetting is AlternateSetting)
+            require(this@UsbAlternateSetting.device === this@DeviceConnection.device)
+            return getString(iInterface)
+        }
+
         override suspend fun UsbEndpoint.clearHalt() {
             currentCoroutineContext().ensureActive()
 
@@ -258,79 +363,16 @@ object Libusb : UsbBackend {
             currentCoroutineContext().ensureActive()
         }
 
-        suspend fun transfer(endpointAddress: UByte, buffer: NativeBuffer): Long {
-            currentCoroutineContext().ensureActive()
-
-            lifetime.withRetained {
-                val nativeTransferAddress = (nativeAllocTransfer.invokeExact(0) as MemoryAddress).nativeAddress()
-
-                if (nativeTransferAddress.isNULL()) {
-                    throw OutOfMemoryError("Failed to allocate transfer")
-                }
-
-                try {
-                    val nativeTransfer = NativeBuffer.unmanaged(nativeTransferAddress, NativeTransfer.layout.size)
-
-                    nativeTransfer[NativeTransfer.devHandle] = handle
-                    nativeTransfer[NativeTransfer.endpoint] = endpointAddress.toByte()
-                    nativeTransfer[NativeTransfer.type] = NativeTransferType.BULK.toByte()
-                    nativeTransfer[NativeTransfer.timeout] = 0
-                    nativeTransfer[NativeTransfer.length] = minOf(buffer.size, Int.MAX_VALUE.toLong()).toInt()
-                    nativeTransfer[NativeTransfer.callback] = nativeTransferCallback
-                    nativeTransfer[NativeTransfer.buffer] = buffer.start
-
-                    buffer.keepAlive {
-                        suspendCoroutine<Unit> { continuation ->
-                            inFlightTransfers[nativeTransferAddress] = continuation
-
-                            when (val returnCode = nativeSubmitTransfer.invokeExact(nativeTransferAddress) as Int) {
-                                0 -> Unit
-                                else -> {
-                                    inFlightTransfers.remove(nativeTransferAddress)
-                                    throw UsbException(errorMessage(returnCode))
-                                }
-                            }
-
-                            @OptIn(InternalCoroutinesApi::class)
-                            continuation.context[Job]?.invokeOnCompletion(
-                                onCancelling = true,
-                                invokeImmediately = true,
-                            ) {
-                                nativeCancelTransfer.invokeExact(nativeTransferAddress)
-                            }
-                        }
-                    }
-
-                    currentCoroutineContext().ensureActive()
-
-                    when (nativeTransfer[NativeTransfer.status]) {
-                        NativeTransferStatus.COMPLETED -> Unit
-                        NativeTransferStatus.ERROR -> throw UsbException("Transfer error")
-                        NativeTransferStatus.TIMED_OUT -> throw UsbException("Transfer timed out")
-                        NativeTransferStatus.CANCELED -> throw UsbException("Transfer cancelled")
-                        NativeTransferStatus.STALL -> throw UsbException("Transfer stalled")
-                        NativeTransferStatus.NO_DEVICE -> throw UsbException("Device is no longer attached")
-                        NativeTransferStatus.OVERFLOW -> throw UsbException("Transfer overflowed")
-                        else -> throw UsbException("Unknown transfer error")
-                    }
-
-                    return nativeTransfer[NativeTransfer.actualLength].toLong()
-                } finally {
-                    nativeFreeTransfer.invokeExact(nativeTransferAddress)
-                }
-            }
-        }
-
         override suspend fun UsbBulkTransferInEndpoint.receive(destination: NativeBuffer): Long {
             require(this@UsbBulkTransferInEndpoint is BulkTransferInEndpoint)
             require(this@UsbBulkTransferInEndpoint.device === this@DeviceConnection.device)
-            return transfer(this@UsbBulkTransferInEndpoint.address, destination)
+            return transfer(this@UsbBulkTransferInEndpoint.address, destination).toLong()
         }
 
         override suspend fun UsbBulkTransferOutEndpoint.send(source: NativeBuffer): Long {
             require(this@UsbBulkTransferOutEndpoint is BulkTransferOutEndpoint)
             require(this@UsbBulkTransferOutEndpoint.device === this@DeviceConnection.device)
-            return transfer(this@UsbBulkTransferOutEndpoint.address, source)
+            return transfer(this@UsbBulkTransferOutEndpoint.address, source).toLong()
         }
 
         override suspend fun close() {
@@ -358,6 +400,10 @@ object Libusb : UsbBackend {
         override val productId: UShort
         override val deviceVersion: UShort
         override val configurations: List<Configuration>
+
+        val iManufacturer: UByte
+        val iProduct: UByte
+        val iSerialNumber: UByte
 
         override val backend get() = Libusb
 
@@ -391,6 +437,9 @@ object Libusb : UsbBackend {
                 vendorId = descriptor[NativeDeviceDescriptor.idVendor].toUShort()
                 productId = descriptor[NativeDeviceDescriptor.idProduct].toUShort()
                 deviceVersion = descriptor[NativeDeviceDescriptor.bcdDevice].toUShort()
+                iManufacturer = descriptor[NativeDeviceDescriptor.iManufacturer].toUByte()
+                iProduct = descriptor[NativeDeviceDescriptor.iProduct].toUByte()
+                iSerialNumber = descriptor[NativeDeviceDescriptor.iSerialNumber].toUByte()
 
                 val numConfigurations = descriptor[NativeDeviceDescriptor.bNumConfigurations].toUByte()
 
@@ -460,6 +509,7 @@ object Libusb : UsbBackend {
         descriptor: NativeBuffer,
     ) : UsbAlternateSetting {
         val value = descriptor[NativeInterfaceDescriptor.bAlternateSetting].toUByte()
+        val iInterface = descriptor[NativeInterfaceDescriptor.iInterface].toUByte()
 
         override val interfaceClass = descriptor[NativeInterfaceDescriptor.bInterfaceClass].toUByte()
         override val interfaceSubClass = descriptor[NativeInterfaceDescriptor.bInterfaceSubClass].toUByte()
@@ -475,7 +525,7 @@ object Libusb : UsbBackend {
                 val attributes = endpointDescriptor[NativeEndpointDescriptor.bmAttributes].toUByte().toInt()
                 val maxPacketSize = endpointDescriptor[NativeEndpointDescriptor.wMaxPacketSize].toUShort()
                 when (attributes and 0b11) {
-                    0 -> ControlEndpoint(this@AlternateSetting, maxPacketSize, address)
+                    0 -> null
                     1 -> null
                     2 -> when (address.toUInt() shr 7) {
                         0u -> BulkTransferOutEndpoint(this@AlternateSetting, maxPacketSize, address)
@@ -493,12 +543,6 @@ object Libusb : UsbBackend {
         override val maxPacketSize: UShort,
         val address: UByte,
     ) : UsbEndpoint
-
-    private class ControlEndpoint(
-        alternateSetting: AlternateSetting,
-        maxPacketSize: UShort,
-        address: UByte,
-    ) : Endpoint(alternateSetting, maxPacketSize, address), UsbControlEndpoint
 
     private class BulkTransferInEndpoint(
         alternateSetting: AlternateSetting,

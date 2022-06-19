@@ -4,9 +4,11 @@ package org.schism.collections
 
 import org.schism.foreign.BufferDecoder
 import org.schism.foreign.BufferEncoder
+import org.schism.math.toIntExact
 import java.lang.invoke.MethodHandles.byteArrayViewVarHandle
 import java.nio.ByteOrder.BIG_ENDIAN
 import java.nio.ByteOrder.LITTLE_ENDIAN
+import java.nio.ByteOrder.nativeOrder
 import java.util.Objects.checkFromIndexSize
 import java.util.Objects.checkFromToIndex
 import kotlin.contracts.ExperimentalContracts
@@ -41,6 +43,8 @@ private class ByteArrayDecoder(
         checkFromToIndex(offset, limit, array.size)
     }
 
+    override val position get() = offset.toLong()
+
     @OptIn(ExperimentalContracts::class)
     private inline fun <R> read(size: Int, block: (offset: Int) -> R): R {
         contract {
@@ -56,7 +60,7 @@ private class ByteArrayDecoder(
         return result
     }
 
-    override fun discardNext(count: Long) {
+    override fun skip(count: Long) {
         val offset = offset
         checkFromIndexSize(offset.toLong(), count, limit.toLong())
         this.offset = offset + count.toInt()
@@ -70,61 +74,91 @@ private class ByteArrayDecoder(
 
     override fun nextLeShort(): Short {
         return read(2) { offset ->
-            vhLeShort.get(array, offset) as Short
+            vhLeShort[array, offset] as Short
         }
     }
 
     override fun nextBeShort(): Short {
         return read(2) { offset ->
-            vhBeShort.get(array, offset) as Short
+            vhBeShort[array, offset] as Short
+        }
+    }
+
+    override fun nextNativeShort(): Short {
+        return read(2) { offset ->
+            vhNativeShort[array, offset] as Short
         }
     }
 
     override fun nextLeInt(): Int {
         return read(4) { offset ->
-            vhLeInt.get(array, offset) as Int
+            vhLeInt[array, offset] as Int
         }
     }
 
     override fun nextBeInt(): Int {
         return read(4) { offset ->
-            vhBeInt.get(array, offset) as Int
+            vhBeInt[array, offset] as Int
+        }
+    }
+
+    override fun nextNativeInt(): Int {
+        return read(4) { offset ->
+            vhNativeInt[array, offset] as Int
         }
     }
 
     override fun nextLeLong(): Long {
         return read(8) { offset ->
-            vhLeLong.get(array, offset) as Long
+            vhLeLong[array, offset] as Long
         }
     }
 
     override fun nextBeLong(): Long {
         return read(8) { offset ->
-            vhBeLong.get(array, offset) as Long
+            vhBeLong[array, offset] as Long
+        }
+    }
+
+    override fun nextNativeLong(): Long {
+        return read(8) { offset ->
+            vhNativeLong[array, offset] as Long
         }
     }
 
     override fun nextLeFloat(): Float {
         return read(4) { offset ->
-            vhLeFloat.get(array, offset) as Float
+            vhLeFloat[array, offset] as Float
         }
     }
 
     override fun nextBeFloat(): Float {
         return read(4) { offset ->
-            vhBeFloat.get(array, offset) as Float
+            vhBeFloat[array, offset] as Float
+        }
+    }
+
+    override fun nextNativeFloat(): Float {
+        return read(4) { offset ->
+            vhNativeFloat[array, offset] as Float
         }
     }
 
     override fun nextLeDouble(): Double {
         return read(8) { offset ->
-            vhLeDouble.get(array, offset) as Double
+            vhLeDouble[array, offset] as Double
         }
     }
 
     override fun nextBeDouble(): Double {
         return read(8) { offset ->
-            vhBeDouble.get(array, offset) as Double
+            vhBeDouble[array, offset] as Double
+        }
+    }
+
+    override fun nextNativeDouble(): Double {
+        return read(8) { offset ->
+            vhNativeDouble[array, offset] as Double
         }
     }
 }
@@ -137,6 +171,8 @@ private class ByteArrayEncoder(
     init {
         checkFromToIndex(offset, limit, array.size)
     }
+
+    override val position get() = offset.toLong()
 
     @OptIn(ExperimentalContracts::class)
     private inline fun write(size: Int, block: (offset: Int) -> Unit) {
@@ -151,10 +187,8 @@ private class ByteArrayEncoder(
         this.offset = offset + size
     }
 
-    override fun putUndefined(count: Long) {
-        val offset = offset
-        checkFromIndexSize(offset.toLong(), count, limit.toLong())
-        this.offset = offset + count.toInt()
+    override fun skip(count: Long) {
+        write(count.toIntExact()) {}
     }
 
     override fun putByte(value: Byte) {
@@ -175,6 +209,12 @@ private class ByteArrayEncoder(
         }
     }
 
+    override fun putNativeShort(value: Short) {
+        write(2) { offset ->
+            vhNativeShort.set(array, offset, value)
+        }
+    }
+
     override fun putLeInt(value: Int) {
         write(4) { offset ->
             vhLeInt.set(array, offset, value)
@@ -184,6 +224,12 @@ private class ByteArrayEncoder(
     override fun putBeInt(value: Int) {
         write(4) { offset ->
             vhBeInt.set(array, offset, value)
+        }
+    }
+
+    override fun putNativeInt(value: Int) {
+        write(4) { offset ->
+            vhNativeInt.set(array, offset, value)
         }
     }
 
@@ -199,6 +245,12 @@ private class ByteArrayEncoder(
         }
     }
 
+    override fun putNativeLong(value: Long) {
+        write(8) { offset ->
+            vhNativeLong.set(array, offset, value)
+        }
+    }
+
     override fun putLeFloat(value: Float) {
         write(4) { offset ->
             vhLeFloat.set(array, offset, value)
@@ -208,6 +260,12 @@ private class ByteArrayEncoder(
     override fun putBeFloat(value: Float) {
         write(4) { offset ->
             vhBeFloat.set(array, offset, value)
+        }
+    }
+
+    override fun putNativeFloat(value: Float) {
+        write(4) { offset ->
+            vhNativeFloat.set(array, offset, value)
         }
     }
 
@@ -222,15 +280,30 @@ private class ByteArrayEncoder(
             vhBeDouble.set(array, offset, value)
         }
     }
+
+    override fun putNativeDouble(value: Double) {
+        write(8) { offset ->
+            vhNativeDouble.set(array, offset, value)
+        }
+    }
 }
 
 private val vhLeShort = byteArrayViewVarHandle(Short::class.java, LITTLE_ENDIAN)
 private val vhBeShort = byteArrayViewVarHandle(Short::class.java, BIG_ENDIAN)
+private val vhNativeShort = byteArrayViewVarHandle(Short::class.java, nativeOrder())
+
 private val vhLeInt = byteArrayViewVarHandle(Int::class.java, LITTLE_ENDIAN)
 private val vhBeInt = byteArrayViewVarHandle(Int::class.java, BIG_ENDIAN)
+private val vhNativeInt = byteArrayViewVarHandle(Int::class.java, nativeOrder())
+
 private val vhLeLong = byteArrayViewVarHandle(Long::class.java, LITTLE_ENDIAN)
 private val vhBeLong = byteArrayViewVarHandle(Long::class.java, BIG_ENDIAN)
+private val vhNativeLong = byteArrayViewVarHandle(Long::class.java, nativeOrder())
+
 private val vhLeFloat = byteArrayViewVarHandle(Float::class.java, LITTLE_ENDIAN)
 private val vhBeFloat = byteArrayViewVarHandle(Float::class.java, BIG_ENDIAN)
+private val vhNativeFloat = byteArrayViewVarHandle(Float::class.java, nativeOrder())
+
 private val vhLeDouble = byteArrayViewVarHandle(Double::class.java, LITTLE_ENDIAN)
 private val vhBeDouble = byteArrayViewVarHandle(Double::class.java, BIG_ENDIAN)
+private val vhNativeDouble = byteArrayViewVarHandle(Double::class.java, nativeOrder())
