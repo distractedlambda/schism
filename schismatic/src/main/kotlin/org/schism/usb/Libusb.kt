@@ -3,8 +3,6 @@ package org.schism.usb
 import kotlinx.collections.immutable.PersistentSet
 import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.InternalCoroutinesApi
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -209,7 +207,7 @@ object Libusb : UsbBackend {
 
         private val lifetime = SharedLifetime()
 
-        private suspend fun transfer(endpointAddress: UByte, buffer: NativeBuffer): Int {
+        private suspend fun transfer(endpointAddress: UByte, type: UByte, buffer: NativeBuffer): Int {
             currentCoroutineContext().ensureActive()
 
             lifetime.withRetained {
@@ -224,7 +222,7 @@ object Libusb : UsbBackend {
 
                     nativeTransfer[NativeTransfer.devHandle] = handle
                     nativeTransfer[NativeTransfer.endpoint] = endpointAddress.toByte()
-                    nativeTransfer[NativeTransfer.type] = NativeTransferType.BULK.toByte()
+                    nativeTransfer[NativeTransfer.type] = type.toByte()
                     nativeTransfer[NativeTransfer.timeout] = 0
                     nativeTransfer[NativeTransfer.length] = minOf(buffer.size, Int.MAX_VALUE.toLong()).toInt()
                     nativeTransfer[NativeTransfer.callback] = nativeTransferCallback
@@ -243,13 +241,14 @@ object Libusb : UsbBackend {
                                 }
                             }
 
-                            @OptIn(InternalCoroutinesApi::class)
-                            continuation.context[Job]?.invokeOnCompletion(
-                                onCancelling = true,
-                                invokeImmediately = true,
-                            ) {
-                                nativeCancelTransfer(nativeTransferAddress.toMemoryAddress())
-                            }
+                            // FIXME: implement cancellability
+                            // @OptIn(InternalCoroutinesApi::class)
+                            // continuation.context[Job]?.invokeOnCompletion(
+                            //     onCancelling = true,
+                            //     invokeImmediately = true,
+                            // ) {
+                            //     nativeCancelTransfer(nativeTransferAddress.toMemoryAddress())
+                            // }
                         }
                     }
 
@@ -288,9 +287,10 @@ object Libusb : UsbBackend {
                     putLeUShort(255u)
                 }
 
-                val actualLength = transfer(0u, buffer)
+                transfer(0x00u, NativeTransferType.CONTROL, buffer)
+                val descriptorLength = buffer[JAVA_BYTE, 8.byteOffset].toUByte().toInt()
 
-                return buffer.slice(10.byteOffset).decoder().nextLeUtf16(actualLength - 2)
+                return buffer.slice(10.byteOffset).decoder().nextLeUtf16((descriptorLength - 2) / 2)
             }
         }
 
@@ -435,13 +435,13 @@ object Libusb : UsbBackend {
         override suspend fun UsbBulkTransferInEndpoint.receive(destination: NativeBuffer): Long {
             require(this@UsbBulkTransferInEndpoint is BulkTransferInEndpoint)
             require(this@UsbBulkTransferInEndpoint.device === this@DeviceConnection.device)
-            return transfer(this@UsbBulkTransferInEndpoint.address, destination).toLong()
+            return transfer(this@UsbBulkTransferInEndpoint.address, NativeTransferType.BULK, destination).toLong()
         }
 
         override suspend fun UsbBulkTransferOutEndpoint.send(source: NativeBuffer): Long {
             require(this@UsbBulkTransferOutEndpoint is BulkTransferOutEndpoint)
             require(this@UsbBulkTransferOutEndpoint.device === this@DeviceConnection.device)
-            return transfer(this@UsbBulkTransferOutEndpoint.address, source).toLong()
+            return transfer(this@UsbBulkTransferOutEndpoint.address, NativeTransferType.BULK, source).toLong()
         }
 
         override suspend fun close() {

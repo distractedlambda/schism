@@ -3,6 +3,7 @@ package org.schism.schismatic
 import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -11,48 +12,44 @@ import org.schism.coroutines.launchWhileEachPresent
 import org.schism.coroutines.updateMutating
 import org.schism.usb.Libusb
 import org.schism.usb.UsbDevice
-import org.schism.usb.UsbDeviceConnection
 import org.schism.usb.connect
+import org.schism.usb.`interface`
+import org.schism.usb.withClaim
 import org.schism.util.contextual
 
-context (CoroutineScope)
-class DeviceManager {
-    val connectedDevices: StateFlow<Set<ConnectedDevice>>
-        get() = mutableConnectedDevices
+class DeviceManager(scope: CoroutineScope) {
+    val connectedDevices: StateFlow<Set<ConnectedDevice>> get() = mutableConnectedDevices
 
     private val mutableConnectedDevices = MutableStateFlow(persistentSetOf<ConnectedDevice>())
 
     init {
-        launch {
+        scope.launch {
             Libusb.attachedDevices.launchWhileEachPresent { device ->
-                val factory: ConnectedDeviceFactory = run {
-                    PicobootEndpoints.find(device)?.let { endpoints ->
-                        return@run { manufacturer, product, serialNumber ->
-                            endpoints.setExclusivity(PicobootExclusivity.Exclusive)
-                            ConnectedPicobootDeviceImpl(device, manufacturer, product, serialNumber, endpoints)
-                        }
-                    }
+                PicobootEndpoints.find(device)?.let { endpoints ->
+                    device.connect {
+                        endpoints.inEndpoint.`interface`.withClaim {
+                            coroutineScope {
+                                val connectedDevice = ConnectedPicobootDeviceImpl(
+                                    scope = contextual(),
+                                    device,
+                                    getManufacturerName(),
+                                    getProductName(),
+                                    getSerialNumber(),
+                                    endpoints,
+                                )
 
-                    return@launchWhileEachPresent
-                }
+                                try {
+                                    mutableConnectedDevices.updateMutating {
+                                        add(connectedDevice)
+                                    }
 
-                device.connect {
-                    val connectedDevice = factory(
-                        contextual(),
-                        getManufacturerName(),
-                        getProductName(),
-                        getSerialNumber(),
-                    )
-
-                    try {
-                        mutableConnectedDevices.updateMutating {
-                            add(connectedDevice)
-                        }
-
-                        awaitCancellation()
-                    } finally {
-                        mutableConnectedDevices.updateMutating {
-                            remove(connectedDevice)
+                                    awaitCancellation()
+                                } finally {
+                                    mutableConnectedDevices.updateMutating {
+                                        remove(connectedDevice)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -60,14 +57,14 @@ class DeviceManager {
         }
     }
 
-    context (CoroutineScope, UsbDeviceConnection)
     private class ConnectedPicobootDeviceImpl(
+        scope: CoroutineScope,
         override val usbDevice: UsbDevice,
         override val manufacturer: String?,
         override val product: String?,
         override val serialNumber: String?,
         val endpoints: PicobootEndpoints,
-    ) : Actor(), ConnectedDevice
+    ) : Actor(scope), ConnectedPicobootDevice
 }
 
 sealed interface ConnectedDevice {
@@ -78,9 +75,3 @@ sealed interface ConnectedDevice {
 }
 
 sealed interface ConnectedPicobootDevice : ConnectedDevice
-
-private typealias ConnectedDeviceFactory = suspend context (UsbDeviceConnection) (
-    manufacturer: String?,
-    product: String?,
-    serialNumber: String?,
-) -> ConnectedDevice

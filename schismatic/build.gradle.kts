@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm") version "1.6.21"
-    id("org.jetbrains.compose") version "1.2.0-alpha01-dev709"
+    id("org.jetbrains.compose") version "1.2.0-alpha01-dev725"
     id("de.undercouch.download") version "5.1.0" apply false
 }
 

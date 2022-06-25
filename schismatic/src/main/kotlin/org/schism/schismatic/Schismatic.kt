@@ -23,23 +23,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.awaitApplication
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.schism.collections.IdMapping
+import org.schism.util.contextual
 
 fun main() {
     System.setProperty("apple.awt.application.appearance", "system")
 
-    runBlocking(Dispatchers.Default) {
-        val deviceManager = DeviceManager()
+    try {
+        runBlocking(Dispatchers.Default) {
+            val deviceManager = DeviceManager(scope = contextual())
 
-        awaitApplication {
-            MainWindow(deviceManager)
+            awaitApplication {
+                MainWindow(deviceManager)
+            }
+
+            cancel()
         }
-
-        cancel()
-    }
+    } catch (_: CancellationException) {}
 }
 
 @Composable
