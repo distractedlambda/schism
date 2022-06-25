@@ -48,6 +48,7 @@ import kotlin.Result.Companion.success
 import kotlin.concurrent.thread
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 import kotlin.io.path.Path
 
@@ -233,11 +234,12 @@ object Libusb : UsbBackend {
                         suspendCoroutine<Unit> { continuation ->
                             inFlightTransfers[nativeTransferAddress] = continuation
 
-                            when (val returnCode = nativeSubmitTransfer(nativeTransferAddress) as Int) {
+                            when (val returnCode = nativeSubmitTransfer(nativeTransferAddress.toMemoryAddress()) as Int) {
                                 0 -> Unit
                                 else -> {
                                     inFlightTransfers.remove(nativeTransferAddress)
-                                    throw UsbException(errorMessage(returnCode))
+                                    continuation.resumeWithException(UsbException(errorMessage(returnCode)))
+                                    return@suspendCoroutine
                                 }
                             }
 
@@ -246,7 +248,7 @@ object Libusb : UsbBackend {
                                 onCancelling = true,
                                 invokeImmediately = true,
                             ) {
-                                nativeCancelTransfer(nativeTransferAddress)
+                                nativeCancelTransfer(nativeTransferAddress.toMemoryAddress())
                             }
                         }
                     }
@@ -266,7 +268,7 @@ object Libusb : UsbBackend {
 
                     return nativeTransfer[NativeTransfer.actualLength]
                 } finally {
-                    nativeFreeTransfer(nativeTransferAddress)
+                    nativeFreeTransfer(nativeTransferAddress.toMemoryAddress())
                 }
             }
         }
@@ -368,7 +370,7 @@ object Libusb : UsbBackend {
                     withContext(Dispatchers.IO) {
                         checkReturn(
                             nativeReleaseInterface(
-                                handle,
+                                handle.toMemoryAddress(),
                                 this@UsbInterface.number.toInt(),
                             ) as Int
                         )
@@ -444,7 +446,7 @@ object Libusb : UsbBackend {
 
         override suspend fun close() {
             if (lifetime.end()) {
-                nativeClose(handle)
+                nativeClose(handle.toMemoryAddress())
             }
         }
 
@@ -614,7 +616,7 @@ object Libusb : UsbBackend {
                     1 -> null
                     2 -> when (address.toUInt() shr 7) {
                         0u -> BulkTransferOutEndpoint(this@AlternateSetting, maxPacketSize, address)
-                        1u -> BulkTransferOutEndpoint(this@AlternateSetting, maxPacketSize, address)
+                        1u -> BulkTransferInEndpoint(this@AlternateSetting, maxPacketSize, address)
                         else -> throw AssertionError()
                     }
                     3 -> null

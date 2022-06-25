@@ -30,8 +30,12 @@ class SharedLifetime {
             nextControlWord = controlWord + Long.MIN_VALUE
         } while (!vhControlWord.weakCompareAndSet(this, lastControlWord, nextControlWord))
 
-        withContext(NonCancellable) {
-            endFence.join()
+        if (lastControlWord == 0L) {
+            endFence.complete()
+        } else {
+            withContext(NonCancellable) {
+                endFence.join()
+            }
         }
 
         return wasEnder
