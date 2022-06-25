@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
@@ -26,8 +27,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.schism.collections.IdMapping
-import org.schism.usb.Libusb
-import org.schism.usb.UsbDevice
 
 fun main() {
     System.setProperty("apple.awt.application.appearance", "system")
@@ -36,7 +35,7 @@ fun main() {
         val deviceManager = DeviceManager()
 
         awaitApplication {
-            MainWindow()
+            MainWindow(deviceManager)
         }
 
         cancel()
@@ -44,13 +43,13 @@ fun main() {
 }
 
 @Composable
-private fun ApplicationScope.MainWindow() {
+private fun ApplicationScope.MainWindow(deviceManager: DeviceManager) {
     Window(title = "Schismatic", onCloseRequest = ::exitApplication) {
         SchismaticMaterialTheme {
             Surface(color = MaterialTheme.colors.background) {
-                val selectedDevice = remember { mutableStateOf<UsbDevice?>(null) }
+                val selectedDevice = remember { mutableStateOf<ConnectedDevice?>(null) }
                 Row {
-                    DeviceList(selectedDevice)
+                    DeviceList(deviceManager, selectedDevice)
                     DeviceContent(selectedDevice.value)
                 }
             }
@@ -59,9 +58,9 @@ private fun ApplicationScope.MainWindow() {
 }
 
 @Composable
-private fun DeviceList(selectedDevice: MutableState<UsbDevice?>) {
-    val devices = Libusb.attachedDevices.collectAsState()
-    val deviceIds = remember { IdMapping<UsbDevice>() }
+private fun DeviceList(deviceManager: DeviceManager, selectedDevice: MutableState<ConnectedDevice?>) {
+    val devices = deviceManager.connectedDevices.collectAsState()
+    val deviceIds = remember { IdMapping<ConnectedDevice>() }
 
     Surface(
         Modifier.width(300.dp),
@@ -69,15 +68,15 @@ private fun DeviceList(selectedDevice: MutableState<UsbDevice?>) {
         elevation = 1.dp,
     ) {
         LazyColumn(Modifier.fillMaxSize()) {
-            // items(devices.value, key = {  }) { device ->
-            //     DeviceListEntry(device, selectedDevice)
-            // }
+            items(devices.value.toList(), key = { deviceIds[it] }) { device ->
+                DeviceListEntry(device, selectedDevice)
+            }
         }
     }
 }
 
 @Composable
-private fun DeviceListEntry(device: UsbDevice, selectedDevice: MutableState<UsbDevice?>) {
+private fun DeviceListEntry(device: ConnectedDevice, selectedDevice: MutableState<ConnectedDevice?>) {
     val isSelected = device == selectedDevice.value
 
     @OptIn(ExperimentalMaterialApi::class) Surface(
@@ -85,29 +84,29 @@ private fun DeviceListEntry(device: UsbDevice, selectedDevice: MutableState<UsbD
         onClick = { selectedDevice.value = device },
         elevation = if (isSelected) 2.dp else 0.dp,
     ) {
-        // Column {
-        //     Text(
-        //         device.knownProductName ?: "Unknown Device",
-        //         style = MaterialTheme.typography.h6,
-        //     )
+        Column {
+            Text(
+                device.product ?: "Unknown Device",
+                style = MaterialTheme.typography.h6,
+            )
 
-        //     Row {
-        //         fun hex4(value: UShort): String {
-        //             return value.toString(16).padStart(4, '0')
-        //         }
+            Row {
+                fun hex4(value: UShort): String {
+                    return value.toString(16).padStart(4, '0')
+                }
 
-        //         Text("${hex4(device.vendorId)}:${hex4(device.productId)}")
+                Text("${hex4(device.usbDevice.vendorId)}:${hex4(device.usbDevice.productId)}")
 
-        //         device.knownVendorName?.let {
-        //             Text(it)
-        //         }
-        //     }
-        // }
+                device.manufacturer?.let {
+                    Text(it)
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun DeviceContent(selectedDevice: UsbDevice?) {
+private fun DeviceContent(selectedDevice: ConnectedDevice?) {
     Column(modifier = Modifier.fillMaxSize()) {
         Text("Hi")
     }

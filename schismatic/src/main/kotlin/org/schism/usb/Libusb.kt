@@ -52,10 +52,77 @@ import kotlin.coroutines.suspendCoroutine
 import kotlin.io.path.Path
 
 object Libusb : UsbBackend {
+    private val nativeAllocTransfer: MethodHandle
+    private val nativeCancelTransfer: MethodHandle
+    private val nativeClaimInterface: MethodHandle
+    private val nativeClearHalt: MethodHandle
+    private val nativeClose: MethodHandle
+    private val nativeFreeConfigDescriptor: MethodHandle
+    private val nativeFreeDeviceList: MethodHandle
+    private val nativeFreeTransfer: MethodHandle
+    private val nativeGetBusNumber: MethodHandle
+    private val nativeGetConfigDescriptor: MethodHandle
+    private val nativeGetConfiguration: MethodHandle
+    private val nativeGetDeviceAddress: MethodHandle
+    private val nativeGetDeviceDescriptor: MethodHandle
+    private val nativeGetDeviceList: MethodHandle
+    private val nativeGetPortNumbers: MethodHandle
+    private val nativeHandleEvents: MethodHandle
+    private val nativeInit: MethodHandle
+    private val nativeOpen: MethodHandle
+    private val nativeRefDevice: MethodHandle
+    private val nativeReleaseInterface: MethodHandle
+    private val nativeResetDevice: MethodHandle
+    private val nativeSetInterfaceAltSetting: MethodHandle
+    private val nativeStrerror: MethodHandle
+    private val nativeSubmitTransfer: MethodHandle
+    private val nativeUnrefDevice: MethodHandle
+
+    init {
+        val lib = libraryLookup(Path("/opt/homebrew/lib/libusb-1.0.dylib"), MemorySession.global())
+        val linker = nativeLinker()
+
+        fun link(name: String, vararg argumentLayouts: MemoryLayout, ret: MemoryLayout? = null): MethodHandle {
+            val descriptor = if (ret != null) {
+                FunctionDescriptor.of(ret, *argumentLayouts)
+            } else {
+                FunctionDescriptor.ofVoid(*argumentLayouts)
+            }
+
+            return linker.downcallHandle(lib.lookup("libusb_$name").orElseThrow(), descriptor)
+        }
+
+        nativeAllocTransfer = link("alloc_transfer", JAVA_INT, ret = ADDRESS)
+        nativeCancelTransfer = link("cancel_transfer", ADDRESS, ret = JAVA_INT)
+        nativeClaimInterface = link("claim_interface", ADDRESS, JAVA_INT, ret = JAVA_INT)
+        nativeClearHalt = link("clear_halt", ADDRESS, JAVA_BYTE, ret = JAVA_INT)
+        nativeClose = link("close", ADDRESS)
+        nativeFreeConfigDescriptor = link("free_config_descriptor", ADDRESS)
+        nativeFreeDeviceList = link("free_device_list", ADDRESS, JAVA_INT)
+        nativeFreeTransfer = link("free_transfer", ADDRESS)
+        nativeGetBusNumber = link("get_bus_number", ADDRESS, ret = JAVA_BYTE)
+        nativeGetConfigDescriptor = link("get_config_descriptor", ADDRESS, JAVA_BYTE, ADDRESS, ret = JAVA_INT)
+        nativeGetConfiguration = link("get_configuration", ADDRESS, ADDRESS, ret = JAVA_INT)
+        nativeGetDeviceAddress = link("get_device_address", ADDRESS, ret = JAVA_BYTE)
+        nativeGetDeviceDescriptor = link("get_device_descriptor", ADDRESS, ADDRESS, ret = JAVA_INT)
+        nativeGetDeviceList = link("get_device_list", ADDRESS, ADDRESS, ret = JAVA_LONG) // FIXME: 32-bit ssize_t?
+        nativeGetPortNumbers = link("get_port_numbers", ADDRESS, ADDRESS, JAVA_INT, ret = JAVA_INT)
+        nativeHandleEvents = link("handle_events", ADDRESS, ret = JAVA_INT)
+        nativeInit = link("init", ADDRESS, ret = JAVA_INT)
+        nativeOpen = link("open", ADDRESS, ADDRESS, ret = JAVA_INT)
+        nativeRefDevice = link("ref_device", ADDRESS, ret = ADDRESS)
+        nativeReleaseInterface = link("release_interface", ADDRESS, JAVA_INT, ret = JAVA_INT)
+        nativeResetDevice = link("reset_device", ADDRESS, ret = JAVA_INT)
+        nativeSetInterfaceAltSetting = link("set_interface_alt_setting", ADDRESS, JAVA_INT, JAVA_INT, ret = JAVA_INT)
+        nativeStrerror = link("strerror", JAVA_INT, ret = ADDRESS)
+        nativeSubmitTransfer = link("submit_transfer", ADDRESS, ret = JAVA_INT)
+        nativeUnrefDevice = link("unref_device", ADDRESS)
+    }
+
     override val attachedDevices: StateFlow<PersistentSet<UsbDevice>>
 
     private val handle = NativeBuffer.withUnmanaged(ADDRESS) { handleBuffer ->
-        checkReturn(nativeInit.invokeExact(handleBuffer.start.toMemoryAddress()) as Int)
+        checkReturn(nativeInit(handleBuffer.start.toMemoryAddress()) as Int)
         handleBuffer[ADDRESS]
     }
 
@@ -70,7 +137,7 @@ object Libusb : UsbBackend {
 
         thread(isDaemon = true, name = "libusb event handler") {
             while (true) {
-                checkReturn(nativeHandleEvents.invokeExact(handle) as Int)
+                checkReturn(nativeHandleEvents(handle.toMemoryAddress()) as Int)
             }
         }
 
@@ -81,13 +148,13 @@ object Libusb : UsbBackend {
             NativeBuffer.withUnmanaged(ADDRESS) { listBuffer ->
                 while (true) {
                     val listSize = checkSize(
-                        nativeGetDeviceList.invokeExact(
+                        nativeGetDeviceList(
                             handle.toMemoryAddress(),
                             listBuffer.start.toMemoryAddress()
                         ) as Long
                     )
 
-                    val list = NativeBuffer.unmanaged(listBuffer[ADDRESS], listSize)
+                    val list = NativeBuffer.unmanaged(listBuffer[ADDRESS], listSize * ADDRESS.byteSize())
                     val newDevicesByHandle = hashMapOf<NativeAddress, Result<Device>>()
 
                     try {
@@ -101,7 +168,7 @@ object Libusb : UsbBackend {
                                 }
                         }
                     } finally {
-                        nativeFreeDeviceList.invokeExact(list.start.toMemoryAddress(), 1)
+                        nativeFreeDeviceList(list.start.toMemoryAddress(), 1)
                     }
 
                     val newDevices = buildSet {
@@ -130,7 +197,7 @@ object Libusb : UsbBackend {
     private class DeviceConnection(override val device: Device) : UsbDeviceConnection {
         private val handle = NativeBuffer.withUnmanaged(ADDRESS) { handleBuffer ->
             checkReturn(
-                nativeOpen.invokeExact(
+                nativeOpen(
                     device.handle.toMemoryAddress(),
                     handleBuffer.start.toMemoryAddress(),
                 ) as Int
@@ -145,7 +212,7 @@ object Libusb : UsbBackend {
             currentCoroutineContext().ensureActive()
 
             lifetime.withRetained {
-                val nativeTransferAddress = (nativeAllocTransfer.invokeExact(0) as MemoryAddress).nativeAddress()
+                val nativeTransferAddress = (nativeAllocTransfer(0) as MemoryAddress).nativeAddress()
 
                 if (nativeTransferAddress.isNULL()) {
                     throw OutOfMemoryError("Failed to allocate transfer")
@@ -166,7 +233,7 @@ object Libusb : UsbBackend {
                         suspendCoroutine<Unit> { continuation ->
                             inFlightTransfers[nativeTransferAddress] = continuation
 
-                            when (val returnCode = nativeSubmitTransfer.invokeExact(nativeTransferAddress) as Int) {
+                            when (val returnCode = nativeSubmitTransfer(nativeTransferAddress) as Int) {
                                 0 -> Unit
                                 else -> {
                                     inFlightTransfers.remove(nativeTransferAddress)
@@ -179,7 +246,7 @@ object Libusb : UsbBackend {
                                 onCancelling = true,
                                 invokeImmediately = true,
                             ) {
-                                nativeCancelTransfer.invokeExact(nativeTransferAddress)
+                                nativeCancelTransfer(nativeTransferAddress)
                             }
                         }
                     }
@@ -199,7 +266,7 @@ object Libusb : UsbBackend {
 
                     return nativeTransfer[NativeTransfer.actualLength]
                 } finally {
-                    nativeFreeTransfer.invokeExact(nativeTransferAddress)
+                    nativeFreeTransfer(nativeTransferAddress)
                 }
             }
         }
@@ -233,7 +300,7 @@ object Libusb : UsbBackend {
                     withContext(Dispatchers.IO) {
                         NativeBuffer.withUnmanaged(JAVA_INT) { configurationValueBuffer ->
                             checkReturn(
-                                nativeGetConfiguration.invokeExact(
+                                nativeGetConfiguration(
                                     handle.toMemoryAddress(),
                                     configurationValueBuffer.start.toMemoryAddress(),
                                 ) as Int
@@ -256,7 +323,7 @@ object Libusb : UsbBackend {
             lifetime.withRetained {
                 withContext(NonCancellable) {
                     withContext(Dispatchers.IO) {
-                        checkReturn(nativeResetDevice.invokeExact(handle.toMemoryAddress()) as Int)
+                        checkReturn(nativeResetDevice(handle.toMemoryAddress()) as Int)
                     }
                 }
             }
@@ -282,7 +349,7 @@ object Libusb : UsbBackend {
 
             lifetime.withRetained {
                 checkReturn(
-                    nativeClaimInterface.invokeExact(
+                    nativeClaimInterface(
                         handle.toMemoryAddress(),
                         this@UsbInterface.number.toInt(),
                     ) as Int
@@ -300,7 +367,7 @@ object Libusb : UsbBackend {
                 withContext(NonCancellable) {
                     withContext(Dispatchers.IO) {
                         checkReturn(
-                            nativeReleaseInterface.invokeExact(
+                            nativeReleaseInterface(
                                 handle,
                                 this@UsbInterface.number.toInt(),
                             ) as Int
@@ -322,7 +389,7 @@ object Libusb : UsbBackend {
                 withContext(NonCancellable) {
                     withContext(Dispatchers.IO) {
                         checkReturn(
-                            nativeSetInterfaceAltSetting.invokeExact(
+                            nativeSetInterfaceAltSetting(
                                 handle.toMemoryAddress(),
                                 `interface`.number.toInt(),
                                 value.toInt(),
@@ -351,7 +418,7 @@ object Libusb : UsbBackend {
                 withContext(NonCancellable) {
                     withContext(Dispatchers.IO) {
                         checkReturn(
-                            nativeClearHalt.invokeExact(
+                            nativeClearHalt(
                                 handle.toMemoryAddress(),
                                 this@UsbEndpoint.address.toByte(),
                             ) as Int
@@ -377,15 +444,33 @@ object Libusb : UsbBackend {
 
         override suspend fun close() {
             if (lifetime.end()) {
-                nativeClose.invokeExact(handle)
+                nativeClose(handle)
             }
+        }
+
+        private companion object {
+            private val inFlightTransfers = ConcurrentHashMap<NativeAddress, Continuation<Unit>>()
+
+            @[Suppress("UNUSED") JvmStatic]
+            private fun transferCallback(nativeTransfer: MemoryAddress) {
+                checkNotNull(inFlightTransfers.remove(nativeTransfer.nativeAddress())).resume(Unit)
+            }
+
+            private val nativeTransferCallback = nativeLinker().upcallStub(
+                MethodHandles.lookup().findStatic(
+                    DeviceConnection::class.java, "transferCallback",
+                    methodType(Void.TYPE, MemoryAddress::class.java),
+                ),
+                FunctionDescriptor.ofVoid(ADDRESS),
+                MemorySession.global(),
+            ).nativeAddress()
         }
     }
 
     private class Device(handle: NativeAddress) : UsbDevice {
         init {
-            nativeRefDevice.invokeExact(handle)
-            deviceCleaner.register(this) { nativeUnrefDevice.invokeExact(handle) }
+            nativeRefDevice(handle.toMemoryAddress())
+            deviceCleaner.register(this) { nativeUnrefDevice(handle.toMemoryAddress()) }
         }
 
         val handle = handle
@@ -410,7 +495,7 @@ object Libusb : UsbBackend {
         init {
             NativeBuffer.withUnmanaged(7) { portNumbersBuffer ->
                 val portNumberCount = checkSize(
-                    nativeGetPortNumbers.invokeExact(
+                    nativeGetPortNumbers(
                         handle.toMemoryAddress(),
                         portNumbersBuffer.start.toMemoryAddress(),
                         portNumbersBuffer.size.toInt(),
@@ -424,7 +509,7 @@ object Libusb : UsbBackend {
 
             NativeBuffer.withUnmanaged(NativeDeviceDescriptor.layout) { descriptor ->
                 checkReturn(
-                    nativeGetDeviceDescriptor.invokeExact(
+                    nativeGetDeviceDescriptor(
                         handle.toMemoryAddress(),
                         descriptor.start.toMemoryAddress(),
                     ) as Int
@@ -446,7 +531,7 @@ object Libusb : UsbBackend {
                 NativeBuffer.withUnmanaged(ADDRESS) { configDescriptorAddressBuffer ->
                     configurations = List(numConfigurations.toInt()) { configIndex ->
                         checkReturn(
-                            nativeGetConfigDescriptor.invokeExact(
+                            nativeGetConfigDescriptor(
                                 handle.toMemoryAddress(),
                                 configIndex.toByte(),
                                 configDescriptorAddressBuffer.start.toMemoryAddress(),
@@ -461,7 +546,7 @@ object Libusb : UsbBackend {
                         try {
                             Configuration(this@Device, configDescriptor)
                         } finally {
-                            nativeFreeConfigDescriptor.invokeExact(configDescriptor.start.toMemoryAddress())
+                            nativeFreeConfigDescriptor(configDescriptor.start.toMemoryAddress())
                         }
                     }
                 }
@@ -555,89 +640,6 @@ object Libusb : UsbBackend {
         maxPacketSize: UShort,
         address: UByte,
     ) : Endpoint(alternateSetting, maxPacketSize, address), UsbBulkTransferOutEndpoint
-
-    private val inFlightTransfers = ConcurrentHashMap<NativeAddress, Continuation<Unit>>()
-
-    @[Suppress("UNUSED") JvmStatic]
-    private fun transferCallback(nativeTransfer: MemoryAddress) {
-        checkNotNull(inFlightTransfers.remove(nativeTransfer.nativeAddress())).resume(Unit)
-    }
-
-    private val nativeTransferCallback = nativeLinker().upcallStub(
-        MethodHandles.lookup().findStatic(
-            DeviceConnection::class.java, "transferCallback",
-            methodType(Void.TYPE, MemoryAddress::class.java),
-        ),
-        FunctionDescriptor.ofVoid(ADDRESS),
-        MemorySession.global(),
-    ).nativeAddress()
-
-    private val nativeAllocTransfer: MethodHandle
-    private val nativeCancelTransfer: MethodHandle
-    private val nativeClaimInterface: MethodHandle
-    private val nativeClearHalt: MethodHandle
-    private val nativeClose: MethodHandle
-    private val nativeFreeConfigDescriptor: MethodHandle
-    private val nativeFreeDeviceList: MethodHandle
-    private val nativeFreeTransfer: MethodHandle
-    private val nativeGetBusNumber: MethodHandle
-    private val nativeGetConfigDescriptor: MethodHandle
-    private val nativeGetConfiguration: MethodHandle
-    private val nativeGetDeviceAddress: MethodHandle
-    private val nativeGetDeviceDescriptor: MethodHandle
-    private val nativeGetDeviceList: MethodHandle
-    private val nativeGetPortNumbers: MethodHandle
-    private val nativeHandleEvents: MethodHandle
-    private val nativeInit: MethodHandle
-    private val nativeOpen: MethodHandle
-    private val nativeRefDevice: MethodHandle
-    private val nativeReleaseInterface: MethodHandle
-    private val nativeResetDevice: MethodHandle
-    private val nativeSetInterfaceAltSetting: MethodHandle
-    private val nativeStrerror: MethodHandle
-    private val nativeSubmitTransfer: MethodHandle
-    private val nativeUnrefDevice: MethodHandle
-
-    init {
-        val lib = libraryLookup(Path("/opt/homebrew/lib/libusb-1.0.dylib"), MemorySession.global())
-        val linker = nativeLinker()
-
-        fun link(name: String, vararg argumentLayouts: MemoryLayout, ret: MemoryLayout? = null): MethodHandle {
-            val descriptor = if (ret != null) {
-                FunctionDescriptor.of(ret, *argumentLayouts)
-            } else {
-                FunctionDescriptor.ofVoid(*argumentLayouts)
-            }
-
-            return linker.downcallHandle(lib.lookup("libusb_$name").orElseThrow(), descriptor)
-        }
-
-        nativeAllocTransfer = link("alloc_transfer", JAVA_INT, ret = ADDRESS)
-        nativeCancelTransfer = link("cancel_transfer", ADDRESS, ret = JAVA_INT)
-        nativeClaimInterface = link("claim_interface", ADDRESS, JAVA_INT, ret = JAVA_INT)
-        nativeClearHalt = link("clear_halt", ADDRESS, JAVA_BYTE, ret = JAVA_INT)
-        nativeClose = link("close", ADDRESS)
-        nativeFreeConfigDescriptor = link("free_config_descriptor", ADDRESS)
-        nativeFreeDeviceList = link("free_device_list", ADDRESS, JAVA_INT)
-        nativeFreeTransfer = link("free_transfer", ADDRESS)
-        nativeGetBusNumber = link("get_bus_number", ADDRESS, ret = JAVA_BYTE)
-        nativeGetConfigDescriptor = link("get_config_descriptor", ADDRESS, JAVA_BYTE, ADDRESS, ret = JAVA_INT)
-        nativeGetConfiguration = link("get_configuration", ADDRESS, ADDRESS, ret = JAVA_INT)
-        nativeGetDeviceAddress = link("get_device_address", ADDRESS, ret = JAVA_BYTE)
-        nativeGetDeviceDescriptor = link("get_device_descriptor", ADDRESS, ADDRESS, ret = JAVA_INT)
-        nativeGetDeviceList = link("get_device_list", ADDRESS, ADDRESS, ret = JAVA_LONG) // FIXME: 32-bit ssize_t?
-        nativeGetPortNumbers = link("get_port_numbers", ADDRESS, ADDRESS, JAVA_INT, ret = JAVA_INT)
-        nativeHandleEvents = link("handle_events", ADDRESS, ret = JAVA_INT)
-        nativeInit = link("init", ADDRESS, ret = JAVA_INT)
-        nativeOpen = link("open", ADDRESS, ADDRESS, ret = JAVA_INT)
-        nativeRefDevice = link("ref_device", ADDRESS, ret = ADDRESS)
-        nativeReleaseInterface = link("release_interface", ADDRESS, JAVA_INT, ret = JAVA_INT)
-        nativeResetDevice = link("reset_device", ADDRESS, ret = JAVA_INT)
-        nativeSetInterfaceAltSetting = link("set_interface_alt_setting", ADDRESS, JAVA_INT, JAVA_INT, ret = JAVA_INT)
-        nativeStrerror = link("strerror", JAVA_INT, ret = ADDRESS)
-        nativeSubmitTransfer = link("submit_transfer", ADDRESS, ret = JAVA_INT)
-        nativeUnrefDevice = link("unref_device", ADDRESS)
-    }
 
     private fun checkReturn(code: Int) {
         if (code != 0) {

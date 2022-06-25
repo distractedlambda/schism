@@ -5,7 +5,6 @@ package org.schism.foreign
 import org.schism.math.minusExact
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
-import kotlin.contracts.InvocationKind.EXACTLY_ONCE
 import kotlin.contracts.contract
 import kotlin.internal.InlineOnly
 
@@ -115,7 +114,7 @@ interface BufferEncoder {
 @OptIn(ExperimentalContracts::class)
 inline fun <T : BufferEncoder> T.positionalDifference(block: T.() -> Unit): Long {
     contract {
-        callsInPlace(block, EXACTLY_ONCE)
+        callsInPlace(block, InvocationKind.EXACTLY_ONCE)
     }
 
     val startingPosition = position

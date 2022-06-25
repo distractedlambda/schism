@@ -390,7 +390,7 @@ class NativeBuffer private constructor(
 
     fun freeUnmanaged() {
         require(isUnmanaged)
-        nativeFree.invokeExact(start.toMemoryAddress())
+        nativeFree(start.toMemoryAddress())
     }
 
     fun encoder(): BufferEncoder {
@@ -706,7 +706,7 @@ class NativeBuffer private constructor(
         fun allocateUnmanagedUninitialized(size: Long): NativeBuffer {
             require(size > 0)
 
-            val start = (nativeMalloc.invokeExact(size) as MemoryAddress).nativeAddress()
+            val start = (nativeMalloc(size) as MemoryAddress).nativeAddress()
 
             if (start.isNULL()) {
                 throw OutOfMemoryError("malloc() returned NULL")
@@ -717,7 +717,7 @@ class NativeBuffer private constructor(
 
         fun allocateUnmanagedUninitialized(layout: NativeLayout): NativeBuffer {
             require(layout.alignment <= ADDRESS.byteAlignment())
-            return allocateUninitialized(layout.size)
+            return allocateUnmanagedUninitialized(layout.size)
         }
 
         fun allocateUnmanagedUninitialized(layout: MemoryLayout): NativeBuffer {
@@ -829,7 +829,7 @@ class NativeBuffer private constructor(
         fun allocateUninitialized(size: Long): NativeBuffer {
             require(size > 0)
 
-            val start = (nativeMalloc.invokeExact(size) as MemoryAddress).nativeAddress()
+            val start = (nativeMalloc(size) as MemoryAddress).nativeAddress()
 
             if (start.isNULL()) {
                 throw OutOfMemoryError("malloc() returned NULL")
@@ -863,7 +863,7 @@ class NativeBuffer private constructor(
 
         private class Free(private val address: NativeAddress) : Runnable {
             override fun run() {
-                nativeFree.invokeExact(address.toMemoryAddress())
+                nativeFree(address.toMemoryAddress())
             }
         }
 
