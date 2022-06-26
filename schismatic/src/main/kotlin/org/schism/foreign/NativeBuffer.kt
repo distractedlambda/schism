@@ -44,16 +44,16 @@ class NativeBuffer private constructor(
         return MemorySegment.ofAddress(start.toMemoryAddress(), size, MemorySession.global())
     }
 
-    context (MemorySession) fun asSegment(): MemorySegment {
+    fun asSegment(session: MemorySession): MemorySegment {
         val attachment = attachment
 
         if (attachment != null) {
-            this@MemorySession.addCloseAction {
+            session.addCloseAction {
                 reachabilityFence(attachment)
             }
         }
 
-        return MemorySegment.ofAddress(start.toMemoryAddress(), size, this@MemorySession)
+        return MemorySegment.ofAddress(start.toMemoryAddress(), size, session)
     }
 
     fun slice(offset: ByteOffset = 0L.byteOffset, size: Long = this.size - offset.value): NativeBuffer {

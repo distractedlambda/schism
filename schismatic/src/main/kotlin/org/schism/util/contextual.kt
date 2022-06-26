@@ -4,5 +4,5 @@ package org.schism.util
 
 import kotlin.internal.InlineOnly
 
-context (T) @InlineOnly
-inline fun <T> contextual(): T = this@T
+@InlineOnly
+inline fun <T> T.contextual(): T = this@contextual

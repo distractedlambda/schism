@@ -16,7 +16,8 @@ import org.schism.usb.sendExact
 import org.schism.usb.sendZeroLength
 
 data class PicobootEndpoints(val inEndpoint: UsbBulkTransferInEndpoint, val outEndpoint: UsbBulkTransferOutEndpoint) {
-    context (UsbDeviceConnection) private suspend fun sendCommand(
+    private suspend fun sendCommand(
+        connection: UsbDeviceConnection,
         id: UByte,
         transferLength: UInt,
         fillArgs: BufferEncoder.() -> Unit,
@@ -35,75 +36,75 @@ data class PicobootEndpoints(val inEndpoint: UsbBulkTransferInEndpoint, val outE
                 putLeUInt(transferLength)
             }
 
-            outEndpoint.sendExact(commandBuffer)
+            connection.sendExact(outEndpoint, commandBuffer)
         }
     }
 
-    context (UsbDeviceConnection) suspend fun setExclusivity(exclusivity: PicobootExclusivity) {
-        sendCommand(id = 0x01u, transferLength = 0u) {
+    suspend fun setExclusivity(connection: UsbDeviceConnection, exclusivity: PicobootExclusivity) {
+        sendCommand(connection, id = 0x01u, transferLength = 0u) {
             putUByte(exclusivity.ordinal.toUByte())
         }
 
-        inEndpoint.receiveZeroLength()
+        connection.receiveZeroLength(inEndpoint)
     }
 
-    context (UsbDeviceConnection) suspend fun eraseFlash(deviceAddress: UInt, byteCount: UInt) {
+    suspend fun eraseFlash(connection: UsbDeviceConnection, deviceAddress: UInt, byteCount: UInt) {
         // FIXME: bounds-check against RP2040 address space?
 
         require(deviceAddress % 4096u == 0u)
         require(byteCount % 4096u == 0u)
         require(byteCount != 0u)
 
-        sendCommand(id = 0x03u, transferLength = 0u) {
+        sendCommand(connection, id = 0x03u, transferLength = 0u) {
             putLeUInt(deviceAddress)
             putLeUInt(byteCount)
         }
 
-        inEndpoint.receiveZeroLength()
+        connection.receiveZeroLength(inEndpoint)
     }
 
-    context (UsbDeviceConnection) suspend fun readMemory(deviceAddress: UInt, destination: NativeBuffer) {
+    suspend fun readMemory(connection: UsbDeviceConnection, deviceAddress: UInt, destination: NativeBuffer) {
         // FIXME: bounds-check against RP2040 address space?
 
         require(destination.size in 1 .. UInt.MAX_VALUE.toLong())
 
-        sendCommand(id = 0x84u, transferLength = destination.size.toUInt()) {
+        sendCommand(connection, id = 0x84u, transferLength = destination.size.toUInt()) {
             putLeUInt(deviceAddress)
             putLeUInt(destination.size.toUInt())
         }
 
-        inEndpoint.receiveExact(destination)
-        outEndpoint.sendZeroLength()
+        connection.receiveExact(inEndpoint, destination)
+        connection.sendZeroLength(outEndpoint)
     }
 
-    context (UsbDeviceConnection) suspend fun readMemory(deviceAddress: UInt, byteCount: UInt): NativeBuffer {
+    suspend fun readMemory(connection: UsbDeviceConnection, deviceAddress: UInt, byteCount: UInt): NativeBuffer {
         return NativeBuffer.allocateUninitialized(byteCount.toLong()).also {
-            readMemory(deviceAddress, it)
+            readMemory(connection, deviceAddress, it)
         }
     }
 
-    context (UsbDeviceConnection) suspend fun writeMemory(deviceAddress: UInt, data: NativeBuffer) {
+    suspend fun writeMemory(connection: UsbDeviceConnection, deviceAddress: UInt, data: NativeBuffer) {
         // FIXME: bounds-check against RP2040 address space?
 
         require(data.size in 1 .. UInt.MAX_VALUE.toLong())
 
-        sendCommand(id = 0x05u, transferLength = data.size.toUInt()) {
+        sendCommand(connection, id = 0x05u, transferLength = data.size.toUInt()) {
             putLeUInt(deviceAddress)
             putLeUInt(data.size.toUInt())
         }
 
-        outEndpoint.sendExact(data)
-        inEndpoint.receiveZeroLength()
+        connection.sendExact(outEndpoint, data)
+        connection.receiveZeroLength(inEndpoint)
     }
 
-    context (UsbDeviceConnection) suspend fun exitXip() {
-        sendCommand(id = 0x06u, transferLength = 0u) {}
-        inEndpoint.receiveZeroLength()
+    suspend fun exitXip(connection: UsbDeviceConnection) {
+        sendCommand(connection, id = 0x06u, transferLength = 0u) {}
+        connection.receiveZeroLength(inEndpoint)
     }
 
-    context (UsbDeviceConnection) suspend fun enterXip() {
-        sendCommand(id = 0x07u, transferLength = 0u) {}
-        inEndpoint.receiveZeroLength()
+    suspend fun enterXip(connection: UsbDeviceConnection) {
+        sendCommand(connection, id = 0x07u, transferLength = 0u) {}
+        connection.receiveZeroLength(inEndpoint)
     }
 
     companion object {

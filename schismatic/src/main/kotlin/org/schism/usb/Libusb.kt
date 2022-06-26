@@ -345,25 +345,25 @@ object Libusb : UsbBackend {
             return getString(device.iSerialNumber)
         }
 
-        override fun UsbInterface.claim() {
-            require(this@UsbInterface is Interface)
-            require(this@UsbInterface.device === this@DeviceConnection.device)
+        override fun claim(`interface`: UsbInterface) {
+            require(`interface` is Interface)
+            require(`interface`.device === device)
 
             lifetime.withRetained {
                 checkReturn(
                     nativeClaimInterface(
                         handle.toMemoryAddress(),
-                        this@UsbInterface.number.toInt(),
+                        `interface`.number.toInt(),
                     ) as Int
                 )
             }
         }
 
-        override suspend fun UsbInterface.release() {
+        override suspend fun release(`interface`: UsbInterface) {
             currentCoroutineContext().ensureActive()
 
-            require(this@UsbInterface is Interface)
-            require(this@UsbInterface.device === this@DeviceConnection.device)
+            require(`interface` is Interface)
+            require(`interface`.device === device)
 
             lifetime.withRetained {
                 withContext(NonCancellable) {
@@ -371,7 +371,7 @@ object Libusb : UsbBackend {
                         checkReturn(
                             nativeReleaseInterface(
                                 handle.toMemoryAddress(),
-                                this@UsbInterface.number.toInt(),
+                                `interface`.number.toInt(),
                             ) as Int
                         )
                     }
@@ -381,11 +381,11 @@ object Libusb : UsbBackend {
             currentCoroutineContext().ensureActive()
         }
 
-        override suspend fun UsbAlternateSetting.makeActive() {
+        override suspend fun makeActive(alternateSetting: UsbAlternateSetting) {
             currentCoroutineContext().ensureActive()
 
-            require(this@UsbAlternateSetting is AlternateSetting)
-            require(this@UsbAlternateSetting.device === this@DeviceConnection.device)
+            require(alternateSetting is AlternateSetting)
+            require(alternateSetting.device === device)
 
             lifetime.withRetained {
                 withContext(NonCancellable) {
@@ -393,8 +393,8 @@ object Libusb : UsbBackend {
                         checkReturn(
                             nativeSetInterfaceAltSetting(
                                 handle.toMemoryAddress(),
-                                `interface`.number.toInt(),
-                                value.toInt(),
+                                alternateSetting.`interface`.number.toInt(),
+                                alternateSetting.value.toInt(),
                             ) as Int
                         )
                     }
@@ -404,17 +404,17 @@ object Libusb : UsbBackend {
             currentCoroutineContext().ensureActive()
         }
 
-        override suspend fun UsbAlternateSetting.getName(): String? {
-            require(this@UsbAlternateSetting is AlternateSetting)
-            require(this@UsbAlternateSetting.device === this@DeviceConnection.device)
-            return getString(iInterface)
+        override suspend fun getName(alternateSetting: UsbAlternateSetting): String? {
+            require(alternateSetting is AlternateSetting)
+            require(alternateSetting.device === device)
+            return getString(alternateSetting.iInterface)
         }
 
-        override suspend fun UsbEndpoint.clearHalt() {
+        override suspend fun clearHalt(endpoint: UsbEndpoint) {
             currentCoroutineContext().ensureActive()
 
-            require(this@UsbEndpoint is Endpoint)
-            require(this@UsbEndpoint.device === this@DeviceConnection.device)
+            require(endpoint is Endpoint)
+            require(endpoint.device === device)
 
             lifetime.withRetained {
                 withContext(NonCancellable) {
@@ -422,7 +422,7 @@ object Libusb : UsbBackend {
                         checkReturn(
                             nativeClearHalt(
                                 handle.toMemoryAddress(),
-                                this@UsbEndpoint.address.toByte(),
+                                endpoint.address.toByte(),
                             ) as Int
                         )
                     }
@@ -432,16 +432,16 @@ object Libusb : UsbBackend {
             currentCoroutineContext().ensureActive()
         }
 
-        override suspend fun UsbBulkTransferInEndpoint.receive(destination: NativeBuffer): Long {
-            require(this@UsbBulkTransferInEndpoint is BulkTransferInEndpoint)
-            require(this@UsbBulkTransferInEndpoint.device === this@DeviceConnection.device)
-            return transfer(this@UsbBulkTransferInEndpoint.address, NativeTransferType.BULK, destination).toLong()
+        override suspend fun receive(endpoint: UsbBulkTransferInEndpoint, destination: NativeBuffer): Long {
+            require(endpoint is BulkTransferInEndpoint)
+            require(endpoint.device === device)
+            return transfer(endpoint.address, NativeTransferType.BULK, destination).toLong()
         }
 
-        override suspend fun UsbBulkTransferOutEndpoint.send(source: NativeBuffer): Long {
-            require(this@UsbBulkTransferOutEndpoint is BulkTransferOutEndpoint)
-            require(this@UsbBulkTransferOutEndpoint.device === this@DeviceConnection.device)
-            return transfer(this@UsbBulkTransferOutEndpoint.address, NativeTransferType.BULK, source).toLong()
+        override suspend fun send(endpoint: UsbBulkTransferOutEndpoint, source: NativeBuffer): Long {
+            require(endpoint is BulkTransferOutEndpoint)
+            require(endpoint.device === device)
+            return transfer(endpoint.address, NativeTransferType.BULK, source).toLong()
         }
 
         override suspend fun close() {

@@ -27,7 +27,7 @@ class DeviceManager(scope: CoroutineScope) {
             Libusb.attachedDevices.launchWhileEachPresent { device ->
                 PicobootEndpoints.find(device)?.let { endpoints ->
                     device.connect {
-                        endpoints.inEndpoint.`interface`.withClaim {
+                        withClaim(endpoints.inEndpoint.`interface`) {
                             coroutineScope {
                                 val connectedDevice = ConnectedPicobootDeviceImpl(
                                     scope = contextual(),

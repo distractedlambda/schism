@@ -19,56 +19,56 @@ interface UsbDeviceConnection : SuspendingAutocloseable {
 
     suspend fun getSerialNumber(): String?
 
-    fun UsbInterface.claim()
+    fun claim(`interface`: UsbInterface)
 
-    suspend fun UsbInterface.release()
+    suspend fun release(`interface`: UsbInterface)
 
-    suspend fun UsbAlternateSetting.makeActive()
+    suspend fun makeActive(alternateSetting: UsbAlternateSetting)
 
-    suspend fun UsbAlternateSetting.getName(): String?
+    suspend fun getName(alternateSetting: UsbAlternateSetting): String?
 
-    suspend fun UsbEndpoint.clearHalt()
+    suspend fun clearHalt(endpoint: UsbEndpoint)
 
-    suspend fun UsbBulkTransferInEndpoint.receive(destination: NativeBuffer): Long
+    suspend fun receive(endpoint: UsbBulkTransferInEndpoint, destination: NativeBuffer): Long
 
-    suspend fun UsbBulkTransferOutEndpoint.send(source: NativeBuffer): Long
+    suspend fun send(endpoint: UsbBulkTransferOutEndpoint, source: NativeBuffer): Long
 }
 
-context (UsbDeviceConnection) suspend inline fun UsbConfiguration.isActive(): Boolean {
-    return getActiveConfiguration() === this@UsbConfiguration
+suspend inline fun UsbDeviceConnection.isActive(configuration: UsbConfiguration): Boolean {
+    return getActiveConfiguration() === configuration
 }
 
-context (UsbDeviceConnection) @OptIn(ExperimentalContracts::class)
-suspend inline fun <R> UsbInterface.withClaim(block: () -> R): R {
+@OptIn(ExperimentalContracts::class)
+suspend inline fun <R> UsbDeviceConnection.withClaim(`interface`: UsbInterface, block: () -> R): R {
     contract {
         callsInPlace(block, InvocationKind.EXACTLY_ONCE)
     }
 
-    claim()
+    claim(`interface`)
 
     try {
         return block()
     } finally {
-        release()
+        release(`interface`)
     }
 }
 
-context (UsbDeviceConnection) suspend inline fun UsbBulkTransferInEndpoint.receiveExact(destination: NativeBuffer) {
-    if (receive(destination) != destination.size) {
+suspend inline fun UsbDeviceConnection.receiveExact(endpoint: UsbBulkTransferInEndpoint, destination: NativeBuffer) {
+    if (receive(endpoint, destination) != destination.size) {
         throw UsbException("Incomplete IN transfer")
     }
 }
 
-context (UsbDeviceConnection) suspend inline fun UsbBulkTransferInEndpoint.receiveZeroLength() {
-    receive(NativeBuffer.empty)
+suspend inline fun UsbDeviceConnection.receiveZeroLength(endpoint: UsbBulkTransferInEndpoint) {
+    receive(endpoint, NativeBuffer.empty)
 }
 
-context (UsbDeviceConnection) suspend inline fun UsbBulkTransferOutEndpoint.sendExact(source: NativeBuffer) {
-    if (send(source) != source.size) {
+suspend inline fun UsbDeviceConnection.sendExact(endpoint: UsbBulkTransferOutEndpoint, source: NativeBuffer) {
+    if (send(endpoint, source) != source.size) {
         throw UsbException("Incomplete OUT transfer")
     }
 }
 
-context (UsbDeviceConnection) suspend inline fun UsbBulkTransferOutEndpoint.sendZeroLength() {
-    send(NativeBuffer.empty)
+suspend inline fun UsbDeviceConnection.sendZeroLength(endpoint: UsbBulkTransferOutEndpoint) {
+    send(endpoint, NativeBuffer.empty)
 }
