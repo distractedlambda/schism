@@ -6,3 +6,6 @@ pluginManagement {
 }
 
 rootProject.name = "schismatic"
+
+include("math")
+include("memory")
