@@ -9,7 +9,7 @@ internal class NativeMemoryEncoder(
     private val attachment: Any?,
 ) : MemoryEncoder {
     override val position: Long get() {
-        return nextDst.numericValue
+        return nextDst.toBits()
     }
 
     private inline fun advance(count: Long, block: (dst: NativeAddress) -> Unit) {
@@ -38,9 +38,9 @@ internal class NativeMemoryEncoder(
         }
     }
 
-    override fun putNativeChar(value: Char) {
+    override fun putChar(value: Char) {
         advance(2) { dst ->
-            dst.writeNativeChar(value)
+            dst.writeChar(value)
         }
     }
 
@@ -56,9 +56,9 @@ internal class NativeMemoryEncoder(
         }
     }
 
-    override fun putNativeShort(value: Short) {
+    override fun putShort(value: Short) {
         advance(2) { dst ->
-            dst.writeNativeShort(value)
+            dst.writeShort(value)
         }
     }
 
@@ -74,9 +74,9 @@ internal class NativeMemoryEncoder(
         }
     }
 
-    override fun putNativeInt(value: Int) {
+    override fun putInt(value: Int) {
         advance(4) { dst ->
-            dst.writeNativeInt(value)
+            dst.writeInt(value)
         }
     }
 
@@ -92,9 +92,9 @@ internal class NativeMemoryEncoder(
         }
     }
 
-    override fun putNativeLong(value: Long) {
+    override fun putLong(value: Long) {
         advance(8) { dst ->
-            dst.writeNativeLong(value)
+            dst.writeLong(value)
         }
     }
 
@@ -110,9 +110,9 @@ internal class NativeMemoryEncoder(
         }
     }
 
-    override fun putNativeFloat(value: Float) {
+    override fun putFloat(value: Float) {
         advance(4) { dst ->
-            dst.writeNativeFloat(value)
+            dst.writeFloat(value)
         }
     }
 
@@ -128,9 +128,9 @@ internal class NativeMemoryEncoder(
         }
     }
 
-    override fun putNativeDouble(value: Double) {
+    override fun putDouble(value: Double) {
         advance(8) { dst ->
-            dst.writeNativeDouble(value)
+            dst.writeDouble(value)
         }
     }
 

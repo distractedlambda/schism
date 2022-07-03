@@ -8,7 +8,7 @@ import java.lang.foreign.ValueLayout
 public fun malloc(size: Long): NativeAddress {
     require(size > 0)
 
-    val address = NativeAddress((NATIVE_MALLOC(size) as MemoryAddress).toRawLongValue())
+    val address = (NATIVE_MALLOC(size) as MemoryAddress).toNativeAddress()
 
     if (address.isNULL()) {
         throw OutOfMemoryError()

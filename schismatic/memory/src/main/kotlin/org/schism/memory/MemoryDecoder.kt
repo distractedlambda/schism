@@ -31,37 +31,39 @@ public interface MemoryDecoder {
 
     public fun nextBeChar(): Char
 
-    public fun nextNativeChar(): Char
+    public fun nextChar(): Char
 
     public fun nextLeShort(): Short
 
     public fun nextBeShort(): Short
 
-    public fun nextNativeShort(): Short
+    public fun nextShort(): Short
 
     public fun nextLeInt(): Int
 
     public fun nextBeInt(): Int
 
-    public fun nextNativeInt(): Int
+    public fun nextInt(): Int
 
     public fun nextLeLong(): Long
 
     public fun nextBeLong(): Long
 
-    public fun nextNativeLong(): Long
+    public fun nextLong(): Long
 
     public fun nextLeFloat(): Float
 
     public fun nextBeFloat(): Float
 
-    public fun nextNativeFloat(): Float
+    public fun nextFloat(): Float
 
     public fun nextLeDouble(): Double
 
     public fun nextBeDouble(): Double
 
-    public fun nextNativeDouble(): Double
+    public fun nextDouble(): Double
+
+    public companion object
 }
 
 public inline fun MemoryDecoder.nextUByte(): UByte {
@@ -76,8 +78,8 @@ public inline fun MemoryDecoder.nextBeUShort(): UShort {
     return nextBeShort().toUShort()
 }
 
-public inline fun MemoryDecoder.nextNativeUShort(): UShort {
-    return nextNativeShort().toUShort()
+public inline fun MemoryDecoder.nextUShort(): UShort {
+    return nextShort().toUShort()
 }
 
 public inline fun MemoryDecoder.nextLeUInt(): UInt {
@@ -88,8 +90,8 @@ public inline fun MemoryDecoder.nextBeUInt(): UInt {
     return nextBeInt().toUInt()
 }
 
-public inline fun MemoryDecoder.nextNativeUInt(): UInt {
-    return nextNativeInt().toUInt()
+public inline fun MemoryDecoder.nextUInt(): UInt {
+    return nextInt().toUInt()
 }
 
 public inline fun MemoryDecoder.nextLeULong(): ULong {
@@ -100,8 +102,8 @@ public inline fun MemoryDecoder.nextBeULong(): ULong {
     return nextBeLong().toULong()
 }
 
-public inline fun MemoryDecoder.nextNativeULong(): ULong {
-    return nextNativeLong().toULong()
+public inline fun MemoryDecoder.nextULong(): ULong {
+    return nextLong().toULong()
 }
 
 public inline fun MemoryDecoder.nextLeUtf16(size: Int): String {
@@ -112,8 +114,8 @@ public inline fun MemoryDecoder.nextBeUtf16(size: Int): String {
     return String(CharArray(size) { nextBeChar() })
 }
 
-public inline fun MemoryDecoder.nextNativeUtf16(size: Int): String {
-    return String(CharArray(size) { nextNativeChar() })
+public inline fun MemoryDecoder.nextUtf16(size: Int): String {
+    return String(CharArray(size) { nextChar() })
 }
 
 @OptIn(ExperimentalContracts::class)

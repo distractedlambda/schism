@@ -28,115 +28,115 @@ internal class HeapMemoryEncoder(
 
     override fun putByte(value: Byte) {
         advancing(1) { offset ->
-            array.writeByte(value, offset)
+            array[offset] = value
         }
     }
 
-    override fun putNativeChar(value: Char) {
+    override fun putChar(value: Char) {
         advancing(2) { offset ->
-            array.writeNativeChar(value, offset)
+            array.setChar(value, offset)
         }
     }
 
     override fun putLeChar(value: Char) {
         advancing(2) { offset ->
-            array.writeLeChar(value, offset)
+            array.setLeChar(value, offset)
         }
     }
 
     override fun putBeChar(value: Char) {
         advancing(2) { offset ->
-            array.writeBeChar(value, offset)
+            array.setBeChar(value, offset)
         }
     }
 
-    override fun putNativeShort(value: Short) {
+    override fun putShort(value: Short) {
         advancing(2) { offset ->
-            array.writeNativeShort(value, offset)
+            array.setShort(value, offset)
         }
     }
 
     override fun putLeShort(value: Short) {
         advancing(2) { offset ->
-            array.writeLeShort(value, offset)
+            array.setLeShort(value, offset)
         }
     }
 
     override fun putBeShort(value: Short) {
         advancing(2) { offset ->
-            array.writeBeShort(value, offset)
+            array.setBeShort(value, offset)
         }
     }
 
-    override fun putNativeInt(value: Int) {
+    override fun putInt(value: Int) {
         advancing(4) { offset ->
-            array.writeNativeInt(value, offset)
+            array.setInt(value, offset)
         }
     }
 
     override fun putLeInt(value: Int) {
         advancing(4) { offset ->
-            array.writeLeInt(value, offset)
+            array.setLeInt(value, offset)
         }
     }
 
     override fun putBeInt(value: Int) {
         advancing(4) { offset ->
-            array.writeBeInt(value, offset)
+            array.setBeInt(value, offset)
         }
     }
 
-    override fun putNativeLong(value: Long) {
+    override fun putLong(value: Long) {
         advancing(8) { offset ->
-            array.writeNativeLong(value, offset)
+            array.setLong(value, offset)
         }
     }
 
     override fun putLeLong(value: Long) {
         advancing(8) { offset ->
-            array.writeLeLong(value, offset)
+            array.setLeLong(value, offset)
         }
     }
 
     override fun putBeLong(value: Long) {
         advancing(8) { offset ->
-            array.writeBeLong(value, offset)
+            array.setBeLong(value, offset)
         }
     }
 
-    override fun putNativeFloat(value: Float) {
+    override fun putFloat(value: Float) {
         advancing(4) { offset ->
-            array.writeNativeFloat(value, offset)
+            array.setFloat(value, offset)
         }
     }
 
     override fun putLeFloat(value: Float) {
         advancing(4) { offset ->
-            array.writeLeFloat(value, offset)
+            array.setLeFloat(value, offset)
         }
     }
 
     override fun putBeFloat(value: Float) {
         advancing(4) { offset ->
-            array.writeBeFloat(value, offset)
+            array.setBeFloat(value, offset)
         }
     }
 
-    override fun putNativeDouble(value: Double) {
+    override fun putDouble(value: Double) {
         advancing(8) { offset ->
-            array.writeNativeDouble(value, offset)
+            array.setDouble(value, offset)
         }
     }
 
     override fun putLeDouble(value: Double) {
         advancing(8) { offset ->
-            array.writeLeDouble(value, offset)
+            array.setLeDouble(value, offset)
         }
     }
 
     override fun putBeDouble(value: Double) {
         advancing(8) { offset ->
-            array.writeBeDouble(value, offset)
+            array.setBeDouble(value, offset)
         }
     }
 }

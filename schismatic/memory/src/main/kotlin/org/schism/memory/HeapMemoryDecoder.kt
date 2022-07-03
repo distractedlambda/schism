@@ -29,115 +29,115 @@ internal class HeapMemoryDecoder(
 
     override fun nextByte(): Byte {
         return advancing(1) { offset ->
-            array.readByte(offset)
+            array[offset]
         }
     }
 
-    override fun nextNativeChar(): Char {
+    override fun nextChar(): Char {
         return advancing(2) { offset ->
-            array.readNativeChar(offset)
+            array.getChar(offset)
         }
     }
 
     override fun nextLeChar(): Char {
         return advancing(2) { offset ->
-            array.readLeChar(offset)
+            array.getLeChar(offset)
         }
     }
 
     override fun nextBeChar(): Char {
         return advancing(2) { offset ->
-            array.readBeChar(offset)
+            array.getBeChar(offset)
         }
     }
 
-    override fun nextNativeShort(): Short {
+    override fun nextShort(): Short {
         return advancing(2) { offset ->
-            array.readNativeShort(offset)
+            array.getShort(offset)
         }
     }
 
     override fun nextLeShort(): Short {
         return advancing(2) { offset ->
-            array.readLeShort(offset)
+            array.getLeShort(offset)
         }
     }
 
     override fun nextBeShort(): Short {
         return advancing(2) { offset ->
-            array.readBeShort(offset)
+            array.getBeShort(offset)
         }
     }
 
-    override fun nextNativeInt(): Int {
+    override fun nextInt(): Int {
         return advancing(4) { offset ->
-            array.readNativeInt(offset)
+            array.getInt(offset)
         }
     }
 
     override fun nextLeInt(): Int {
         return advancing(4) { offset ->
-            array.readLeInt(offset)
+            array.getLeInt(offset)
         }
     }
 
     override fun nextBeInt(): Int {
         return advancing(4) { offset ->
-            array.readBeInt(offset)
+            array.getBeInt(offset)
         }
     }
 
-    override fun nextNativeLong(): Long {
+    override fun nextLong(): Long {
         return advancing(8) { offset ->
-            array.readNativeLong(offset)
+            array.getLong(offset)
         }
     }
 
     override fun nextLeLong(): Long {
         return advancing(8) { offset ->
-            array.readLeLong(offset)
+            array.getLeLong(offset)
         }
     }
 
     override fun nextBeLong(): Long {
         return advancing(8) { offset ->
-            array.readBeLong(offset)
+            array.getBeLong(offset)
         }
     }
 
-    override fun nextNativeFloat(): Float {
+    override fun nextFloat(): Float {
         return advancing(4) { offset ->
-            array.readNativeFloat(offset)
+            array.getFloat(offset)
         }
     }
 
     override fun nextLeFloat(): Float {
         return advancing(4) { offset ->
-            array.readLeFloat(offset)
+            array.getLeFloat(offset)
         }
     }
 
     override fun nextBeFloat(): Float {
         return advancing(4) { offset ->
-            array.readBeFloat(offset)
+            array.getBeFloat(offset)
         }
     }
 
-    override fun nextNativeDouble(): Double {
+    override fun nextDouble(): Double {
         return advancing(8) { offset ->
-            array.readNativeDouble(offset)
+            array.getDouble(offset)
         }
     }
 
     override fun nextLeDouble(): Double {
         return advancing(8) { offset ->
-            array.readLeDouble(offset)
+            array.getLeDouble(offset)
         }
     }
 
     override fun nextBeDouble(): Double {
         return advancing(8) { offset ->
-            array.readBeDouble(offset)
+            array.getBeDouble(offset)
         }
     }
 }

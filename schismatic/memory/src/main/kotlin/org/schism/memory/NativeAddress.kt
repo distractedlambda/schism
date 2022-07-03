@@ -8,30 +8,33 @@ import java.lang.foreign.MemorySegment
 import java.lang.foreign.MemorySession
 import java.lang.foreign.ValueLayout.JAVA_BYTE
 
-@JvmInline public value class NativeAddress
-@PublishedApi internal constructor(@PublishedApi internal val numericValue: Long) {
-    internal fun toMemoryAddress(): MemoryAddress {
-        return MemoryAddress.ofLong(numericValue)
+@JvmInline public value class NativeAddress private constructor(private val bits: Long) {
+    public fun toBits(): Long {
+        return bits
+    }
+
+    public fun toMemoryAddress(): MemoryAddress {
+        return MemoryAddress.ofLong(bits)
     }
 
     public operator fun plus(offset: Long): NativeAddress {
-        return NativeAddress(addExact(numericValue, offset))
+        return NativeAddress(addExact(bits, offset))
     }
 
     public operator fun minus(offset: Long): NativeAddress {
-        return NativeAddress(subtractExact(numericValue, offset))
+        return NativeAddress(subtractExact(bits, offset))
     }
 
     public operator fun minus(other: NativeAddress): Long {
-        return subtractExact(numericValue, other.numericValue)
+        return subtractExact(bits, other.bits)
     }
 
     public fun requireAlignedTo(alignment: Long) {
-        numericValue.requireAlignedTo(alignment)
+        bits.requireAlignedTo(alignment)
     }
 
     public fun isNULL(): Boolean {
-        return numericValue == 0L
+        return bits == 0L
     }
 
     public fun readByte(): Byte {
@@ -50,11 +53,11 @@ import java.lang.foreign.ValueLayout.JAVA_BYTE
         writeByte(value.toByte())
     }
 
-    public fun readNativeChar(): Char {
+    public fun readChar(): Char {
         return toMemoryAddress()[UNALIGNED_NATIVE_CHAR, 0]
     }
 
-    public fun writeNativeChar(value: Char) {
+    public fun writeChar(value: Char) {
         toMemoryAddress()[UNALIGNED_NATIVE_CHAR, 0] = value
     }
 
@@ -74,20 +77,20 @@ import java.lang.foreign.ValueLayout.JAVA_BYTE
         toMemoryAddress()[UNALIGNED_BE_CHAR, 0] = value
     }
 
-    public fun readNativeShort(): Short {
+    public fun readShort(): Short {
         return toMemoryAddress()[UNALIGNED_NATIVE_SHORT, 0]
     }
 
-    public fun readNativeUShort(): UShort {
-        return readNativeShort().toUShort()
+    public fun readUShort(): UShort {
+        return readShort().toUShort()
     }
 
-    public fun writeNativeShort(value: Short) {
+    public fun writeShort(value: Short) {
         toMemoryAddress()[UNALIGNED_NATIVE_SHORT, 0] = value
     }
 
-    public fun writeNativeUShort(value: UShort) {
-        writeNativeShort(value.toShort())
+    public fun writeUShort(value: UShort) {
+        writeShort(value.toShort())
     }
 
     public fun readLeShort(): Short {
@@ -122,20 +125,20 @@ import java.lang.foreign.ValueLayout.JAVA_BYTE
         writeBeShort(value.toShort())
     }
 
-    public fun readNativeInt(): Int {
+    public fun readInt(): Int {
         return toMemoryAddress()[UNALIGNED_NATIVE_INT, 0]
     }
 
-    public fun readNativeUInt(): UInt {
-        return readNativeInt().toUInt()
+    public fun readUInt(): UInt {
+        return readInt().toUInt()
     }
 
-    public fun writeNativeInt(value: Int) {
+    public fun writeInt(value: Int) {
         toMemoryAddress()[UNALIGNED_NATIVE_INT, 0] = value
     }
 
-    public fun writeNativeUInt(value: UInt) {
-        writeNativeInt(value.toInt())
+    public fun writeUInt(value: UInt) {
+        writeInt(value.toInt())
     }
 
     public fun readLeInt(): Int {
@@ -170,20 +173,20 @@ import java.lang.foreign.ValueLayout.JAVA_BYTE
         writeBeInt(value.toInt())
     }
 
-    public fun readNativeLong(): Long {
+    public fun readLong(): Long {
         return toMemoryAddress()[UNALIGNED_NATIVE_LONG, 0]
     }
 
-    public fun readNativeULong(): ULong {
-        return readNativeLong().toULong()
+    public fun readULong(): ULong {
+        return readLong().toULong()
     }
 
-    public fun writeNativeLong(value: Long) {
+    public fun writeLong(value: Long) {
         toMemoryAddress()[UNALIGNED_NATIVE_LONG, 0] = value
     }
 
-    public fun writeNativeULong(value: ULong) {
-        writeNativeLong(value.toLong())
+    public fun writeULong(value: ULong) {
+        writeLong(value.toLong())
     }
 
     public fun readLeLong(): Long {
@@ -218,11 +221,11 @@ import java.lang.foreign.ValueLayout.JAVA_BYTE
         writeBeLong(value.toLong())
     }
 
-    public fun readNativeFloat(): Float {
+    public fun readFloat(): Float {
         return toMemoryAddress()[UNALIGNED_NATIVE_FLOAT, 0]
     }
 
-    public fun writeNativeFloat(value: Float) {
+    public fun writeFloat(value: Float) {
         toMemoryAddress()[UNALIGNED_NATIVE_FLOAT, 0] = value
     }
 
@@ -242,11 +245,11 @@ import java.lang.foreign.ValueLayout.JAVA_BYTE
         toMemoryAddress()[UNALIGNED_BE_FLOAT, 0] = value
     }
 
-    public fun readNativeDouble(): Double {
+    public fun readDouble(): Double {
         return toMemoryAddress()[UNALIGNED_NATIVE_DOUBLE, 0]
     }
 
-    public fun writeNativeDouble(value: Double) {
+    public fun writeDouble(value: Double) {
         toMemoryAddress()[UNALIGNED_NATIVE_DOUBLE, 0] = value
     }
 
@@ -267,16 +270,20 @@ import java.lang.foreign.ValueLayout.JAVA_BYTE
     }
 
     override fun toString(): String {
-        return "NativeAddress(0x${numericValue.toString(16).padStart(16, '0')})"
+        return "NativeAddress(0x${bits.toString(16).padStart(16, '0')})"
     }
 
     public companion object {
         public val NULL: NativeAddress get() = NativeAddress(0)
+
+        public fun fromBits(bits: Long): NativeAddress {
+            return NativeAddress(bits)
+        }
     }
 }
 
-internal fun MemoryAddress.toNativeAddress(): NativeAddress {
-    return NativeAddress(toRawLongValue())
+public fun MemoryAddress.toNativeAddress(): NativeAddress {
+    return NativeAddress.fromBits(toRawLongValue())
 }
 
 public fun memcpy(dst: NativeAddress, src: NativeAddress, size: Long) {

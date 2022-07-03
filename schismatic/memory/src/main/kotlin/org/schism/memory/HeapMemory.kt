@@ -56,232 +56,232 @@ internal class HeapMemory(
         return HeapMemory(array, arrayOffset + offset.toInt(), size.toInt(), flags)
     }
 
-    override fun readByte(offset: Long): Byte {
+    override fun getByte(offset: Long): Byte {
         checkReadable()
         checkIndex(offset, size)
-        return array.readByte(arrayOffset + offset.toInt())
+        return array[arrayOffset + offset.toInt()]
     }
 
-    override fun readNativeChar(offset: Long): Char {
+    override fun getChar(offset: Long): Char {
         checkReadable()
         checkFromIndexSize(offset, 2, size)
-        return array.readNativeChar(arrayOffset + offset.toInt())
+        return array.getChar(arrayOffset + offset.toInt())
     }
 
-    override fun readLeChar(offset: Long): Char {
+    override fun getLeChar(offset: Long): Char {
         checkReadable()
         checkFromIndexSize(offset, 2, size)
-        return array.readLeChar(arrayOffset + offset.toInt())
+        return array.getLeChar(arrayOffset + offset.toInt())
     }
 
-    override fun readBeChar(offset: Long): Char {
+    override fun getBeChar(offset: Long): Char {
         checkReadable()
         checkFromIndexSize(offset, 2, size)
-        return array.readBeChar(arrayOffset + offset.toInt())
+        return array.getBeChar(arrayOffset + offset.toInt())
     }
 
-    override fun readNativeShort(offset: Long): Short {
+    override fun getShort(offset: Long): Short {
         checkReadable()
         checkFromIndexSize(offset, 2, size)
-        return array.readNativeShort(arrayOffset + offset.toInt())
+        return array.getShort(arrayOffset + offset.toInt())
     }
 
-    override fun readLeShort(offset: Long): Short {
+    override fun getLeShort(offset: Long): Short {
         checkReadable()
         checkFromIndexSize(offset, 2, size)
-        return array.readLeShort(arrayOffset + offset.toInt())
+        return array.getLeShort(arrayOffset + offset.toInt())
     }
 
-    override fun readBeShort(offset: Long): Short {
+    override fun getBeShort(offset: Long): Short {
         checkReadable()
         checkFromIndexSize(offset, 2, size)
-        return array.readBeShort(arrayOffset + offset.toInt())
+        return array.getBeShort(arrayOffset + offset.toInt())
     }
 
-    override fun readNativeInt(offset: Long): Int {
+    override fun getInt(offset: Long): Int {
         checkReadable()
         checkFromIndexSize(offset, 4, size)
-        return array.readNativeInt(arrayOffset + offset.toInt())
+        return array.getInt(arrayOffset + offset.toInt())
     }
 
-    override fun readLeInt(offset: Long): Int {
+    override fun getLeInt(offset: Long): Int {
         checkReadable()
         checkFromIndexSize(offset, 4, size)
-        return array.readLeInt(arrayOffset + offset.toInt())
+        return array.getLeInt(arrayOffset + offset.toInt())
     }
 
-    override fun readBeInt(offset: Long): Int {
+    override fun getBeInt(offset: Long): Int {
         checkReadable()
         checkFromIndexSize(offset, 4, size)
-        return array.readBeInt(arrayOffset + offset.toInt())
+        return array.getBeInt(arrayOffset + offset.toInt())
     }
 
-    override fun readNativeLong(offset: Long): Long {
+    override fun getLong(offset: Long): Long {
         checkReadable()
         checkFromIndexSize(offset, 8, size)
-        return array.readNativeLong(arrayOffset + offset.toInt())
+        return array.getLong(arrayOffset + offset.toInt())
     }
 
-    override fun readLeLong(offset: Long): Long {
+    override fun getLeLong(offset: Long): Long {
         checkReadable()
         checkFromIndexSize(offset, 8, size)
-        return array.readLeLong(arrayOffset + offset.toInt())
+        return array.getLeLong(arrayOffset + offset.toInt())
     }
 
-    override fun readBeLong(offset: Long): Long {
+    override fun getBeLong(offset: Long): Long {
         checkReadable()
         checkFromIndexSize(offset, 8, size)
-        return array.readBeLong(arrayOffset + offset.toInt())
+        return array.getBeLong(arrayOffset + offset.toInt())
     }
 
-    override fun readNativeFloat(offset: Long): Float {
+    override fun getFloat(offset: Long): Float {
         checkReadable()
         checkFromIndexSize(offset, 4, size)
-        return array.readNativeFloat(arrayOffset + offset.toInt())
+        return array.getFloat(arrayOffset + offset.toInt())
     }
 
-    override fun readLeFloat(offset: Long): Float {
+    override fun getLeFloat(offset: Long): Float {
         checkReadable()
         checkFromIndexSize(offset, 4, size)
-        return array.readLeFloat(arrayOffset + offset.toInt())
+        return array.getLeFloat(arrayOffset + offset.toInt())
     }
 
-    override fun readBeFloat(offset: Long): Float {
+    override fun getBeFloat(offset: Long): Float {
         checkReadable()
         checkFromIndexSize(offset, 4, size)
-        return array.readBeFloat(arrayOffset + offset.toInt())
+        return array.getBeFloat(arrayOffset + offset.toInt())
     }
 
-    override fun readNativeDouble(offset: Long): Double {
+    override fun getDouble(offset: Long): Double {
         checkReadable()
         checkFromIndexSize(offset, 8, size)
-        return array.readNativeDouble(arrayOffset + offset.toInt())
+        return array.getDouble(arrayOffset + offset.toInt())
     }
 
-    override fun readLeDouble(offset: Long): Double {
+    override fun getLeDouble(offset: Long): Double {
         checkReadable()
         checkFromIndexSize(offset, 8, size)
-        return array.readLeDouble(arrayOffset + offset.toInt())
+        return array.getLeDouble(arrayOffset + offset.toInt())
     }
 
-    override fun readBeDouble(offset: Long): Double {
+    override fun getBeDouble(offset: Long): Double {
         checkReadable()
         checkFromIndexSize(offset, 8, size)
-        return array.readBeDouble(arrayOffset + offset.toInt())
+        return array.getBeDouble(arrayOffset + offset.toInt())
     }
 
-    override fun writeByte(value: Byte, offset: Long) {
+    override fun setByte(value: Byte, offset: Long) {
         checkWritable()
         checkIndex(offset, size)
-        array.writeByte(value, arrayOffset + offset.toInt())
+        array[arrayOffset + offset.toInt()] = value
     }
 
-    override fun writeNativeChar(value: Char, offset: Long) {
+    override fun setChar(value: Char, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 2, size)
-        array.writeNativeChar(value, arrayOffset + offset.toInt())
+        array.setChar(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeLeChar(value: Char, offset: Long) {
+    override fun setLeChar(value: Char, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 2, size)
-        array.writeLeChar(value, arrayOffset + offset.toInt())
+        array.setLeChar(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeBeChar(value: Char, offset: Long) {
+    override fun setBeChar(value: Char, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 2, size)
-        array.writeBeChar(value, arrayOffset + offset.toInt())
+        array.setBeChar(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeNativeShort(value: Short, offset: Long) {
+    override fun setShort(value: Short, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 2, size)
-        array.writeNativeShort(value, arrayOffset + offset.toInt())
+        array.setShort(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeLeShort(value: Short, offset: Long) {
+    override fun setLeShort(value: Short, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 2, size)
-        array.writeLeShort(value, arrayOffset + offset.toInt())
+        array.setLeShort(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeBeShort(value: Short, offset: Long) {
+    override fun setBeShort(value: Short, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 2, size)
-        array.writeBeShort(value, arrayOffset + offset.toInt())
+        array.setBeShort(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeNativeInt(value: Int, offset: Long) {
+    override fun setInt(value: Int, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 4, size)
-        array.writeNativeInt(value, arrayOffset + offset.toInt())
+        array.setInt(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeLeInt(value: Int, offset: Long) {
+    override fun setLeInt(value: Int, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 4, size)
-        array.writeLeInt(value, arrayOffset + offset.toInt())
+        array.setLeInt(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeBeInt(value: Int, offset: Long) {
+    override fun setBeInt(value: Int, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 4, size)
-        array.writeBeInt(value, arrayOffset + offset.toInt())
+        array.setBeInt(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeNativeLong(value: Long, offset: Long) {
+    override fun setLong(value: Long, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 8, size)
-        array.writeNativeLong(value, arrayOffset + offset.toInt())
+        array.setLong(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeLeLong(value: Long, offset: Long) {
+    override fun setLeLong(value: Long, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 8, size)
-        array.writeLeLong(value, arrayOffset + offset.toInt())
+        array.setLeLong(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeBeLong(value: Long, offset: Long) {
+    override fun setBeLong(value: Long, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 8, size)
-        array.writeBeLong(value, arrayOffset + offset.toInt())
+        array.setBeLong(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeNativeFloat(value: Float, offset: Long) {
+    override fun setFloat(value: Float, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 4, size)
-        array.writeNativeFloat(value, arrayOffset + offset.toInt())
+        array.setFloat(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeLeFloat(value: Float, offset: Long) {
+    override fun setLeFloat(value: Float, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 4, size)
-        array.writeLeFloat(value, arrayOffset + offset.toInt())
+        array.setLeFloat(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeBeFloat(value: Float, offset: Long) {
+    override fun setBeFloat(value: Float, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 4, size)
-        array.writeBeFloat(value, arrayOffset + offset.toInt())
+        array.setBeFloat(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeNativeDouble(value: Double, offset: Long) {
+    override fun setDouble(value: Double, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 8, size)
-        array.writeNativeDouble(value, arrayOffset + offset.toInt())
+        array.setDouble(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeLeDouble(value: Double, offset: Long) {
+    override fun setLeDouble(value: Double, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 8, size)
-        array.writeLeDouble(value, arrayOffset + offset.toInt())
+        array.setLeDouble(value, arrayOffset + offset.toInt())
     }
 
-    override fun writeBeDouble(value: Double, offset: Long) {
+    override fun setBeDouble(value: Double, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 8, size)
-        array.writeBeDouble(value, arrayOffset + offset.toInt())
+        array.setBeDouble(value, arrayOffset + offset.toInt())
     }
 
     companion object {

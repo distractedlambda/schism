@@ -19,159 +19,161 @@ public interface Memory {
 
     public fun slice(offset: Long = 0L, size: Long = this.size - offset): Memory
 
-    public fun readByte(offset: Long = 0L): Byte
+    public fun getByte(offset: Long = 0L): Byte
 
-    public fun readNativeChar(offset: Long = 0L): Char
+    public fun getChar(offset: Long = 0L): Char
 
-    public fun readLeChar(offset: Long = 0L): Char
+    public fun getLeChar(offset: Long = 0L): Char
 
-    public fun readBeChar(offset: Long = 0L): Char
+    public fun getBeChar(offset: Long = 0L): Char
 
-    public fun readNativeShort(offset: Long = 0L): Short
+    public fun getShort(offset: Long = 0L): Short
 
-    public fun readLeShort(offset: Long = 0L): Short
+    public fun getLeShort(offset: Long = 0L): Short
 
-    public fun readBeShort(offset: Long = 0L): Short
+    public fun getBeShort(offset: Long = 0L): Short
 
-    public fun readNativeInt(offset: Long = 0L): Int
+    public fun getInt(offset: Long = 0L): Int
 
-    public fun readLeInt(offset: Long = 0L): Int
+    public fun getLeInt(offset: Long = 0L): Int
 
-    public fun readBeInt(offset: Long = 0L): Int
+    public fun getBeInt(offset: Long = 0L): Int
 
-    public fun readNativeLong(offset: Long = 0L): Long
+    public fun getLong(offset: Long = 0L): Long
 
-    public fun readLeLong(offset: Long = 0L): Long
+    public fun getLeLong(offset: Long = 0L): Long
 
-    public fun readBeLong(offset: Long = 0L): Long
+    public fun getBeLong(offset: Long = 0L): Long
 
-    public fun readNativeFloat(offset: Long = 0L): Float
+    public fun getFloat(offset: Long = 0L): Float
 
-    public fun readLeFloat(offset: Long = 0L): Float
+    public fun getLeFloat(offset: Long = 0L): Float
 
-    public fun readBeFloat(offset: Long = 0L): Float
+    public fun getBeFloat(offset: Long = 0L): Float
 
-    public fun readNativeDouble(offset: Long = 0L): Double
+    public fun getDouble(offset: Long = 0L): Double
 
-    public fun readLeDouble(offset: Long = 0L): Double
+    public fun getLeDouble(offset: Long = 0L): Double
 
-    public fun readBeDouble(offset: Long = 0L): Double
+    public fun getBeDouble(offset: Long = 0L): Double
 
-    public fun writeByte(value: Byte, offset: Long = 0L)
+    public fun setByte(value: Byte, offset: Long = 0L)
 
-    public fun writeNativeChar(value: Char, offset: Long = 0L)
+    public fun setChar(value: Char, offset: Long = 0L)
 
-    public fun writeLeChar(value: Char, offset: Long = 0L)
+    public fun setLeChar(value: Char, offset: Long = 0L)
 
-    public fun writeBeChar(value: Char, offset: Long = 0L)
+    public fun setBeChar(value: Char, offset: Long = 0L)
 
-    public fun writeNativeShort(value: Short, offset: Long = 0L)
+    public fun setShort(value: Short, offset: Long = 0L)
 
-    public fun writeLeShort(value: Short, offset: Long = 0L)
+    public fun setLeShort(value: Short, offset: Long = 0L)
 
-    public fun writeBeShort(value: Short, offset: Long = 0L)
+    public fun setBeShort(value: Short, offset: Long = 0L)
 
-    public fun writeNativeInt(value: Int, offset: Long = 0L)
+    public fun setInt(value: Int, offset: Long = 0L)
 
-    public fun writeLeInt(value: Int, offset: Long = 0L)
+    public fun setLeInt(value: Int, offset: Long = 0L)
 
-    public fun writeBeInt(value: Int, offset: Long = 0L)
+    public fun setBeInt(value: Int, offset: Long = 0L)
 
-    public fun writeNativeLong(value: Long, offset: Long = 0L)
+    public fun setLong(value: Long, offset: Long = 0L)
 
-    public fun writeLeLong(value: Long, offset: Long = 0L)
+    public fun setLeLong(value: Long, offset: Long = 0L)
 
-    public fun writeBeLong(value: Long, offset: Long = 0L)
+    public fun setBeLong(value: Long, offset: Long = 0L)
 
-    public fun writeNativeFloat(value: Float, offset: Long = 0L)
+    public fun setFloat(value: Float, offset: Long = 0L)
 
-    public fun writeLeFloat(value: Float, offset: Long = 0L)
+    public fun setLeFloat(value: Float, offset: Long = 0L)
 
-    public fun writeBeFloat(value: Float, offset: Long = 0L)
+    public fun setBeFloat(value: Float, offset: Long = 0L)
 
-    public fun writeNativeDouble(value: Double, offset: Long = 0L)
+    public fun setDouble(value: Double, offset: Long = 0L)
 
-    public fun writeLeDouble(value: Double, offset: Long = 0L)
+    public fun setLeDouble(value: Double, offset: Long = 0L)
 
-    public fun writeBeDouble(value: Double, offset: Long = 0L)
+    public fun setBeDouble(value: Double, offset: Long = 0L)
+
+    public companion object
 }
 
-public inline fun Memory.readUByte(offset: Long = 0L): UByte {
-    return readByte(offset).toUByte()
+public inline fun Memory.getUByte(offset: Long = 0L): UByte {
+    return getByte(offset).toUByte()
 }
 
-public inline fun Memory.readNativeUShort(offset: Long = 0L): UShort {
-    return readNativeShort(offset).toUShort()
+public inline fun Memory.getUShort(offset: Long = 0L): UShort {
+    return getShort(offset).toUShort()
 }
 
-public inline fun Memory.readLeUShort(offset: Long = 0L): UShort {
-    return readLeShort(offset).toUShort()
+public inline fun Memory.getLeUShort(offset: Long = 0L): UShort {
+    return getLeShort(offset).toUShort()
 }
 
-public inline fun Memory.readBeUShort(offset: Long = 0L): UShort {
-    return readBeShort(offset).toUShort()
+public inline fun Memory.getBeUShort(offset: Long = 0L): UShort {
+    return getBeShort(offset).toUShort()
 }
 
-public inline fun Memory.readNativeUInt(offset: Long = 0L): UInt {
-    return readNativeInt(offset).toUInt()
+public inline fun Memory.getUInt(offset: Long = 0L): UInt {
+    return getInt(offset).toUInt()
 }
 
-public inline fun Memory.readLeUInt(offset: Long = 0L): UInt {
-    return readLeInt(offset).toUInt()
+public inline fun Memory.getLeUInt(offset: Long = 0L): UInt {
+    return getLeInt(offset).toUInt()
 }
 
-public inline fun Memory.readBeUInt(offset: Long = 0L): UInt {
-    return readBeInt(offset).toUInt()
+public inline fun Memory.getBeUInt(offset: Long = 0L): UInt {
+    return getBeInt(offset).toUInt()
 }
 
-public inline fun Memory.readNativeULong(offset: Long = 0L): ULong {
-    return readNativeLong(offset).toULong()
+public inline fun Memory.getULong(offset: Long = 0L): ULong {
+    return getLong(offset).toULong()
 }
 
-public inline fun Memory.readLeULong(offset: Long = 0L): ULong {
-    return readLeLong(offset).toULong()
+public inline fun Memory.getLeULong(offset: Long = 0L): ULong {
+    return getLeLong(offset).toULong()
 }
 
-public inline fun Memory.readBeULong(offset: Long = 0L): ULong {
-    return readBeLong(offset).toULong()
+public inline fun Memory.getBeULong(offset: Long = 0L): ULong {
+    return getBeLong(offset).toULong()
 }
 
-public inline fun Memory.writeUByte(value: UByte, offset: Long = 0L) {
-    writeByte(value.toByte(), offset)
+public inline fun Memory.setUByte(value: UByte, offset: Long = 0L) {
+    setByte(value.toByte(), offset)
 }
 
-public inline fun Memory.writeNativeUShort(value: UShort, offset: Long = 0L) {
-    writeNativeShort(value.toShort(), offset)
+public inline fun Memory.setUShort(value: UShort, offset: Long = 0L) {
+    setShort(value.toShort(), offset)
 }
 
-public inline fun Memory.writeLeUShort(value: UShort, offset: Long = 0L) {
-    writeLeShort(value.toShort(), offset)
+public inline fun Memory.setLeUShort(value: UShort, offset: Long = 0L) {
+    setLeShort(value.toShort(), offset)
 }
 
-public inline fun Memory.writeBeUShort(value: UShort, offset: Long = 0L) {
-    writeBeShort(value.toShort(), offset)
+public inline fun Memory.setBeUShort(value: UShort, offset: Long = 0L) {
+    setBeShort(value.toShort(), offset)
 }
 
-public inline fun Memory.writeNativeUInt(value: UInt, offset: Long = 0L) {
-    writeNativeInt(value.toInt(), offset)
+public inline fun Memory.setUInt(value: UInt, offset: Long = 0L) {
+    setInt(value.toInt(), offset)
 }
 
-public inline fun Memory.writeLeUInt(value: UInt, offset: Long = 0L) {
-    writeLeInt(value.toInt(), offset)
+public inline fun Memory.setLeUInt(value: UInt, offset: Long = 0L) {
+    setLeInt(value.toInt(), offset)
 }
 
-public inline fun Memory.writeBeUInt(value: UInt, offset: Long = 0L) {
-    writeBeInt(value.toInt(), offset)
+public inline fun Memory.setBeUInt(value: UInt, offset: Long = 0L) {
+    setBeInt(value.toInt(), offset)
 }
 
-public inline fun Memory.writeNativeULong(value: ULong, offset: Long = 0L) {
-    writeNativeLong(value.toLong(), offset)
+public inline fun Memory.setULong(value: ULong, offset: Long = 0L) {
+    setLong(value.toLong(), offset)
 }
 
-public inline fun Memory.writeLeULong(value: ULong, offset: Long = 0L) {
-    writeLeLong(value.toLong(), offset)
+public inline fun Memory.setLeULong(value: ULong, offset: Long = 0L) {
+    setLeLong(value.toLong(), offset)
 }
 
-public inline fun Memory.writeBeULong(value: ULong, offset: Long = 0L) {
-    writeBeLong(value.toLong(), offset)
+public inline fun Memory.setBeULong(value: ULong, offset: Long = 0L) {
+    setBeLong(value.toLong(), offset)
 }

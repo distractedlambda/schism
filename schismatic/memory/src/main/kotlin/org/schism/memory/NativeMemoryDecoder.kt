@@ -9,7 +9,7 @@ internal class NativeMemoryDecoder(
     private val attachment: Any?,
 ) : MemoryDecoder {
     override val position: Long get() {
-        return nextSrc.numericValue
+        return nextSrc.toBits()
     }
 
     private inline fun <R> advance(count: Long, block: (src: NativeAddress) -> R): R {
@@ -39,9 +39,9 @@ internal class NativeMemoryDecoder(
         }
     }
 
-    override fun nextNativeChar(): Char {
+    override fun nextChar(): Char {
         return advance(2) { src ->
-            src.readNativeChar()
+            src.readChar()
         }
     }
 
@@ -57,9 +57,9 @@ internal class NativeMemoryDecoder(
         }
     }
 
-    override fun nextNativeShort(): Short {
+    override fun nextShort(): Short {
         return advance(2) { src ->
-            src.readNativeShort()
+            src.readShort()
         }
     }
 
@@ -75,9 +75,9 @@ internal class NativeMemoryDecoder(
         }
     }
 
-    override fun nextNativeInt(): Int {
+    override fun nextInt(): Int {
         return advance(4) { src ->
-            src.readNativeInt()
+            src.readInt()
         }
     }
 
@@ -93,9 +93,9 @@ internal class NativeMemoryDecoder(
         }
     }
 
-    override fun nextNativeLong(): Long {
+    override fun nextLong(): Long {
         return advance(8) { src ->
-            src.readNativeLong()
+            src.readLong()
         }
     }
 
@@ -111,9 +111,9 @@ internal class NativeMemoryDecoder(
         }
     }
 
-    override fun nextNativeFloat(): Float {
+    override fun nextFloat(): Float {
         return advance(4) { src ->
-            src.readNativeFloat()
+            src.readFloat()
         }
     }
 
@@ -129,9 +129,9 @@ internal class NativeMemoryDecoder(
         }
     }
 
-    override fun nextNativeDouble(): Double {
+    override fun nextDouble(): Double {
         return advance(8) { src ->
-            src.readNativeDouble()
+            src.readDouble()
         }
     }
 

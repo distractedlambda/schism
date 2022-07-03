@@ -63,7 +63,7 @@ internal class NativeMemory : Memory {
         return NativeMemoryDecoder(startAddress, startAddress + size, attachment)
     }
 
-    override fun readByte(offset: Long): Byte {
+    override fun getByte(offset: Long): Byte {
         checkReadable()
         checkIndex(offset, size)
 
@@ -74,18 +74,18 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun readNativeChar(offset: Long): Char {
+    override fun getChar(offset: Long): Char {
         checkReadable()
         checkFromIndexSize(offset, 2, size)
 
         try {
-            return (startAddress + offset).readNativeChar()
+            return (startAddress + offset).readChar()
         } finally {
             reachabilityFence(attachment)
         }
     }
 
-    override fun readLeChar(offset: Long): Char {
+    override fun getLeChar(offset: Long): Char {
         checkReadable()
         checkFromIndexSize(offset, 2, size)
 
@@ -96,7 +96,7 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun readBeChar(offset: Long): Char {
+    override fun getBeChar(offset: Long): Char {
         checkReadable()
         checkFromIndexSize(offset, 2, size)
 
@@ -107,18 +107,18 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun readNativeShort(offset: Long): Short {
+    override fun getShort(offset: Long): Short {
         checkReadable()
         checkFromIndexSize(offset, 2, size)
 
         try {
-            return (startAddress + offset).readNativeShort()
+            return (startAddress + offset).readShort()
         } finally {
             reachabilityFence(attachment)
         }
     }
 
-    override fun readLeShort(offset: Long): Short {
+    override fun getLeShort(offset: Long): Short {
         checkReadable()
         checkFromIndexSize(offset, 2, size)
 
@@ -129,7 +129,7 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun readBeShort(offset: Long): Short {
+    override fun getBeShort(offset: Long): Short {
         checkReadable()
         checkFromIndexSize(offset, 2, size)
 
@@ -140,18 +140,18 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun readNativeInt(offset: Long): Int {
+    override fun getInt(offset: Long): Int {
         checkReadable()
         checkFromIndexSize(offset, 4, size)
 
         try {
-            return (startAddress + offset).readNativeInt()
+            return (startAddress + offset).readInt()
         } finally {
             reachabilityFence(attachment)
         }
     }
 
-    override fun readLeInt(offset: Long): Int {
+    override fun getLeInt(offset: Long): Int {
         checkReadable()
         checkFromIndexSize(offset, 4, size)
 
@@ -162,7 +162,7 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun readBeInt(offset: Long): Int {
+    override fun getBeInt(offset: Long): Int {
         checkReadable()
         checkFromIndexSize(offset, 4, size)
 
@@ -173,18 +173,18 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun readNativeLong(offset: Long): Long {
+    override fun getLong(offset: Long): Long {
         checkReadable()
         checkFromIndexSize(offset, 8, size)
 
         try {
-            return (startAddress + offset).readNativeLong()
+            return (startAddress + offset).readLong()
         } finally {
             reachabilityFence(attachment)
         }
     }
 
-    override fun readLeLong(offset: Long): Long {
+    override fun getLeLong(offset: Long): Long {
         checkReadable()
         checkFromIndexSize(offset, 8, size)
 
@@ -195,7 +195,7 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun readBeLong(offset: Long): Long {
+    override fun getBeLong(offset: Long): Long {
         checkReadable()
         checkFromIndexSize(offset, 8, size)
 
@@ -206,18 +206,18 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun readNativeFloat(offset: Long): Float {
+    override fun getFloat(offset: Long): Float {
         checkReadable()
         checkFromIndexSize(offset, 4, size)
 
         try {
-            return (startAddress + offset).readNativeFloat()
+            return (startAddress + offset).readFloat()
         } finally {
             reachabilityFence(attachment)
         }
     }
 
-    override fun readLeFloat(offset: Long): Float {
+    override fun getLeFloat(offset: Long): Float {
         checkReadable()
         checkFromIndexSize(offset, 4, size)
 
@@ -228,7 +228,7 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun readBeFloat(offset: Long): Float {
+    override fun getBeFloat(offset: Long): Float {
         checkReadable()
         checkFromIndexSize(offset, 4, size)
 
@@ -239,18 +239,18 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun readNativeDouble(offset: Long): Double {
+    override fun getDouble(offset: Long): Double {
         checkReadable()
         checkFromIndexSize(offset, 8, size)
 
         try {
-            return (startAddress + offset).readNativeDouble()
+            return (startAddress + offset).readDouble()
         } finally {
             reachabilityFence(attachment)
         }
     }
 
-    override fun readLeDouble(offset: Long): Double {
+    override fun getLeDouble(offset: Long): Double {
         checkReadable()
         checkFromIndexSize(offset, 8, size)
 
@@ -261,7 +261,7 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun readBeDouble(offset: Long): Double {
+    override fun getBeDouble(offset: Long): Double {
         checkReadable()
         checkFromIndexSize(offset, 8, size)
 
@@ -272,7 +272,7 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun writeByte(value: Byte, offset: Long) {
+    override fun setByte(value: Byte, offset: Long) {
         checkWritable()
         checkIndex(offset, size)
 
@@ -283,18 +283,18 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun writeNativeChar(value: Char, offset: Long) {
+    override fun setChar(value: Char, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 2, size)
 
         try {
-            (startAddress + offset).writeNativeChar(value)
+            (startAddress + offset).writeChar(value)
         } finally {
             reachabilityFence(attachment)
         }
     }
 
-    override fun writeLeChar(value: Char, offset: Long) {
+    override fun setLeChar(value: Char, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 2, size)
 
@@ -305,7 +305,7 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun writeBeChar(value: Char, offset: Long) {
+    override fun setBeChar(value: Char, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 2, size)
 
@@ -316,18 +316,18 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun writeNativeShort(value: Short, offset: Long) {
+    override fun setShort(value: Short, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 2, size)
 
         try {
-            (startAddress + offset).writeNativeShort(value)
+            (startAddress + offset).writeShort(value)
         } finally {
             reachabilityFence(attachment)
         }
     }
 
-    override fun writeLeShort(value: Short, offset: Long) {
+    override fun setLeShort(value: Short, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 2, size)
 
@@ -338,7 +338,7 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun writeBeShort(value: Short, offset: Long) {
+    override fun setBeShort(value: Short, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 2, size)
 
@@ -349,18 +349,18 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun writeNativeInt(value: Int, offset: Long) {
+    override fun setInt(value: Int, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 4, size)
 
         try {
-            (startAddress + offset).writeNativeInt(value)
+            (startAddress + offset).writeInt(value)
         } finally {
             reachabilityFence(attachment)
         }
     }
 
-    override fun writeLeInt(value: Int, offset: Long) {
+    override fun setLeInt(value: Int, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 4, size)
 
@@ -371,7 +371,7 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun writeBeInt(value: Int, offset: Long) {
+    override fun setBeInt(value: Int, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 4, size)
 
@@ -382,18 +382,18 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun writeNativeLong(value: Long, offset: Long) {
+    override fun setLong(value: Long, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 8, size)
 
         try {
-            (startAddress + offset).writeNativeLong(value)
+            (startAddress + offset).writeLong(value)
         } finally {
             reachabilityFence(attachment)
         }
     }
 
-    override fun writeLeLong(value: Long, offset: Long) {
+    override fun setLeLong(value: Long, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 8, size)
 
@@ -404,7 +404,7 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun writeBeLong(value: Long, offset: Long) {
+    override fun setBeLong(value: Long, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 8, size)
 
@@ -415,18 +415,18 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun writeNativeFloat(value: Float, offset: Long) {
+    override fun setFloat(value: Float, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 4, size)
 
         try {
-            (startAddress + offset).writeNativeFloat(value)
+            (startAddress + offset).writeFloat(value)
         } finally {
             reachabilityFence(attachment)
         }
     }
 
-    override fun writeLeFloat(value: Float, offset: Long) {
+    override fun setLeFloat(value: Float, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 4, size)
 
@@ -437,7 +437,7 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun writeBeFloat(value: Float, offset: Long) {
+    override fun setBeFloat(value: Float, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 4, size)
 
@@ -448,18 +448,18 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun writeNativeDouble(value: Double, offset: Long) {
+    override fun setDouble(value: Double, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 8, size)
 
         try {
-            (startAddress + offset).writeNativeDouble(value)
+            (startAddress + offset).writeDouble(value)
         } finally {
             reachabilityFence(attachment)
         }
     }
 
-    override fun writeLeDouble(value: Double, offset: Long) {
+    override fun setLeDouble(value: Double, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 8, size)
 
@@ -470,7 +470,7 @@ internal class NativeMemory : Memory {
         }
     }
 
-    override fun writeBeDouble(value: Double, offset: Long) {
+    override fun setBeDouble(value: Double, offset: Long) {
         checkWritable()
         checkFromIndexSize(offset, 8, size)
 

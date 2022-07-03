@@ -31,37 +31,39 @@ public interface MemoryEncoder {
 
     public fun putBeChar(value: Char)
 
-    public fun putNativeChar(value: Char)
+    public fun putChar(value: Char)
 
     public fun putLeShort(value: Short)
 
     public fun putBeShort(value: Short)
 
-    public fun putNativeShort(value: Short)
+    public fun putShort(value: Short)
 
     public fun putLeInt(value: Int)
 
     public fun putBeInt(value: Int)
 
-    public fun putNativeInt(value: Int)
+    public fun putInt(value: Int)
 
     public fun putLeLong(value: Long)
 
     public fun putBeLong(value: Long)
 
-    public fun putNativeLong(value: Long)
+    public fun putLong(value: Long)
 
     public fun putLeFloat(value: Float)
 
     public fun putBeFloat(value: Float)
 
-    public fun putNativeFloat(value: Float)
+    public fun putFloat(value: Float)
 
     public fun putLeDouble(value: Double)
 
     public fun putBeDouble(value: Double)
 
-    public fun putNativeDouble(value: Double)
+    public fun putDouble(value: Double)
+
+    public companion object
 }
 
 public inline fun MemoryEncoder.putUByte(value: UByte) {
@@ -76,8 +78,8 @@ public inline fun MemoryEncoder.putBeUShort(value: UShort) {
     putBeShort(value.toShort())
 }
 
-public inline fun MemoryEncoder.putNativeUShort(value: UShort) {
-    putNativeShort(value.toShort())
+public inline fun MemoryEncoder.putUShort(value: UShort) {
+    putShort(value.toShort())
 }
 
 public inline fun MemoryEncoder.putLeUInt(value: UInt) {
@@ -88,8 +90,8 @@ public inline fun MemoryEncoder.putBeUInt(value: UInt) {
     putBeInt(value.toInt())
 }
 
-public inline fun MemoryEncoder.putNativeUInt(value: UInt) {
-    putNativeInt(value.toInt())
+public inline fun MemoryEncoder.putUInt(value: UInt) {
+    putInt(value.toInt())
 }
 
 public inline fun MemoryEncoder.putLeULong(value: ULong) {
@@ -100,8 +102,8 @@ public inline fun MemoryEncoder.putBeULong(value: ULong) {
     putBeLong(value.toLong())
 }
 
-public inline fun MemoryEncoder.putNativeULong(value: ULong) {
-    putNativeLong(value.toLong())
+public inline fun MemoryEncoder.putULong(value: ULong) {
+    putLong(value.toLong())
 }
 
 @OptIn(ExperimentalContracts::class)
