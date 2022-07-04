@@ -89,7 +89,7 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
     implWriter.visit(
         V19,
         ACC_FINAL,
-        "org/schism/ffi/LinkedNativeLibrary",
+        "org/schism/ffi/NativeLibraryImpl",
         null,
         "java/lang/Object",
         arrayOf(getInternalName(clazz)),
