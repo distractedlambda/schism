@@ -6,6 +6,7 @@ import java.lang.Math.subtractExact
 import java.lang.foreign.MemoryAddress
 import java.lang.foreign.MemorySegment
 import java.lang.foreign.MemorySession
+import java.lang.foreign.ValueLayout.ADDRESS
 import java.lang.foreign.ValueLayout.JAVA_BYTE
 
 @JvmInline public value class NativeAddress private constructor(private val bits: Long) {
@@ -269,12 +270,36 @@ import java.lang.foreign.ValueLayout.JAVA_BYTE
         toMemoryAddress()[UNALIGNED_BE_DOUBLE, 0] = value
     }
 
+    public fun readUtf8CString(): String {
+        return toMemoryAddress().getUtf8String(0)
+    }
+
+    public fun readPointer(): NativeAddress {
+        return when (BYTE_SIZE) {
+            4 -> fromBits(readUInt().toLong())
+            8 -> fromBits(readLong())
+            else -> throw UnsupportedOperationException("Unsupported native address size")
+        }
+    }
+
+    public fun writePointer(value: NativeAddress) {
+        when (BYTE_SIZE) {
+            4 -> writeInt(value.toBits().toInt())
+            8 -> writeLong(value.toBits())
+            else -> throw UnsupportedOperationException("Unsupported native address size")
+        }
+    }
+
     override fun toString(): String {
         return "NativeAddress(0x${bits.toString(16).padStart(16, '0')})"
     }
 
     public companion object {
-        public val NULL: NativeAddress get() = NativeAddress(0)
+        @JvmStatic public val NULL: NativeAddress get() = NativeAddress(0)
+
+        @JvmStatic public val BIT_SIZE: Int = ADDRESS.bitSize().toInt()
+
+        @JvmStatic public val BYTE_SIZE: Int = ADDRESS.byteSize().toInt()
 
         public fun fromBits(bits: Long): NativeAddress {
             return NativeAddress(bits)

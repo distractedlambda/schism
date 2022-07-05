@@ -57,6 +57,8 @@ public interface Memory {
 
     public fun getBeDouble(offset: Long = 0L): Double
 
+    public fun getPointer(offset: Long = 0L): NativeAddress
+
     public fun setByte(value: Byte, offset: Long = 0L)
 
     public fun setChar(value: Char, offset: Long = 0L)
@@ -94,6 +96,8 @@ public interface Memory {
     public fun setLeDouble(value: Double, offset: Long = 0L)
 
     public fun setBeDouble(value: Double, offset: Long = 0L)
+
+    public fun setPointer(value: NativeAddress, offset: Long = 0L)
 
     public companion object
 }

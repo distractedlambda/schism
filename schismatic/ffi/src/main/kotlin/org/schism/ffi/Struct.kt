@@ -546,9 +546,8 @@ private abstract class AbstractStructTypeImpl<S : Struct>(
     final override val alignment: Long,
 ) : Struct.Type<S> {
     final override fun invoke(memory: Memory): S {
-        require(memory.size == size)
         require(!memory.isNative || memory.startAddress.toBits().isAlignedTo(alignment))
-        return createStruct(memory)
+        return createStruct(memory.slice(size = size))
     }
 
     protected abstract fun createStruct(memory: Memory): S

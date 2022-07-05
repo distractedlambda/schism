@@ -109,6 +109,30 @@ public typealias CSSizeT = CPtrDiffT
         })
     }
 
+    public operator fun compareTo(rhs: CLong): Int {
+        return if (C_LONG_IS_4_BYTES) {
+            value.toInt().compareTo(rhs.value.toInt())
+        } else {
+            value.compareTo(rhs.value)
+        }
+    }
+
+    public operator fun compareTo(rhs: Long): Int {
+        return if (C_LONG_IS_4_BYTES) {
+            value.toInt().toLong().compareTo(rhs)
+        } else {
+            value.compareTo(rhs)
+        }
+    }
+
+    public operator fun compareTo(rhs: Int): Int {
+        return if (C_LONG_IS_4_BYTES) {
+            value.toInt().compareTo(rhs)
+        } else {
+            value.compareTo(rhs)
+        }
+    }
+
     public companion object {
         public val SIZE_BITS: Int
 
@@ -229,6 +253,14 @@ public fun Long.toCLong(): CLong {
         } else {
             value.dec()
         })
+    }
+
+    public operator fun compareTo(rhs: CUnsignedLong): Int {
+        return if (C_LONG_IS_4_BYTES) {
+            value.toUInt().compareTo(rhs.value.toUInt())
+        } else {
+            value.compareTo(rhs.value)
+        }
     }
 
     public companion object {
@@ -359,6 +391,30 @@ public fun ULong.toCUnsignedLong(): CUnsignedLong {
         })
     }
 
+    public operator fun compareTo(rhs: CPtrDiffT): Int {
+        return if (ADDRESS_IS_4_BYTES) {
+            value.toInt().compareTo(rhs.value.toInt())
+        } else {
+            value.compareTo(rhs.value)
+        }
+    }
+
+    public operator fun compareTo(rhs: Long): Int {
+        return if (ADDRESS_IS_4_BYTES) {
+            value.toInt().toLong().compareTo(rhs)
+        } else {
+            value.compareTo(rhs)
+        }
+    }
+
+    public operator fun compareTo(rhs: Int): Int {
+        return if (ADDRESS_IS_4_BYTES) {
+            value.toInt().compareTo(rhs)
+        } else {
+            value.compareTo(rhs)
+        }
+    }
+
     public companion object {
         public val SIZE_BITS: Int
 
@@ -479,6 +535,14 @@ public fun Long.toCPtrdiffT(): CPtrDiffT {
         } else {
             value.dec()
         })
+    }
+
+    public operator fun compareTo(rhs: CSizeT): Int {
+        return if (ADDRESS_IS_4_BYTES) {
+            value.toUInt().compareTo(rhs.value.toUInt())
+        } else {
+            value.compareTo(rhs.value)
+        }
     }
 
     public companion object {

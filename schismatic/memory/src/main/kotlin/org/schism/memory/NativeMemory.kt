@@ -272,6 +272,17 @@ internal class NativeMemory : Memory {
         }
     }
 
+    override fun getPointer(offset: Long): NativeAddress {
+        checkReadable()
+        checkFromIndexSize(offset, NativeAddress.BYTE_SIZE.toLong(), size)
+
+        try {
+            return (startAddress + offset).readPointer()
+        } finally {
+            reachabilityFence(attachment)
+        }
+    }
+
     override fun setByte(value: Byte, offset: Long) {
         checkWritable()
         checkIndex(offset, size)
@@ -476,6 +487,17 @@ internal class NativeMemory : Memory {
 
         try {
             (startAddress + offset).writeBeDouble(value)
+        } finally {
+            reachabilityFence(attachment)
+        }
+    }
+
+    override fun setPointer(value: NativeAddress, offset: Long) {
+        checkWritable()
+        checkFromIndexSize(offset, NativeAddress.BYTE_SIZE.toLong(), size)
+
+        try {
+            (startAddress + offset).writePointer(value)
         } finally {
             reachabilityFence(attachment)
         }

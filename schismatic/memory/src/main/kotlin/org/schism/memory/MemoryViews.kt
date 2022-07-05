@@ -3,52 +3,321 @@
 package org.schism.memory
 
 import org.schism.math.timesExact
+import kotlin.reflect.KProperty
 
-public val Memory.bytes: MemoryBytes get() {
-    return MemoryBytes(this)
+public val Memory.byte: MemoryByteView get() {
+    return MemoryByteView(slice(size = 1))
 }
 
-public val Memory.ubytes: MemoryUBytes get() {
-    return MemoryUBytes(this)
+public val Memory.ubyte: MemoryUByteView get() {
+    return MemoryUByteView(slice(size = 1))
 }
 
-public val Memory.chars: MemoryChars get() {
-    return MemoryChars(this)
+public val Memory.char: MemoryCharView get() {
+    return MemoryCharView(slice(size = 2))
 }
 
-public val Memory.shorts: MemoryShorts get() {
-    return MemoryShorts(this)
+public val Memory.short: MemoryShortView get() {
+    return MemoryShortView(slice(size = 2))
 }
 
-public val Memory.ushorts: MemoryUShorts get() {
-    return MemoryUShorts(this)
+public val Memory.ushort: MemoryUShortView get() {
+    return MemoryUShortView(slice(size = 2))
 }
 
-public val Memory.ints: MemoryInts get() {
-    return MemoryInts(this)
+public val Memory.int: MemoryIntView get() {
+    return MemoryIntView(slice(size = 4))
 }
 
-public val Memory.uints: MemoryUInts get() {
-    return MemoryUInts(this)
+public val Memory.uint: MemoryUIntView get() {
+    return MemoryUIntView(slice(size = 4))
 }
 
-public val Memory.longs: MemoryLongs get() {
-    return MemoryLongs(this)
+public val Memory.long: MemoryLongView get() {
+    return MemoryLongView(slice(size = 8))
 }
 
-public val Memory.ulongs: MemoryULongs get() {
-    return MemoryULongs(this)
+public val Memory.ulong: MemoryULongView get() {
+    return MemoryULongView(slice(size = 8))
 }
 
-public val Memory.floats: MemoryFloats get() {
-    return MemoryFloats(this)
+public val Memory.float: MemoryFloatView get() {
+    return MemoryFloatView(slice(size = 4))
 }
 
-public val Memory.doubles: MemoryDoubles get() {
-    return MemoryDoubles(this)
+public val Memory.double: MemoryDoubleView get() {
+    return MemoryDoubleView(slice(size = 8))
 }
 
-@JvmInline public value class MemoryBytes internal constructor(public val memory: Memory) {
+public val Memory.pointer: MemoryPointerView get() {
+    return MemoryPointerView(slice(size = NativeAddress.BYTE_SIZE.toLong()))
+}
+
+public fun Memory.byte(offset: Long): MemoryByteView {
+    return MemoryByteView(slice(offset, 1))
+}
+
+public fun Memory.ubyte(offset: Long): MemoryUByteView {
+    return MemoryUByteView(slice(offset, 1))
+}
+
+public fun Memory.char(offset: Long): MemoryCharView {
+    return MemoryCharView(slice(offset, 2))
+}
+
+public fun Memory.short(offset: Long): MemoryShortView {
+    return MemoryShortView(slice(offset, 2))
+}
+
+public fun Memory.ushort(offset: Long): MemoryUShortView {
+    return MemoryUShortView(slice(offset, 2))
+}
+
+public fun Memory.int(offset: Long): MemoryIntView {
+    return MemoryIntView(slice(offset, 4))
+}
+
+public fun Memory.uint(offset: Long): MemoryUIntView {
+    return MemoryUIntView(slice(offset, 4))
+}
+
+public fun Memory.long(offset: Long): MemoryLongView {
+    return MemoryLongView(slice(offset, 8))
+}
+
+public fun Memory.ulong(offset: Long): MemoryULongView {
+    return MemoryULongView(slice(offset, 8))
+}
+
+public fun Memory.float(offset: Long): MemoryFloatView {
+    return MemoryFloatView(slice(offset, 4))
+}
+
+public fun Memory.double(offset: Long): MemoryDoubleView {
+    return MemoryDoubleView(slice(offset, 8))
+}
+
+public fun Memory.pointer(offset: Long): MemoryPointerView {
+    return MemoryPointerView(slice(offset, NativeAddress.BYTE_SIZE.toLong()))
+}
+
+@JvmInline public value class MemoryByteView internal constructor(public val memory: Memory) {
+    public inline var value: Byte
+        get() = memory.getByte()
+        set(newValue) = memory.setByte(newValue)
+
+    public inline operator fun getValue(thisRef: Any?, property: KProperty<*>): Byte {
+        return value
+    }
+
+    public inline operator fun setValue(thisRef: Any?, property: KProperty<*>, value: Byte) {
+        this.value = value
+    }
+}
+
+@JvmInline public value class MemoryUByteView internal constructor(public val memory: Memory) {
+    public inline var value: UByte
+        get() = memory.getUByte()
+        set(newValue) = memory.setUByte(newValue)
+
+    public inline operator fun getValue(thisRef: Any?, property: KProperty<*>): UByte {
+        return value
+    }
+
+    public inline operator fun setValue(thisRef: Any?, property: KProperty<*>, value: UByte) {
+        this.value = value
+    }
+}
+
+@JvmInline public value class MemoryCharView internal constructor(public val memory: Memory) {
+    public inline var value: Char
+        get() = memory.getChar()
+        set(newValue) = memory.setChar(newValue)
+
+    public inline operator fun getValue(thisRef: Any?, property: KProperty<*>): Char {
+        return value
+    }
+
+    public inline operator fun setValue(thisRef: Any?, property: KProperty<*>, value: Char) {
+        this.value = value
+    }
+}
+
+@JvmInline public value class MemoryShortView internal constructor(public val memory: Memory) {
+    public inline var value: Short
+        get() = memory.getShort()
+        set(newValue) = memory.setShort(newValue)
+
+    public inline operator fun getValue(thisRef: Any?, property: KProperty<*>): Short {
+        return value
+    }
+
+    public inline operator fun setValue(thisRef: Any?, property: KProperty<*>, value: Short) {
+        this.value = value
+    }
+}
+
+@JvmInline public value class MemoryUShortView internal constructor(public val memory: Memory) {
+    public inline var value: UShort
+        get() = memory.getUShort()
+        set(newValue) = memory.setUShort(newValue)
+
+    public inline operator fun getValue(thisRef: Any?, property: KProperty<*>): UShort {
+        return value
+    }
+
+    public inline operator fun setValue(thisRef: Any?, property: KProperty<*>, value: UShort) {
+        this.value = value
+    }
+}
+
+@JvmInline public value class MemoryIntView internal constructor(public val memory: Memory) {
+    public inline var value: Int
+        get() = memory.getInt()
+        set(newValue) = memory.setInt(newValue)
+
+    public inline operator fun getValue(thisRef: Any?, property: KProperty<*>): Int {
+        return value
+    }
+
+    public inline operator fun setValue(thisRef: Any?, property: KProperty<*>, value: Int) {
+        this.value = value
+    }
+}
+
+@JvmInline public value class MemoryUIntView internal constructor(public val memory: Memory) {
+    public inline var value: UInt
+        get() = memory.getUInt()
+        set(newValue) = memory.setUInt(newValue)
+
+    public inline operator fun getValue(thisRef: Any?, property: KProperty<*>): UInt {
+        return value
+    }
+
+    public inline operator fun setValue(thisRef: Any?, property: KProperty<*>, value: UInt) {
+        this.value = value
+    }
+}
+
+@JvmInline public value class MemoryLongView internal constructor(public val memory: Memory) {
+    public inline var value: Long
+        get() = memory.getLong()
+        set(newValue) = memory.setLong(newValue)
+
+    public inline operator fun getValue(thisRef: Any?, property: KProperty<*>): Long {
+        return value
+    }
+
+    public inline operator fun setValue(thisRef: Any?, property: KProperty<*>, value: Long) {
+        this.value = value
+    }
+}
+
+@JvmInline public value class MemoryULongView internal constructor(public val memory: Memory) {
+    public inline var value: ULong
+        get() = memory.getULong()
+        set(newValue) = memory.setULong(newValue)
+
+    public inline operator fun getValue(thisRef: Any?, property: KProperty<*>): ULong {
+        return value
+    }
+
+    public inline operator fun setValue(thisRef: Any?, property: KProperty<*>, value: ULong) {
+        this.value = value
+    }
+}
+
+@JvmInline public value class MemoryFloatView internal constructor(public val memory: Memory) {
+    public inline var value: Float
+        get() = memory.getFloat()
+        set(newValue) = memory.setFloat(newValue)
+
+    public inline operator fun getValue(thisRef: Any?, property: KProperty<*>): Float {
+        return value
+    }
+
+    public inline operator fun setValue(thisRef: Any?, property: KProperty<*>, value: Float) {
+        this.value = value
+    }
+}
+
+@JvmInline public value class MemoryDoubleView internal constructor(public val memory: Memory) {
+    public inline var value: Double
+        get() = memory.getDouble()
+        set(newValue) = memory.setDouble(newValue)
+
+    public inline operator fun getValue(thisRef: Any?, property: KProperty<*>): Double {
+        return value
+    }
+
+    public inline operator fun setValue(thisRef: Any?, property: KProperty<*>, value: Double) {
+        this.value = value
+    }
+}
+
+@JvmInline public value class MemoryPointerView internal constructor(public val memory: Memory) {
+    public inline var value: NativeAddress
+        get() = memory.getPointer()
+        set(newValue) = memory.setPointer(newValue)
+
+    public inline operator fun getValue(thisRef: Any?, property: KProperty<*>): NativeAddress {
+        return value
+    }
+
+    public inline operator fun setValue(thisRef: Any?, property: KProperty<*>, value: NativeAddress) {
+        this.value = value
+    }
+}
+
+public val Memory.bytes: MemoryByteArrayView get() {
+    return MemoryByteArrayView(this)
+}
+
+public val Memory.ubytes: MemoryUByteArrayView get() {
+    return MemoryUByteArrayView(this)
+}
+
+public val Memory.chars: MemoryCharArrayView get() {
+    return MemoryCharArrayView(this)
+}
+
+public val Memory.shorts: MemoryShortArrayView get() {
+    return MemoryShortArrayView(this)
+}
+
+public val Memory.ushorts: MemoryUShortArrayView get() {
+    return MemoryUShortArrayView(this)
+}
+
+public val Memory.ints: MemoryIntArrayView get() {
+    return MemoryIntArrayView(this)
+}
+
+public val Memory.uints: MemoryUIntArrayView get() {
+    return MemoryUIntArrayView(this)
+}
+
+public val Memory.longs: MemoryLongArrayView get() {
+    return MemoryLongArrayView(this)
+}
+
+public val Memory.ulongs: MemoryULongArrayView get() {
+    return MemoryULongArrayView(this)
+}
+
+public val Memory.floats: MemoryFloatArrayView get() {
+    return MemoryFloatArrayView(this)
+}
+
+public val Memory.doubles: MemoryDoubleArrayView get() {
+    return MemoryDoubleArrayView(this)
+}
+
+public val Memory.pointers: MemoryPointerArrayView get() {
+    return MemoryPointerArrayView(this)
+}
+
+@JvmInline public value class MemoryByteArrayView internal constructor(public val memory: Memory) {
     public inline val size: Long get() {
         return memory.size
     }
@@ -69,7 +338,7 @@ public val Memory.doubles: MemoryDoubles get() {
         return Iterator(this)
     }
 
-    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryBytes) {
+    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryByteArrayView) {
         @PublishedApi internal var index: Long = 0L
 
         public inline operator fun hasNext(): Boolean {
@@ -86,7 +355,7 @@ public val Memory.doubles: MemoryDoubles get() {
     public companion object
 }
 
-@JvmInline public value class MemoryUBytes internal constructor(public val memory: Memory) {
+@JvmInline public value class MemoryUByteArrayView internal constructor(public val memory: Memory) {
     public inline val size: Long get() {
         return memory.size
     }
@@ -107,7 +376,7 @@ public val Memory.doubles: MemoryDoubles get() {
         return Iterator(this)
     }
 
-    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryUBytes) {
+    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryUByteArrayView) {
         @PublishedApi internal var index: Long = 0L
 
         public inline operator fun hasNext(): Boolean {
@@ -124,7 +393,7 @@ public val Memory.doubles: MemoryDoubles get() {
     public companion object
 }
 
-@JvmInline public value class MemoryChars internal constructor(public val memory: Memory) {
+@JvmInline public value class MemoryCharArrayView internal constructor(public val memory: Memory) {
     public inline val size: Long get() {
         return memory.size / ELEMENT_STRIDE
     }
@@ -145,7 +414,7 @@ public val Memory.doubles: MemoryDoubles get() {
         return Iterator(this)
     }
 
-    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryChars) {
+    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryCharArrayView) {
         @PublishedApi internal var index: Long = 0L
 
         public inline operator fun hasNext(): Boolean {
@@ -153,7 +422,7 @@ public val Memory.doubles: MemoryDoubles get() {
         }
 
         public inline operator fun next(): Char {
-            return elements[index].also { index += ELEMENT_STRIDE }
+            return elements[index++]
         }
 
         public companion object
@@ -164,7 +433,7 @@ public val Memory.doubles: MemoryDoubles get() {
     }
 }
 
-@JvmInline public value class MemoryShorts internal constructor(public val memory: Memory) {
+@JvmInline public value class MemoryShortArrayView internal constructor(public val memory: Memory) {
     public inline val size: Long get() {
         return memory.size / ELEMENT_STRIDE
     }
@@ -185,7 +454,7 @@ public val Memory.doubles: MemoryDoubles get() {
         return Iterator(this)
     }
 
-    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryShorts) {
+    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryShortArrayView) {
         @PublishedApi internal var index: Long = 0L
 
         public inline operator fun hasNext(): Boolean {
@@ -193,7 +462,7 @@ public val Memory.doubles: MemoryDoubles get() {
         }
 
         public inline operator fun next(): Short {
-            return elements[index].also { index += ELEMENT_STRIDE }
+            return elements[index++]
         }
 
         public companion object
@@ -204,7 +473,7 @@ public val Memory.doubles: MemoryDoubles get() {
     }
 }
 
-@JvmInline public value class MemoryUShorts internal constructor(public val memory: Memory) {
+@JvmInline public value class MemoryUShortArrayView internal constructor(public val memory: Memory) {
     public inline val size: Long get() {
         return memory.size / ELEMENT_STRIDE
     }
@@ -225,7 +494,7 @@ public val Memory.doubles: MemoryDoubles get() {
         return Iterator(this)
     }
 
-    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryUShorts) {
+    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryUShortArrayView) {
         @PublishedApi internal var index: Long = 0L
 
         public inline operator fun hasNext(): Boolean {
@@ -233,7 +502,7 @@ public val Memory.doubles: MemoryDoubles get() {
         }
 
         public inline operator fun next(): UShort {
-            return elements[index].also { index += ELEMENT_STRIDE }
+            return elements[index++]
         }
 
         public companion object
@@ -244,7 +513,7 @@ public val Memory.doubles: MemoryDoubles get() {
     }
 }
 
-@JvmInline public value class MemoryInts internal constructor(public val memory: Memory) {
+@JvmInline public value class MemoryIntArrayView internal constructor(public val memory: Memory) {
     public inline val size: Long get() {
         return memory.size / ELEMENT_STRIDE
     }
@@ -265,7 +534,7 @@ public val Memory.doubles: MemoryDoubles get() {
         return Iterator(this)
     }
 
-    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryInts) {
+    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryIntArrayView) {
         @PublishedApi internal var index: Long = 0L
 
         public inline operator fun hasNext(): Boolean {
@@ -273,7 +542,7 @@ public val Memory.doubles: MemoryDoubles get() {
         }
 
         public inline operator fun next(): Int {
-            return elements[index].also { index += ELEMENT_STRIDE }
+            return elements[index++]
         }
 
         public companion object
@@ -284,7 +553,7 @@ public val Memory.doubles: MemoryDoubles get() {
     }
 }
 
-@JvmInline public value class MemoryUInts internal constructor(public val memory: Memory) {
+@JvmInline public value class MemoryUIntArrayView internal constructor(public val memory: Memory) {
     public inline val size: Long get() {
         return memory.size / ELEMENT_STRIDE
     }
@@ -305,7 +574,7 @@ public val Memory.doubles: MemoryDoubles get() {
         return Iterator(this)
     }
 
-    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryUInts) {
+    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryUIntArrayView) {
         @PublishedApi internal var index: Long = 0L
 
         public inline operator fun hasNext(): Boolean {
@@ -313,7 +582,7 @@ public val Memory.doubles: MemoryDoubles get() {
         }
 
         public inline operator fun next(): UInt {
-            return elements[index].also { index += ELEMENT_STRIDE }
+            return elements[index++]
         }
 
         public companion object
@@ -324,7 +593,7 @@ public val Memory.doubles: MemoryDoubles get() {
     }
 }
 
-@JvmInline public value class MemoryFloats internal constructor(public val memory: Memory) {
+@JvmInline public value class MemoryFloatArrayView internal constructor(public val memory: Memory) {
     public inline val size: Long get() {
         return memory.size / ELEMENT_STRIDE
     }
@@ -345,7 +614,7 @@ public val Memory.doubles: MemoryDoubles get() {
         return Iterator(this)
     }
 
-    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryFloats) {
+    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryFloatArrayView) {
         @PublishedApi internal var index: Long = 0L
 
         public inline operator fun hasNext(): Boolean {
@@ -353,7 +622,7 @@ public val Memory.doubles: MemoryDoubles get() {
         }
 
         public inline operator fun next(): Float {
-            return elements[index].also { index += ELEMENT_STRIDE }
+            return elements[index++]
         }
 
         public companion object
@@ -364,7 +633,7 @@ public val Memory.doubles: MemoryDoubles get() {
     }
 }
 
-@JvmInline public value class MemoryLongs internal constructor(public val memory: Memory) {
+@JvmInline public value class MemoryLongArrayView internal constructor(public val memory: Memory) {
     public inline val size: Long get() {
         return memory.size / ELEMENT_STRIDE
     }
@@ -385,7 +654,7 @@ public val Memory.doubles: MemoryDoubles get() {
         return Iterator(this)
     }
 
-    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryLongs) {
+    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryLongArrayView) {
         @PublishedApi internal var index: Long = 0L
 
         public inline operator fun hasNext(): Boolean {
@@ -393,7 +662,7 @@ public val Memory.doubles: MemoryDoubles get() {
         }
 
         public inline operator fun next(): Long {
-            return elements[index].also { index += ELEMENT_STRIDE }
+            return elements[index++]
         }
 
         public companion object
@@ -404,7 +673,7 @@ public val Memory.doubles: MemoryDoubles get() {
     }
 }
 
-@JvmInline public value class MemoryULongs internal constructor(public val memory: Memory) {
+@JvmInline public value class MemoryULongArrayView internal constructor(public val memory: Memory) {
     public inline val size: Long get() {
         return memory.size / ELEMENT_STRIDE
     }
@@ -425,7 +694,7 @@ public val Memory.doubles: MemoryDoubles get() {
         return Iterator(this)
     }
 
-    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryULongs) {
+    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryULongArrayView) {
         @PublishedApi internal var index: Long = 0L
 
         public inline operator fun hasNext(): Boolean {
@@ -433,7 +702,7 @@ public val Memory.doubles: MemoryDoubles get() {
         }
 
         public inline operator fun next(): ULong {
-            return elements[index].also { index += ELEMENT_STRIDE }
+            return elements[index++]
         }
 
         public companion object
@@ -444,7 +713,7 @@ public val Memory.doubles: MemoryDoubles get() {
     }
 }
 
-@JvmInline public value class MemoryDoubles internal constructor(public val memory: Memory) {
+@JvmInline public value class MemoryDoubleArrayView internal constructor(public val memory: Memory) {
     public inline val size: Long get() {
         return memory.size / ELEMENT_STRIDE
     }
@@ -465,7 +734,7 @@ public val Memory.doubles: MemoryDoubles get() {
         return Iterator(this)
     }
 
-    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryDoubles) {
+    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryDoubleArrayView) {
         @PublishedApi internal var index: Long = 0L
 
         public inline operator fun hasNext(): Boolean {
@@ -473,7 +742,7 @@ public val Memory.doubles: MemoryDoubles get() {
         }
 
         public inline operator fun next(): Double {
-            return elements[index].also { index += ELEMENT_STRIDE }
+            return elements[index++]
         }
 
         public companion object
@@ -481,5 +750,39 @@ public val Memory.doubles: MemoryDoubles get() {
 
     public companion object {
         @PublishedApi internal const val ELEMENT_STRIDE: Long = 8
+    }
+}
+
+@JvmInline public value class MemoryPointerArrayView internal constructor(public val memory: Memory) {
+    public inline val size: Long get() {
+        return memory.size / NativeAddress.BYTE_SIZE
+    }
+
+    public inline val indices: LongRange get() {
+        return 0 until size
+    }
+
+    public inline operator fun get(index: Long): NativeAddress {
+        return memory.getPointer(index timesExact NativeAddress.BYTE_SIZE.toLong())
+    }
+
+    public inline operator fun set(index: Long, value: NativeAddress) {
+        memory.setPointer(value, index timesExact NativeAddress.BYTE_SIZE.toLong())
+    }
+
+    public operator fun iterator(): Iterator {
+        return Iterator(this)
+    }
+
+    public class Iterator internal constructor(@PublishedApi internal val elements: MemoryPointerArrayView) {
+        @PublishedApi internal var index: Long = 0L
+
+        public inline operator fun hasNext(): Boolean {
+            return index < elements.size
+        }
+
+        public inline operator fun next(): NativeAddress {
+            return elements[index++]
+        }
     }
 }

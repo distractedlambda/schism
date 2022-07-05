@@ -10,3 +10,4 @@ rootProject.name = "schismatic"
 include("ffi")
 include("math")
 include("memory")
+include("usb")

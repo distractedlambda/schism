@@ -227,6 +227,22 @@ public fun ByteArray.setBeULong(value: ULong, offset: Int = 0) {
     setBeLong(value.toLong(), offset)
 }
 
+public fun ByteArray.getPointer(offset: Int = 0): NativeAddress {
+    return when (NativeAddress.BYTE_SIZE) {
+        4 -> NativeAddress.fromBits(getUInt(offset).toLong())
+        8 -> NativeAddress.fromBits(getLong(offset))
+        else -> throw UnsupportedOperationException("Unsupported native address size")
+    }
+}
+
+public fun ByteArray.setPointer(value: NativeAddress, offset: Int = 0) {
+    when (NativeAddress.BYTE_SIZE) {
+        4 -> setInt(value.toBits().toInt(), offset)
+        8 -> setLong(value.toBits())
+        else -> throw UnsupportedOperationException("Unsupported native address size")
+    }
+}
+
 public fun memcpy(
     dst: ByteArray,
     dstOffset: Int = 0,
