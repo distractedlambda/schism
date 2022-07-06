@@ -139,44 +139,58 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
         val argumentLayouts = mutableListOf<MemoryLayout>()
         var nextArgumentLocal = 1
 
-        for (param in member.parameters.drop(1)) when (param.type) {
+        for ((kParam, jParam) in member.parameters.zip(javaMethod.parameterTypes).drop(1)) when (kParam.type) {
             typeOf<Byte>(), typeOf<UByte>() -> {
+                require(jParam == Byte::class.java)
+
                 argumentLayouts.add(ValueLayout.JAVA_BYTE)
                 methodWriter.visitVarInsn(Opcodes.ILOAD, nextArgumentLocal)
                 nextArgumentLocal += 1
             }
 
             typeOf<Short>(), typeOf<UShort>() -> {
+                require(jParam == Short::class.java)
+
                 argumentLayouts.add(ValueLayout.JAVA_SHORT)
                 methodWriter.visitVarInsn(Opcodes.ILOAD, nextArgumentLocal)
                 nextArgumentLocal += 1
             }
 
             typeOf<Int>(), typeOf<UInt>() -> {
+                require(jParam == Int::class.java)
+
                 argumentLayouts.add(JAVA_INT)
                 methodWriter.visitVarInsn(Opcodes.ILOAD, nextArgumentLocal)
                 nextArgumentLocal += 1
             }
 
             typeOf<Long>(), typeOf<ULong>() -> {
+                require(jParam == Long::class.java)
+
                 argumentLayouts.add(JAVA_LONG)
                 methodWriter.visitVarInsn(Opcodes.LLOAD, nextArgumentLocal)
                 nextArgumentLocal += 2
             }
 
             typeOf<Float>() -> {
+                require(jParam == Float::class.java)
+
                 argumentLayouts.add(ValueLayout.JAVA_FLOAT)
                 methodWriter.visitVarInsn(Opcodes.FLOAD, nextArgumentLocal)
                 nextArgumentLocal += 1
             }
 
             typeOf<Double>() -> {
+                require(jParam == Double::class.java)
+
                 argumentLayouts.add(ValueLayout.JAVA_DOUBLE)
                 methodWriter.visitVarInsn(Opcodes.DLOAD, nextArgumentLocal)
                 nextArgumentLocal += 2
             }
 
             typeOf<CLong>(), typeOf<CUnsignedLong>() -> {
+                require(jParam == Long::class.java)
+
                 methodWriter.visitVarInsn(Opcodes.LLOAD, nextArgumentLocal)
                 nextArgumentLocal += 2
 
@@ -189,6 +203,8 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
             }
 
             typeOf<CPtrDiffT>(), typeOf<CSizeT>(), typeOf<NativeAddress>() -> {
+                require(jParam == Long::class.java)
+
                 methodWriter.visitVarInsn(Opcodes.LLOAD, nextArgumentLocal)
                 nextArgumentLocal += 2
 
@@ -201,7 +217,7 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
             }
 
             else -> {
-                throw UnsupportedOperationException("Unsupported parameter type '${param.type}'")
+                throw UnsupportedOperationException("Unsupported parameter type '${kParam.type}'")
             }
         }
 
@@ -210,36 +226,44 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
 
         when (member.returnType) {
             typeOf<Byte>(), typeOf<UByte>() -> {
+                require(javaMethod.returnType == Byte::class.java)
                 visitReturn = { visitInsn(Opcodes.IRETURN) }
                 returnLayout = ValueLayout.JAVA_BYTE
             }
 
             typeOf<Short>(), typeOf<UShort>() -> {
+                require(javaMethod.returnType == Short::class.java)
                 visitReturn = { visitInsn(Opcodes.IRETURN) }
                 returnLayout = ValueLayout.JAVA_SHORT
             }
 
             typeOf<Int>(), typeOf<UInt>() -> {
+                require(javaMethod.returnType == Int::class.java)
                 visitReturn = { visitInsn(Opcodes.IRETURN) }
                 returnLayout = JAVA_INT
             }
 
             typeOf<Long>(), typeOf<ULong>() -> {
+                require(javaMethod.returnType == Long::class.java)
                 visitReturn = { visitInsn(LRETURN) }
                 returnLayout = JAVA_LONG
             }
 
             typeOf<Float>() -> {
+                require(javaMethod.returnType == Float::class.java)
                 visitReturn = { visitInsn(Opcodes.FRETURN) }
                 returnLayout = ValueLayout.JAVA_FLOAT
             }
 
             typeOf<Double>() -> {
+                require(javaMethod.returnType == Double::class.java)
                 visitReturn = { visitInsn(Opcodes.DRETURN) }
                 returnLayout = ValueLayout.JAVA_DOUBLE
             }
 
             typeOf<CLong>() -> {
+                require(javaMethod.returnType == Long::class.java)
+
                 if (C_LONG_IS_4_BYTES) {
                     visitReturn = {
                         visitInsn(I2L)
@@ -254,6 +278,8 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
             }
 
             typeOf<CUnsignedLong>() -> {
+                require(javaMethod.returnType == Long::class.java)
+
                 if (C_LONG_IS_4_BYTES) {
                     visitReturn = {
                         visitInsn(I2L)
@@ -270,6 +296,8 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
             }
 
             typeOf<CPtrDiffT>() -> {
+                require(javaMethod.returnType == Long::class.java)
+
                 if (ADDRESS_IS_4_BYTES) {
                     visitReturn = {
                         visitInsn(I2L)
@@ -284,6 +312,8 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
             }
 
             typeOf<CSizeT>(), typeOf<NativeAddress>() -> {
+                require(javaMethod.returnType == Long::class.java)
+
                 if (ADDRESS_IS_4_BYTES) {
                     visitReturn = {
                         visitInsn(I2L)
@@ -300,6 +330,7 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
             }
 
             typeOf<Unit>() -> {
+                require(javaMethod.returnType == Void.TYPE)
                 visitReturn = {}
                 returnLayout = null
             }
