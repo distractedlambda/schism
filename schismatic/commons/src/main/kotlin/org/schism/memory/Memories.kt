@@ -1,6 +1,6 @@
 package org.schism.memory
 
-import java.lang.ref.Cleaner
+import org.schism.concurrent.virtualThreadCleaner
 
 public fun heapMemory(array: ByteArray, offset: Int = 0, size: Int = array.size - offset): Memory {
     return HeapMemory(array, offset, size, HeapMemory.READABLE or HeapMemory.WRITABLE)
@@ -106,4 +106,4 @@ public inline fun <R> withNativePointer(block: (MemoryPointerView) -> R): R {
     }
 }
 
-private val CLEANER = Cleaner.create()
+private val CLEANER = virtualThreadCleaner("malloc() cleaner")

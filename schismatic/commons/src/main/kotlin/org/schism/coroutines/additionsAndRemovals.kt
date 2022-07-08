@@ -7,7 +7,7 @@ import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 
-fun <E : Any> Flow<Collection<E>>.additionsAndRemovals(): Flow<AddedOrRemoved<E>> = flow {
+public fun <E : Any> Flow<Collection<E>>.additionsAndRemovals(): Flow<AddedOrRemoved<E>> = flow {
     val currentElements = mutableSetOf<E>()
 
     conflate().collect {
@@ -30,9 +30,9 @@ fun <E : Any> Flow<Collection<E>>.additionsAndRemovals(): Flow<AddedOrRemoved<E>
     }
 }
 
-data class AddedOrRemoved<out E>(val element: E, val kind: Kind) {
+public data class AddedOrRemoved<out E>(val element: E, val kind: Kind) {
     @OptIn(ExperimentalContracts::class)
-    inline fun onAdded(body: (element: E) -> Unit): AddedOrRemoved<E> {
+    public inline fun onAdded(body: (element: E) -> Unit): AddedOrRemoved<E> {
         contract {
             callsInPlace(body, InvocationKind.AT_MOST_ONCE)
         }
@@ -45,7 +45,7 @@ data class AddedOrRemoved<out E>(val element: E, val kind: Kind) {
     }
 
     @OptIn(ExperimentalContracts::class)
-    inline fun onRemoved(body: (element: E) -> Unit): AddedOrRemoved<E> {
+    public inline fun onRemoved(body: (element: E) -> Unit): AddedOrRemoved<E> {
         contract {
             callsInPlace(body, InvocationKind.AT_MOST_ONCE)
         }
@@ -58,7 +58,7 @@ data class AddedOrRemoved<out E>(val element: E, val kind: Kind) {
     }
 
     @OptIn(ExperimentalContracts::class)
-    inline fun <R> fold(onAdded: (element: E) -> R, onRemoved: (element: E) -> R): R {
+    public inline fun <R> fold(onAdded: (element: E) -> R, onRemoved: (element: E) -> R): R {
         contract {
             callsInPlace(onAdded, InvocationKind.AT_MOST_ONCE)
             callsInPlace(onRemoved, InvocationKind.AT_MOST_ONCE)
@@ -70,19 +70,19 @@ data class AddedOrRemoved<out E>(val element: E, val kind: Kind) {
         }
     }
 
-    enum class Kind {
+    public enum class Kind {
         Added,
         Removed;
 
-        companion object
+        public companion object
     }
 
-    companion object {
-        fun <E> added(element: E): AddedOrRemoved<E> {
+    public companion object {
+        public fun <E> added(element: E): AddedOrRemoved<E> {
             return AddedOrRemoved(element, Kind.Added)
         }
 
-        fun <E> removed(element: E): AddedOrRemoved<E> {
+        public fun <E> removed(element: E): AddedOrRemoved<E> {
             return AddedOrRemoved(element, Kind.Removed)
         }
     }

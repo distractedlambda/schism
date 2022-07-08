@@ -7,7 +7,5 @@ pluginManagement {
 
 rootProject.name = "schismatic"
 
-include("ffi")
-include("math")
-include("memory")
+include("commons")
 include("usb")

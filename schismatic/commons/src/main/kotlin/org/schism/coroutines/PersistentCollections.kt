@@ -13,7 +13,7 @@ import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 
 @OptIn(ExperimentalContracts::class) @JvmName("updateListMutating")
-inline fun <E> MutableStateFlow<PersistentList<E>>.updateMutating(
+public inline fun <E> MutableStateFlow<PersistentList<E>>.updateMutating(
     block: MutableList<E>.() -> Unit,
 ) {
     contract {
@@ -26,7 +26,7 @@ inline fun <E> MutableStateFlow<PersistentList<E>>.updateMutating(
 }
 
 @OptIn(ExperimentalContracts::class)
-inline fun <E> MutableStateFlow<PersistentList<E>>.getAndUpdateMutating(
+public inline fun <E> MutableStateFlow<PersistentList<E>>.getAndUpdateMutating(
     block: MutableList<E>.() -> Unit,
 ): PersistentList<E> {
     contract {
@@ -39,7 +39,7 @@ inline fun <E> MutableStateFlow<PersistentList<E>>.getAndUpdateMutating(
 }
 
 @OptIn(ExperimentalContracts::class)
-inline fun <E> MutableStateFlow<PersistentList<E>>.updateAndGetMutating(
+public inline fun <E> MutableStateFlow<PersistentList<E>>.updateAndGetMutating(
     block: MutableList<E>.() -> Unit,
 ): PersistentList<E> {
     contract {
@@ -52,7 +52,7 @@ inline fun <E> MutableStateFlow<PersistentList<E>>.updateAndGetMutating(
 }
 
 @OptIn(ExperimentalContracts::class) @JvmName("updateSetMutating")
-inline fun <E> MutableStateFlow<PersistentSet<E>>.updateMutating(
+public inline fun <E> MutableStateFlow<PersistentSet<E>>.updateMutating(
     block: MutableSet<E>.() -> Unit,
 ) {
     contract {
@@ -65,7 +65,7 @@ inline fun <E> MutableStateFlow<PersistentSet<E>>.updateMutating(
 }
 
 @OptIn(ExperimentalContracts::class)
-inline fun <E> MutableStateFlow<PersistentSet<E>>.getAndUpdateMutating(
+public inline fun <E> MutableStateFlow<PersistentSet<E>>.getAndUpdateMutating(
     block: MutableSet<E>.() -> Unit,
 ): PersistentSet<E> {
     contract {
@@ -78,7 +78,7 @@ inline fun <E> MutableStateFlow<PersistentSet<E>>.getAndUpdateMutating(
 }
 
 @OptIn(ExperimentalContracts::class)
-inline fun <E> MutableStateFlow<PersistentSet<E>>.updateAndGetMutating(
+public inline fun <E> MutableStateFlow<PersistentSet<E>>.updateAndGetMutating(
     block: MutableSet<E>.() -> Unit,
 ): PersistentSet<E> {
     contract {
@@ -91,7 +91,7 @@ inline fun <E> MutableStateFlow<PersistentSet<E>>.updateAndGetMutating(
 }
 
 @OptIn(ExperimentalContracts::class) @JvmName("updateMapMutating")
-inline fun <K, V> MutableStateFlow<PersistentMap<K, V>>.updateMutating(
+public inline fun <K, V> MutableStateFlow<PersistentMap<K, V>>.updateMutating(
     block: MutableMap<K, V>.() -> Unit,
 ) {
     contract {
@@ -104,7 +104,7 @@ inline fun <K, V> MutableStateFlow<PersistentMap<K, V>>.updateMutating(
 }
 
 @OptIn(ExperimentalContracts::class)
-inline fun <K, V> MutableStateFlow<PersistentMap<K, V>>.getAndUpdateMutating(
+public inline fun <K, V> MutableStateFlow<PersistentMap<K, V>>.getAndUpdateMutating(
     block: MutableMap<K, V>.() -> Unit,
 ): PersistentMap<K, V> {
     contract {
@@ -117,7 +117,7 @@ inline fun <K, V> MutableStateFlow<PersistentMap<K, V>>.getAndUpdateMutating(
 }
 
 @OptIn(ExperimentalContracts::class)
-inline fun <K, V> MutableStateFlow<PersistentMap<K, V>>.updateAndGetMutating(
+public inline fun <K, V> MutableStateFlow<PersistentMap<K, V>>.updateAndGetMutating(
     block: MutableMap<K, V>.() -> Unit,
 ): PersistentMap<K, V> {
     contract {

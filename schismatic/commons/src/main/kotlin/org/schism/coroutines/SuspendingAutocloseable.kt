@@ -1,10 +1,10 @@
-package org.schism.util
+package org.schism.coroutines
 
-fun interface SuspendingAutocloseable {
-    suspend fun close()
+public fun interface SuspendingAutocloseable {
+    public suspend fun close()
 }
 
-suspend inline fun <T : SuspendingAutocloseable?, R> T.use(block: (T) -> R): R {
+public suspend inline fun <T : SuspendingAutocloseable?, R> T.use(block: (T) -> R): R {
     var cause: Throwable? = null
 
     try {
@@ -17,7 +17,7 @@ suspend inline fun <T : SuspendingAutocloseable?, R> T.use(block: (T) -> R): R {
     }
 }
 
-suspend fun SuspendingAutocloseable?.closeFinally(cause: Throwable?) {
+@PublishedApi internal suspend fun SuspendingAutocloseable?.closeFinally(cause: Throwable?) {
     if (this == null) {
         return
     }

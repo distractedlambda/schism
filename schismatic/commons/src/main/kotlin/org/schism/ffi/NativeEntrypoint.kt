@@ -24,11 +24,11 @@ import kotlin.reflect.jvm.javaMethod
 import kotlin.reflect.typeOf
 
 @Suppress("NOTHING_TO_INLINE")
-public inline fun nativeEntryPoint(function: KFunction<*>): NativeAddress {
-    return nativeEntryPoint(MethodHandles.lookup(), function)
+public inline fun nativeEntrypoint(function: KFunction<*>): NativeAddress {
+    return nativeEntrypoint(MethodHandles.lookup(), function)
 }
 
-public fun nativeEntryPoint(lookup: Lookup, function: KFunction<*>): NativeAddress {
+public fun nativeEntrypoint(lookup: Lookup, function: KFunction<*>): NativeAddress {
     val javaMethod = function.javaMethod
 
     require(javaMethod != null && Modifier.isStatic(javaMethod.modifiers)) {
