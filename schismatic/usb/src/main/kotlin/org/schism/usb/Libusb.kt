@@ -1,6 +1,5 @@
 package org.schism.usb
 
-import org.schism.concurrent.platformThread
 import org.schism.ffi.CInt
 import org.schism.ffi.CSSizeT
 import org.schism.ffi.CUnsignedChar
@@ -9,6 +8,7 @@ import org.schism.ffi.NativeLibrary
 import org.schism.ffi.Struct
 import org.schism.memory.NativeAddress
 import org.schism.memory.withNativePointer
+import kotlin.concurrent.thread
 
 @NativeLibrary.Name("usb-1.0")
 internal interface Libusb : NativeLibrary {
@@ -309,7 +309,7 @@ internal interface Libusb : NativeLibrary {
         }
 
         init {
-            platformThread(isDaemon = true, name = "libusb event handler") {
+            thread(isDaemon = true, name = "libusb event handler") {
                 while (true) {
                     checkReturn(handleEvents(context))
                 }

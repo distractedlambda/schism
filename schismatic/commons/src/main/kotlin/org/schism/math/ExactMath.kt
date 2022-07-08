@@ -48,6 +48,10 @@ public infix fun Int.timesExact(rhs: Int): Int {
     return Math.multiplyExact(this, rhs)
 }
 
+public infix fun Long.timesExact(rhs: Int): Long {
+    return Math.multiplyExact(this, rhs)
+}
+
 public infix fun Long.timesExact(rhs: Long): Long {
     return Math.multiplyExact(this, rhs)
 }

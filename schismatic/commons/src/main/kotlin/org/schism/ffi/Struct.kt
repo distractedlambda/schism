@@ -32,6 +32,9 @@ import org.schism.math.alignForwardsTo
 import org.schism.math.isAlignedTo
 import org.schism.memory.Memory
 import org.schism.memory.NativeAddress
+import org.schism.memory.allocateNativeMemory
+import org.schism.memory.nativeMemory
+import org.schism.memory.withNativeMemory
 import java.lang.invoke.CallSite
 import java.lang.invoke.ConstantCallSite
 import java.lang.invoke.MethodHandle
@@ -42,6 +45,9 @@ import java.lang.invoke.MethodHandles.classData
 import java.lang.invoke.MethodType
 import java.lang.invoke.MethodType.methodType
 import java.lang.reflect.Modifier
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
 import kotlin.reflect.KMutableProperty1
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.isSubclassOf
@@ -76,6 +82,25 @@ public interface Struct {
         public inline fun <reified S : Struct> type(): Type<S> {
             return type(S::class.java)
         }
+    }
+}
+
+public operator fun <S : Struct> Struct.Type<S>.invoke(address: NativeAddress): S {
+    return invoke(nativeMemory(address, size))
+}
+
+public fun <S : Struct> Struct.Type<S>.allocate(): S {
+    return invoke(allocateNativeMemory(size))
+}
+
+@OptIn(ExperimentalContracts::class)
+public inline fun <S : Struct, R> Struct.Type<S>.withAllocated(block: (S) -> R): R {
+    contract {
+        callsInPlace(block, InvocationKind.EXACTLY_ONCE)
+    }
+
+    return withNativeMemory(size) { memory ->
+        block(invoke(memory))
     }
 }
 
