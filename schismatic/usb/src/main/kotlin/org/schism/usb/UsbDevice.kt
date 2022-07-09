@@ -1,7 +1,8 @@
 package org.schism.usb
 
-import org.schism.ffi.invoke
-import org.schism.ffi.withAllocated
+import org.schism.ffi.address
+import org.schism.ffi.withNativeStruct
+import org.schism.ffi.wrap
 import org.schism.memory.NativeAddress
 import org.schism.memory.withNativePointer
 import org.schism.memory.withNativeUBytes
@@ -38,8 +39,8 @@ public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
     init {
         val numConfigurations: UByte
 
-        DeviceDescriptor.withAllocated { deviceDescriptor ->
-            checkReturn(getDeviceDescriptor(nativeHandle, deviceDescriptor.memory().startAddress))
+        withNativeStruct(DeviceDescriptor) { deviceDescriptor ->
+            checkReturn(getDeviceDescriptor(nativeHandle, deviceDescriptor.address()))
             usbVersion = deviceDescriptor.bcdUSB
             deviceClass = deviceDescriptor.bDeviceClass
             deviceSubClass = deviceDescriptor.bDeviceSubClass
@@ -54,7 +55,7 @@ public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
             val portNumbersSize = checkSize(
                 getPortNumbers(
                     nativeHandle,
-                    nativePortNumbers.memory.startAddress,
+                    nativePortNumbers.startAddress,
                     MAX_PORT_NUMBERS,
                 )
             )
@@ -70,7 +71,7 @@ public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
                     getConfigDescriptor(
                         nativeHandle,
                         configIndex.toUByte(),
-                        configDescriptorPointer.memory.startAddress,
+                        configDescriptorPointer.address,
                     )
                 )
 
@@ -78,7 +79,7 @@ public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
             }
 
             try {
-                val configDescriptor = ConfigDescriptor(configDescriptorAddress)
+                val configDescriptor = ConfigDescriptor.wrap(configDescriptorAddress)
                 TODO()
             } finally {
                 freeConfigDescriptor(configDescriptorAddress)

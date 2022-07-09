@@ -6,7 +6,11 @@ import org.schism.ffi.CUnsignedChar
 import org.schism.ffi.CUnsignedInt
 import org.schism.ffi.NativeLibrary
 import org.schism.ffi.Struct
+import org.schism.ffi.StructType
+import org.schism.ffi.linkNativeLibrary
+import org.schism.ffi.structType
 import org.schism.memory.NativeAddress
+import org.schism.memory.readUtf8CString
 import org.schism.memory.withNativePointer
 import kotlin.concurrent.thread
 
@@ -113,7 +117,7 @@ internal interface Libusb : NativeLibrary {
         val extra: NativeAddress
         val extra_length: CInt
 
-        companion object : Struct.Type<ConfigDescriptor> by Struct.type()
+        companion object : StructType<ConfigDescriptor> by structType()
     }
 
     @Struct.Fields(
@@ -148,7 +152,7 @@ internal interface Libusb : NativeLibrary {
         val iSerialNumber: UByte
         val bNumConfigurations: UByte
 
-        companion object : Struct.Type<DeviceDescriptor> by Struct.type()
+        companion object : StructType<DeviceDescriptor> by structType()
     }
 
     @Struct.Fields(
@@ -175,7 +179,7 @@ internal interface Libusb : NativeLibrary {
         val extra: NativeAddress
         val extra_length: CInt
 
-        companion object : Struct.Type<EndpointDescriptor> by Struct.type()
+        companion object : StructType<EndpointDescriptor> by structType()
     }
 
     @Struct.Fields(
@@ -186,7 +190,7 @@ internal interface Libusb : NativeLibrary {
         val altsetting: NativeAddress
         val num_altsetting: CInt
 
-        companion object : Struct.Type<Interface> by Struct.type()
+        companion object : StructType<Interface> by structType()
     }
 
     @Struct.Fields(
@@ -217,7 +221,7 @@ internal interface Libusb : NativeLibrary {
         val extra: NativeAddress
         val extra_length: CInt
 
-        companion object : Struct.Type<InterfaceDescriptor> by Struct.type()
+        companion object : StructType<InterfaceDescriptor> by structType()
     }
 
     @Struct.Fields(
@@ -248,7 +252,7 @@ internal interface Libusb : NativeLibrary {
         var buffer: NativeAddress
         var num_iso_packets: CInt
 
-        companion object : Struct.Type<Transfer> by Struct.type()
+        companion object : StructType<Transfer> by structType()
     }
 
     object TransferStatus {
@@ -276,7 +280,7 @@ internal interface Libusb : NativeLibrary {
         const val BULK_STREAM: UByte = 4u
     }
 
-    companion object : Libusb by NativeLibrary.link() {
+    companion object : Libusb by linkNativeLibrary() {
         private fun errorMessage(code: CInt): String {
             return strerror(code).readUtf8CString()
         }

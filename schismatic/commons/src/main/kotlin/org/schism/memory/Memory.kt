@@ -1,6 +1,6 @@
-@file:Suppress("NOTHING_TO_INLINE")
-
 package org.schism.memory
+
+import java.awt.Point
 
 public interface Memory {
     public val size: Long
@@ -57,8 +57,6 @@ public interface Memory {
 
     public fun getBeDouble(offset: Long = 0L): Double
 
-    public fun getPointer(offset: Long = 0L): NativeAddress
-
     public fun setByte(value: Byte, offset: Long = 0L)
 
     public fun setChar(value: Char, offset: Long = 0L)
@@ -97,87 +95,108 @@ public interface Memory {
 
     public fun setBeDouble(value: Double, offset: Long = 0L)
 
-    public fun setPointer(value: NativeAddress, offset: Long = 0L)
-
     public companion object
 }
 
-public inline fun Memory.getUByte(offset: Long = 0L): UByte {
+public fun Memory.requireAlignedTo(alignment: Long) {
+    // FIXME: what about heap memory?
+    if (isNative) {
+        startAddress.requireAlignedTo(alignment)
+    }
+}
+
+public fun Memory.getUByte(offset: Long = 0L): UByte {
     return getByte(offset).toUByte()
 }
 
-public inline fun Memory.getUShort(offset: Long = 0L): UShort {
+public fun Memory.getUShort(offset: Long = 0L): UShort {
     return getShort(offset).toUShort()
 }
 
-public inline fun Memory.getLeUShort(offset: Long = 0L): UShort {
+public fun Memory.getLeUShort(offset: Long = 0L): UShort {
     return getLeShort(offset).toUShort()
 }
 
-public inline fun Memory.getBeUShort(offset: Long = 0L): UShort {
+public fun Memory.getBeUShort(offset: Long = 0L): UShort {
     return getBeShort(offset).toUShort()
 }
 
-public inline fun Memory.getUInt(offset: Long = 0L): UInt {
+public fun Memory.getUInt(offset: Long = 0L): UInt {
     return getInt(offset).toUInt()
 }
 
-public inline fun Memory.getLeUInt(offset: Long = 0L): UInt {
+public fun Memory.getLeUInt(offset: Long = 0L): UInt {
     return getLeInt(offset).toUInt()
 }
 
-public inline fun Memory.getBeUInt(offset: Long = 0L): UInt {
+public fun Memory.getBeUInt(offset: Long = 0L): UInt {
     return getBeInt(offset).toUInt()
 }
 
-public inline fun Memory.getULong(offset: Long = 0L): ULong {
+public fun Memory.getULong(offset: Long = 0L): ULong {
     return getLong(offset).toULong()
 }
 
-public inline fun Memory.getLeULong(offset: Long = 0L): ULong {
+public fun Memory.getLeULong(offset: Long = 0L): ULong {
     return getLeLong(offset).toULong()
 }
 
-public inline fun Memory.getBeULong(offset: Long = 0L): ULong {
+public fun Memory.getBeULong(offset: Long = 0L): ULong {
     return getBeLong(offset).toULong()
 }
 
-public inline fun Memory.setUByte(value: UByte, offset: Long = 0L) {
+public fun Memory.setUByte(value: UByte, offset: Long = 0L) {
     setByte(value.toByte(), offset)
 }
 
-public inline fun Memory.setUShort(value: UShort, offset: Long = 0L) {
+public fun Memory.setUShort(value: UShort, offset: Long = 0L) {
     setShort(value.toShort(), offset)
 }
 
-public inline fun Memory.setLeUShort(value: UShort, offset: Long = 0L) {
+public fun Memory.setLeUShort(value: UShort, offset: Long = 0L) {
     setLeShort(value.toShort(), offset)
 }
 
-public inline fun Memory.setBeUShort(value: UShort, offset: Long = 0L) {
+public fun Memory.setBeUShort(value: UShort, offset: Long = 0L) {
     setBeShort(value.toShort(), offset)
 }
 
-public inline fun Memory.setUInt(value: UInt, offset: Long = 0L) {
+public fun Memory.setUInt(value: UInt, offset: Long = 0L) {
     setInt(value.toInt(), offset)
 }
 
-public inline fun Memory.setLeUInt(value: UInt, offset: Long = 0L) {
+public fun Memory.setLeUInt(value: UInt, offset: Long = 0L) {
     setLeInt(value.toInt(), offset)
 }
 
-public inline fun Memory.setBeUInt(value: UInt, offset: Long = 0L) {
+public fun Memory.setBeUInt(value: UInt, offset: Long = 0L) {
     setBeInt(value.toInt(), offset)
 }
 
-public inline fun Memory.setULong(value: ULong, offset: Long = 0L) {
+public fun Memory.setULong(value: ULong, offset: Long = 0L) {
     setLong(value.toLong(), offset)
 }
 
-public inline fun Memory.setLeULong(value: ULong, offset: Long = 0L) {
+public fun Memory.setLeULong(value: ULong, offset: Long = 0L) {
     setLeLong(value.toLong(), offset)
 }
 
-public inline fun Memory.setBeULong(value: ULong, offset: Long = 0L) {
+public fun Memory.setBeULong(value: ULong, offset: Long = 0L) {
     setBeLong(value.toLong(), offset)
+}
+
+public fun Memory.getPointer(offset: Long = 0L): NativeAddress {
+    return NativeAddress.fromBits(when (NativeAddress.BIT_SIZE) {
+        32 -> getULong(offset).toLong()
+        64 -> getLong(offset)
+        else -> throw UnsupportedOperationException("Unsupported native address width")
+    })
+}
+
+public fun Memory.setPointer(value: NativeAddress, offset: Long = 0L) {
+    when (NativeAddress.BIT_SIZE) {
+        32 -> setInt(value.toBits().toInt(), offset)
+        64 -> setLong(value.toBits(), offset)
+        else -> throw UnsupportedOperationException("Unsupported native address width")
+    }
 }

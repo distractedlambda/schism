@@ -14,282 +14,6 @@ import java.lang.foreign.ValueLayout.JAVA_BYTE
         return bits
     }
 
-    public fun toMemoryAddress(): MemoryAddress {
-        return MemoryAddress.ofLong(bits)
-    }
-
-    public operator fun plus(offset: Long): NativeAddress {
-        return NativeAddress(addExact(bits, offset))
-    }
-
-    public operator fun minus(offset: Long): NativeAddress {
-        return NativeAddress(subtractExact(bits, offset))
-    }
-
-    public operator fun minus(other: NativeAddress): Long {
-        return subtractExact(bits, other.bits)
-    }
-
-    public fun requireAlignedTo(alignment: Long) {
-        bits.requireAlignedTo(alignment)
-    }
-
-    public fun isNULL(): Boolean {
-        return bits == 0L
-    }
-
-    public fun readByte(): Byte {
-        return toMemoryAddress()[JAVA_BYTE, 0]
-    }
-
-    public fun readUByte(): UByte {
-        return readByte().toUByte()
-    }
-
-    public fun writeByte(value: Byte) {
-        toMemoryAddress()[JAVA_BYTE, 0] = value
-    }
-
-    public fun writeUByte(value: UByte) {
-        writeByte(value.toByte())
-    }
-
-    public fun readChar(): Char {
-        return toMemoryAddress()[UNALIGNED_NATIVE_CHAR, 0]
-    }
-
-    public fun writeChar(value: Char) {
-        toMemoryAddress()[UNALIGNED_NATIVE_CHAR, 0] = value
-    }
-
-    public fun readLeChar(): Char {
-        return toMemoryAddress()[UNALIGNED_LE_CHAR, 0]
-    }
-
-    public fun writeLeChar(value: Char) {
-        toMemoryAddress()[UNALIGNED_LE_CHAR, 0] = value
-    }
-
-    public fun readBeChar(): Char {
-        return toMemoryAddress()[UNALIGNED_BE_CHAR, 0]
-    }
-
-    public fun writeBeChar(value: Char) {
-        toMemoryAddress()[UNALIGNED_BE_CHAR, 0] = value
-    }
-
-    public fun readShort(): Short {
-        return toMemoryAddress()[UNALIGNED_NATIVE_SHORT, 0]
-    }
-
-    public fun readUShort(): UShort {
-        return readShort().toUShort()
-    }
-
-    public fun writeShort(value: Short) {
-        toMemoryAddress()[UNALIGNED_NATIVE_SHORT, 0] = value
-    }
-
-    public fun writeUShort(value: UShort) {
-        writeShort(value.toShort())
-    }
-
-    public fun readLeShort(): Short {
-        return toMemoryAddress()[UNALIGNED_LE_SHORT, 0]
-    }
-
-    public fun readLeUShort(): UShort {
-        return readLeShort().toUShort()
-    }
-
-    public fun writeLeShort(value: Short) {
-        toMemoryAddress()[UNALIGNED_LE_SHORT, 0] = value
-    }
-
-    public fun writeLeUShort(value: UShort) {
-        writeLeShort(value.toShort())
-    }
-
-    public fun readBeShort(): Short {
-        return toMemoryAddress()[UNALIGNED_BE_SHORT, 0]
-    }
-
-    public fun readBeUShort(): UShort {
-        return readBeShort().toUShort()
-    }
-
-    public fun writeBeShort(value: Short) {
-        toMemoryAddress()[UNALIGNED_BE_SHORT, 0] = value
-    }
-
-    public fun writeBeUShort(value: UShort) {
-        writeBeShort(value.toShort())
-    }
-
-    public fun readInt(): Int {
-        return toMemoryAddress()[UNALIGNED_NATIVE_INT, 0]
-    }
-
-    public fun readUInt(): UInt {
-        return readInt().toUInt()
-    }
-
-    public fun writeInt(value: Int) {
-        toMemoryAddress()[UNALIGNED_NATIVE_INT, 0] = value
-    }
-
-    public fun writeUInt(value: UInt) {
-        writeInt(value.toInt())
-    }
-
-    public fun readLeInt(): Int {
-        return toMemoryAddress()[UNALIGNED_LE_INT, 0]
-    }
-
-    public fun readLeUInt(): UInt {
-        return readLeInt().toUInt()
-    }
-
-    public fun writeLeInt(value: Int) {
-        toMemoryAddress()[UNALIGNED_LE_INT, 0] = value
-    }
-
-    public fun writeLeUInt(value: UInt) {
-        writeLeInt(value.toInt())
-    }
-
-    public fun readBeInt(): Int {
-        return toMemoryAddress()[UNALIGNED_BE_INT, 0]
-    }
-
-    public fun readBeUInt(): UInt {
-        return readBeInt().toUInt()
-    }
-
-    public fun writeBeInt(value: Int) {
-        toMemoryAddress()[UNALIGNED_BE_INT, 0] = value
-    }
-
-    public fun writeBeUInt(value: UInt) {
-        writeBeInt(value.toInt())
-    }
-
-    public fun readLong(): Long {
-        return toMemoryAddress()[UNALIGNED_NATIVE_LONG, 0]
-    }
-
-    public fun readULong(): ULong {
-        return readLong().toULong()
-    }
-
-    public fun writeLong(value: Long) {
-        toMemoryAddress()[UNALIGNED_NATIVE_LONG, 0] = value
-    }
-
-    public fun writeULong(value: ULong) {
-        writeLong(value.toLong())
-    }
-
-    public fun readLeLong(): Long {
-        return toMemoryAddress()[UNALIGNED_LE_LONG, 0]
-    }
-
-    public fun readLeULong(): ULong {
-        return readLeLong().toULong()
-    }
-
-    public fun writeLeLong(value: Long) {
-        toMemoryAddress()[UNALIGNED_LE_LONG, 0] = value
-    }
-
-    public fun writeLeULong(value: ULong) {
-        writeLeLong(value.toLong())
-    }
-
-    public fun readBeLong(): Long {
-        return toMemoryAddress()[UNALIGNED_BE_LONG, 0]
-    }
-
-    public fun readBeULong(): ULong {
-        return readBeLong().toULong()
-    }
-
-    public fun writeBeLong(value: Long) {
-        toMemoryAddress()[UNALIGNED_BE_LONG, 0] = value
-    }
-
-    public fun writeBeULong(value: ULong) {
-        writeBeLong(value.toLong())
-    }
-
-    public fun readFloat(): Float {
-        return toMemoryAddress()[UNALIGNED_NATIVE_FLOAT, 0]
-    }
-
-    public fun writeFloat(value: Float) {
-        toMemoryAddress()[UNALIGNED_NATIVE_FLOAT, 0] = value
-    }
-
-    public fun readLeFloat(): Float {
-        return toMemoryAddress()[UNALIGNED_LE_FLOAT, 0]
-    }
-
-    public fun writeLeFloat(value: Float) {
-        toMemoryAddress()[UNALIGNED_LE_FLOAT, 0] = value
-    }
-
-    public fun readBeFloat(): Float {
-        return toMemoryAddress()[UNALIGNED_BE_FLOAT, 0]
-    }
-
-    public fun writeBeFloat(value: Float) {
-        toMemoryAddress()[UNALIGNED_BE_FLOAT, 0] = value
-    }
-
-    public fun readDouble(): Double {
-        return toMemoryAddress()[UNALIGNED_NATIVE_DOUBLE, 0]
-    }
-
-    public fun writeDouble(value: Double) {
-        toMemoryAddress()[UNALIGNED_NATIVE_DOUBLE, 0] = value
-    }
-
-    public fun readLeDouble(): Double {
-        return toMemoryAddress()[UNALIGNED_LE_DOUBLE, 0]
-    }
-
-    public fun writeLeDouble(value: Double) {
-        toMemoryAddress()[UNALIGNED_LE_DOUBLE, 0] = value
-    }
-
-    public fun readBeDouble(): Double {
-        return toMemoryAddress()[UNALIGNED_BE_DOUBLE, 0]
-    }
-
-    public fun writeBeDouble(value: Double) {
-        toMemoryAddress()[UNALIGNED_BE_DOUBLE, 0] = value
-    }
-
-    public fun readUtf8CString(): String {
-        return toMemoryAddress().getUtf8String(0)
-    }
-
-    public fun readPointer(): NativeAddress {
-        return when (BYTE_SIZE) {
-            4 -> fromBits(readUInt().toLong())
-            8 -> fromBits(readLong())
-            else -> throw UnsupportedOperationException("Unsupported native address size")
-        }
-    }
-
-    public fun writePointer(value: NativeAddress) {
-        when (BYTE_SIZE) {
-            4 -> writeInt(value.toBits().toInt())
-            8 -> writeLong(value.toBits())
-            else -> throw UnsupportedOperationException("Unsupported native address size")
-        }
-    }
-
     override fun toString(): String {
         return "NativeAddress(0x${bits.toString(16).padStart(16, '0')})"
     }
@@ -304,6 +28,282 @@ import java.lang.foreign.ValueLayout.JAVA_BYTE
         public fun fromBits(bits: Long): NativeAddress {
             return NativeAddress(bits)
         }
+    }
+}
+
+public fun NativeAddress.toMemoryAddress(): MemoryAddress {
+    return MemoryAddress.ofLong(toBits())
+}
+
+public operator fun NativeAddress.plus(offset: Long): NativeAddress {
+    return NativeAddress.fromBits(addExact(toBits(), offset))
+}
+
+public operator fun NativeAddress.minus(offset: Long): NativeAddress {
+    return NativeAddress.fromBits(subtractExact(toBits(), offset))
+}
+
+public operator fun NativeAddress.minus(other: NativeAddress): Long {
+    return subtractExact(toBits(), other.toBits())
+}
+
+public fun NativeAddress.requireAlignedTo(alignment: Long) {
+    toBits().requireAlignedTo(alignment)
+}
+
+public fun NativeAddress.isNULL(): Boolean {
+    return toBits() == 0L
+}
+
+public fun NativeAddress.readByte(): Byte {
+    return toMemoryAddress()[JAVA_BYTE, 0]
+}
+
+public fun NativeAddress.readUByte(): UByte {
+    return readByte().toUByte()
+}
+
+public fun NativeAddress.writeByte(value: Byte) {
+    toMemoryAddress()[JAVA_BYTE, 0] = value
+}
+
+public fun NativeAddress.writeUByte(value: UByte) {
+    writeByte(value.toByte())
+}
+
+public fun NativeAddress.readChar(): Char {
+    return toMemoryAddress()[UNALIGNED_NATIVE_CHAR, 0]
+}
+
+public fun NativeAddress.writeChar(value: Char) {
+    toMemoryAddress()[UNALIGNED_NATIVE_CHAR, 0] = value
+}
+
+public fun NativeAddress.readLeChar(): Char {
+    return toMemoryAddress()[UNALIGNED_LE_CHAR, 0]
+}
+
+public fun NativeAddress.writeLeChar(value: Char) {
+    toMemoryAddress()[UNALIGNED_LE_CHAR, 0] = value
+}
+
+public fun NativeAddress.readBeChar(): Char {
+    return toMemoryAddress()[UNALIGNED_BE_CHAR, 0]
+}
+
+public fun NativeAddress.writeBeChar(value: Char) {
+    toMemoryAddress()[UNALIGNED_BE_CHAR, 0] = value
+}
+
+public fun NativeAddress.readShort(): Short {
+    return toMemoryAddress()[UNALIGNED_NATIVE_SHORT, 0]
+}
+
+public fun NativeAddress.readUShort(): UShort {
+    return readShort().toUShort()
+}
+
+public fun NativeAddress.writeShort(value: Short) {
+    toMemoryAddress()[UNALIGNED_NATIVE_SHORT, 0] = value
+}
+
+public fun NativeAddress.writeUShort(value: UShort) {
+    writeShort(value.toShort())
+}
+
+public fun NativeAddress.readLeShort(): Short {
+    return toMemoryAddress()[UNALIGNED_LE_SHORT, 0]
+}
+
+public fun NativeAddress.readLeUShort(): UShort {
+    return readLeShort().toUShort()
+}
+
+public fun NativeAddress.writeLeShort(value: Short) {
+    toMemoryAddress()[UNALIGNED_LE_SHORT, 0] = value
+}
+
+public fun NativeAddress.writeLeUShort(value: UShort) {
+    writeLeShort(value.toShort())
+}
+
+public fun NativeAddress.readBeShort(): Short {
+    return toMemoryAddress()[UNALIGNED_BE_SHORT, 0]
+}
+
+public fun NativeAddress.readBeUShort(): UShort {
+    return readBeShort().toUShort()
+}
+
+public fun NativeAddress.writeBeShort(value: Short) {
+    toMemoryAddress()[UNALIGNED_BE_SHORT, 0] = value
+}
+
+public fun NativeAddress.writeBeUShort(value: UShort) {
+    writeBeShort(value.toShort())
+}
+
+public fun NativeAddress.readInt(): Int {
+    return toMemoryAddress()[UNALIGNED_NATIVE_INT, 0]
+}
+
+public fun NativeAddress.readUInt(): UInt {
+    return readInt().toUInt()
+}
+
+public fun NativeAddress.writeInt(value: Int) {
+    toMemoryAddress()[UNALIGNED_NATIVE_INT, 0] = value
+}
+
+public fun NativeAddress.writeUInt(value: UInt) {
+    writeInt(value.toInt())
+}
+
+public fun NativeAddress.readLeInt(): Int {
+    return toMemoryAddress()[UNALIGNED_LE_INT, 0]
+}
+
+public fun NativeAddress.readLeUInt(): UInt {
+    return readLeInt().toUInt()
+}
+
+public fun NativeAddress.writeLeInt(value: Int) {
+    toMemoryAddress()[UNALIGNED_LE_INT, 0] = value
+}
+
+public fun NativeAddress.writeLeUInt(value: UInt) {
+    writeLeInt(value.toInt())
+}
+
+public fun NativeAddress.readBeInt(): Int {
+    return toMemoryAddress()[UNALIGNED_BE_INT, 0]
+}
+
+public fun NativeAddress.readBeUInt(): UInt {
+    return readBeInt().toUInt()
+}
+
+public fun NativeAddress.writeBeInt(value: Int) {
+    toMemoryAddress()[UNALIGNED_BE_INT, 0] = value
+}
+
+public fun NativeAddress.writeBeUInt(value: UInt) {
+    writeBeInt(value.toInt())
+}
+
+public fun NativeAddress.readLong(): Long {
+    return toMemoryAddress()[UNALIGNED_NATIVE_LONG, 0]
+}
+
+public fun NativeAddress.readULong(): ULong {
+    return readLong().toULong()
+}
+
+public fun NativeAddress.writeLong(value: Long) {
+    toMemoryAddress()[UNALIGNED_NATIVE_LONG, 0] = value
+}
+
+public fun NativeAddress.writeULong(value: ULong) {
+    writeLong(value.toLong())
+}
+
+public fun NativeAddress.readLeLong(): Long {
+    return toMemoryAddress()[UNALIGNED_LE_LONG, 0]
+}
+
+public fun NativeAddress.readLeULong(): ULong {
+    return readLeLong().toULong()
+}
+
+public fun NativeAddress.writeLeLong(value: Long) {
+    toMemoryAddress()[UNALIGNED_LE_LONG, 0] = value
+}
+
+public fun NativeAddress.writeLeULong(value: ULong) {
+    writeLeLong(value.toLong())
+}
+
+public fun NativeAddress.readBeLong(): Long {
+    return toMemoryAddress()[UNALIGNED_BE_LONG, 0]
+}
+
+public fun NativeAddress.readBeULong(): ULong {
+    return readBeLong().toULong()
+}
+
+public fun NativeAddress.writeBeLong(value: Long) {
+    toMemoryAddress()[UNALIGNED_BE_LONG, 0] = value
+}
+
+public fun NativeAddress.writeBeULong(value: ULong) {
+    writeBeLong(value.toLong())
+}
+
+public fun NativeAddress.readFloat(): Float {
+    return toMemoryAddress()[UNALIGNED_NATIVE_FLOAT, 0]
+}
+
+public fun NativeAddress.writeFloat(value: Float) {
+    toMemoryAddress()[UNALIGNED_NATIVE_FLOAT, 0] = value
+}
+
+public fun NativeAddress.readLeFloat(): Float {
+    return toMemoryAddress()[UNALIGNED_LE_FLOAT, 0]
+}
+
+public fun NativeAddress.writeLeFloat(value: Float) {
+    toMemoryAddress()[UNALIGNED_LE_FLOAT, 0] = value
+}
+
+public fun NativeAddress.readBeFloat(): Float {
+    return toMemoryAddress()[UNALIGNED_BE_FLOAT, 0]
+}
+
+public fun NativeAddress.writeBeFloat(value: Float) {
+    toMemoryAddress()[UNALIGNED_BE_FLOAT, 0] = value
+}
+
+public fun NativeAddress.readDouble(): Double {
+    return toMemoryAddress()[UNALIGNED_NATIVE_DOUBLE, 0]
+}
+
+public fun NativeAddress.writeDouble(value: Double) {
+    toMemoryAddress()[UNALIGNED_NATIVE_DOUBLE, 0] = value
+}
+
+public fun NativeAddress.readLeDouble(): Double {
+    return toMemoryAddress()[UNALIGNED_LE_DOUBLE, 0]
+}
+
+public fun NativeAddress.writeLeDouble(value: Double) {
+    toMemoryAddress()[UNALIGNED_LE_DOUBLE, 0] = value
+}
+
+public fun NativeAddress.readBeDouble(): Double {
+    return toMemoryAddress()[UNALIGNED_BE_DOUBLE, 0]
+}
+
+public fun NativeAddress.writeBeDouble(value: Double) {
+    toMemoryAddress()[UNALIGNED_BE_DOUBLE, 0] = value
+}
+
+public fun NativeAddress.readUtf8CString(): String {
+    return toMemoryAddress().getUtf8String(0)
+}
+
+public fun NativeAddress.readPointer(): NativeAddress {
+    return when (NativeAddress.BYTE_SIZE) {
+        4 -> NativeAddress.fromBits(readUInt().toLong())
+        8 -> NativeAddress.fromBits(readLong())
+        else -> throw UnsupportedOperationException("Unsupported native address size")
+    }
+}
+
+public fun NativeAddress.writePointer(value: NativeAddress) {
+    when (NativeAddress.BYTE_SIZE) {
+        4 -> writeInt(value.toBits().toInt())
+        8 -> writeLong(value.toBits())
+        else -> throw UnsupportedOperationException("Unsupported native address size")
     }
 }
 

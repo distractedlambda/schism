@@ -1,5 +1,3 @@
-@file:Suppress("NOTHING_TO_INLINE")
-
 package org.schism.memory
 
 import org.schism.math.minusExact
@@ -66,55 +64,55 @@ public interface MemoryDecoder {
     public companion object
 }
 
-public inline fun MemoryDecoder.nextUByte(): UByte {
+public fun MemoryDecoder.nextUByte(): UByte {
     return nextByte().toUByte()
 }
 
-public inline fun MemoryDecoder.nextLeUShort(): UShort {
+public fun MemoryDecoder.nextLeUShort(): UShort {
     return nextLeShort().toUShort()
 }
 
-public inline fun MemoryDecoder.nextBeUShort(): UShort {
+public fun MemoryDecoder.nextBeUShort(): UShort {
     return nextBeShort().toUShort()
 }
 
-public inline fun MemoryDecoder.nextUShort(): UShort {
+public fun MemoryDecoder.nextUShort(): UShort {
     return nextShort().toUShort()
 }
 
-public inline fun MemoryDecoder.nextLeUInt(): UInt {
+public fun MemoryDecoder.nextLeUInt(): UInt {
     return nextLeInt().toUInt()
 }
 
-public inline fun MemoryDecoder.nextBeUInt(): UInt {
+public fun MemoryDecoder.nextBeUInt(): UInt {
     return nextBeInt().toUInt()
 }
 
-public inline fun MemoryDecoder.nextUInt(): UInt {
+public fun MemoryDecoder.nextUInt(): UInt {
     return nextInt().toUInt()
 }
 
-public inline fun MemoryDecoder.nextLeULong(): ULong {
+public fun MemoryDecoder.nextLeULong(): ULong {
     return nextLeLong().toULong()
 }
 
-public inline fun MemoryDecoder.nextBeULong(): ULong {
+public fun MemoryDecoder.nextBeULong(): ULong {
     return nextBeLong().toULong()
 }
 
-public inline fun MemoryDecoder.nextULong(): ULong {
+public fun MemoryDecoder.nextULong(): ULong {
     return nextLong().toULong()
 }
 
-public inline fun MemoryDecoder.nextLeUtf16(size: Int): String {
+public fun MemoryDecoder.nextLeUtf16(size: Int): String {
     return String(CharArray(size) { nextLeChar() })
 }
 
-public inline fun MemoryDecoder.nextBeUtf16(size: Int): String {
+public fun MemoryDecoder.nextBeUtf16(size: Int): String {
     return String(CharArray(size) { nextBeChar() })
 }
 
-public inline fun MemoryDecoder.nextUtf16(size: Int): String {
+public fun MemoryDecoder.nextUtf16(size: Int): String {
     return String(CharArray(size) { nextChar() })
 }
 

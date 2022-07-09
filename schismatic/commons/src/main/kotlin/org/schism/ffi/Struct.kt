@@ -29,11 +29,11 @@ import org.objectweb.asm.Type.getDescriptor
 import org.objectweb.asm.Type.getInternalName
 import org.objectweb.asm.Type.getMethodDescriptor
 import org.schism.math.alignForwardsTo
-import org.schism.math.isAlignedTo
 import org.schism.memory.Memory
 import org.schism.memory.NativeAddress
 import org.schism.memory.allocateNativeMemory
 import org.schism.memory.nativeMemory
+import org.schism.memory.requireAlignedTo
 import org.schism.memory.withNativeMemory
 import java.lang.invoke.CallSite
 import java.lang.invoke.ConstantCallSite
@@ -60,57 +60,77 @@ import kotlin.reflect.typeOf
 public interface Struct {
     public fun memory(): Memory
 
-    public interface Type<out S : Struct> {
-        public val size: Long
-
-        public val alignment: Long
-
-        public operator fun invoke(memory: Memory): S
-
-        public companion object
-    }
-
     @Target(AnnotationTarget.CLASS)
     @Retention(AnnotationRetention.RUNTIME)
     public annotation class Fields(vararg val value: String)
 
-    public companion object {
-        public fun <S : Struct> type(clazz: Class<S>): Type<S> {
-            return (@Suppress("UNCHECKED_CAST") (GeneratedStructTypes[clazz] as Type<S>))
-        }
-
-        public inline fun <reified S : Struct> type(): Type<S> {
-            return type(S::class.java)
-        }
-    }
+    public companion object
 }
 
-public operator fun <S : Struct> Struct.Type<S>.invoke(address: NativeAddress): S {
-    return invoke(nativeMemory(address, size))
+public interface StructType<out S : Struct> {
+    public val size: Long
+
+    public val alignment: Long
+
+    public fun wrap(memory: Memory): S
+
+    public companion object
 }
 
-public fun <S : Struct> Struct.Type<S>.allocate(): S {
-    return invoke(allocateNativeMemory(size))
+public fun <S : Struct> structType(clazz: Class<S>): StructType<S> {
+    return (@Suppress("UNCHECKED_CAST") (GeneratedStructTypes[clazz] as StructType<S>))
+}
+
+public inline fun <reified S : Struct> structType(): StructType<S> {
+    return structType(S::class.java)
+}
+
+public fun Struct.isNative(): Boolean {
+    return memory().isNative
+}
+
+public fun Struct.size(): Long {
+    return memory().size
+}
+
+public fun Struct.isReadable(): Boolean {
+    return memory().isReadable
+}
+
+public fun Struct.isWritable(): Boolean {
+    return memory().isWritable
+}
+
+public fun Struct.address(): NativeAddress {
+    return memory().startAddress
+}
+
+public fun <S : Struct> StructType<S>.wrap(address: NativeAddress): S {
+    return wrap(nativeMemory(address, size))
+}
+
+public fun <S : Struct> allocateNativeStruct(type: StructType<S>): S {
+    return type.wrap(allocateNativeMemory(type.size))
 }
 
 @OptIn(ExperimentalContracts::class)
-public inline fun <S : Struct, R> Struct.Type<S>.withAllocated(block: (S) -> R): R {
+public inline fun <S : Struct, R> withNativeStruct(type: StructType<S>, block: (S) -> R): R {
     contract {
         callsInPlace(block, InvocationKind.EXACTLY_ONCE)
     }
 
-    return withNativeMemory(size) { memory ->
-        block(invoke(memory))
+    return withNativeMemory(type.size) {
+        block(type.wrap(it))
     }
 }
 
-private object GeneratedStructTypes : ClassValue<Struct.Type<*>>() {
-    override fun computeValue(type: Class<*>): Struct.Type<*> {
+private object GeneratedStructTypes : ClassValue<StructType<*>>() {
+    override fun computeValue(type: Class<*>): StructType<*> {
         return generateStructType(type)
     }
 }
 
-private fun generateStructType(clazz: Class<*>): Struct.Type<*> {
+private fun generateStructType(clazz: Class<*>): StructType<*> {
     val klass = clazz.kotlin
 
     require(clazz.isInterface) {
@@ -549,7 +569,7 @@ private fun generateStructType(clazz: Class<*>): Struct.Type<*> {
 
     val typeImplConstructor = typeImplLookup.findConstructor(typeImplLookup.lookupClass(), methodType(Void.TYPE))
 
-    return (@Suppress("UNCHECKED_CAST") (typeImplConstructor.invoke() as Struct.Type<*>))
+    return (@Suppress("UNCHECKED_CAST") (typeImplConstructor.invoke() as StructType<*>))
 }
 
 private abstract class AbstractStructImpl(@JvmField protected val memory: Memory) : Struct {
@@ -569,9 +589,9 @@ private abstract class AbstractStructImpl(@JvmField protected val memory: Memory
 private abstract class AbstractStructTypeImpl<S : Struct>(
     final override val size: Long,
     final override val alignment: Long,
-) : Struct.Type<S> {
-    final override fun invoke(memory: Memory): S {
-        require(!memory.isNative || memory.startAddress.toBits().isAlignedTo(alignment))
+) : StructType<S> {
+    final override fun wrap(memory: Memory): S {
+        memory.requireAlignedTo(alignment)
         return createStruct(memory.slice(size = size))
     }
 

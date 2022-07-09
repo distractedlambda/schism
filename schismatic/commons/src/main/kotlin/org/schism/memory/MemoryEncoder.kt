@@ -1,5 +1,3 @@
-@file:Suppress("NOTHING_TO_INLINE")
-
 package org.schism.memory
 
 import org.schism.math.minusExact
@@ -66,43 +64,43 @@ public interface MemoryEncoder {
     public companion object
 }
 
-public inline fun MemoryEncoder.putUByte(value: UByte) {
+public fun MemoryEncoder.putUByte(value: UByte) {
     putByte(value.toByte())
 }
 
-public inline fun MemoryEncoder.putLeUShort(value: UShort) {
+public fun MemoryEncoder.putLeUShort(value: UShort) {
     putLeShort(value.toShort())
 }
 
-public inline fun MemoryEncoder.putBeUShort(value: UShort) {
+public fun MemoryEncoder.putBeUShort(value: UShort) {
     putBeShort(value.toShort())
 }
 
-public inline fun MemoryEncoder.putUShort(value: UShort) {
+public fun MemoryEncoder.putUShort(value: UShort) {
     putShort(value.toShort())
 }
 
-public inline fun MemoryEncoder.putLeUInt(value: UInt) {
+public fun MemoryEncoder.putLeUInt(value: UInt) {
     putLeInt(value.toInt())
 }
 
-public inline fun MemoryEncoder.putBeUInt(value: UInt) {
+public fun MemoryEncoder.putBeUInt(value: UInt) {
     putBeInt(value.toInt())
 }
 
-public inline fun MemoryEncoder.putUInt(value: UInt) {
+public fun MemoryEncoder.putUInt(value: UInt) {
     putInt(value.toInt())
 }
 
-public inline fun MemoryEncoder.putLeULong(value: ULong) {
+public fun MemoryEncoder.putLeULong(value: ULong) {
     putLeLong(value.toLong())
 }
 
-public inline fun MemoryEncoder.putBeULong(value: ULong) {
+public fun MemoryEncoder.putBeULong(value: ULong) {
     putBeLong(value.toLong())
 }
 
-public inline fun MemoryEncoder.putULong(value: ULong) {
+public fun MemoryEncoder.putULong(value: ULong) {
     putLong(value.toLong())
 }
 

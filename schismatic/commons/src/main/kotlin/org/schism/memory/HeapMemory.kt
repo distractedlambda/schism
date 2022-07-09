@@ -170,12 +170,6 @@ internal class HeapMemory(
         return array.getBeDouble(arrayOffset + offset.toInt())
     }
 
-    override fun getPointer(offset: Long): NativeAddress {
-        checkReadable()
-        checkFromIndexSize(offset, NativeAddress.BYTE_SIZE.toLong(), size)
-        return array.getPointer(arrayOffset + offset.toInt())
-    }
-
     override fun setByte(value: Byte, offset: Long) {
         checkWritable()
         checkIndex(offset, size)
@@ -288,12 +282,6 @@ internal class HeapMemory(
         checkWritable()
         checkFromIndexSize(offset, 8, size)
         array.setBeDouble(value, arrayOffset + offset.toInt())
-    }
-
-    override fun setPointer(value: NativeAddress, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, NativeAddress.BYTE_SIZE.toLong(), size)
-        array.setPointer(value, arrayOffset + offset.toInt())
     }
 
     companion object {

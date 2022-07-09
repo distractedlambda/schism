@@ -49,15 +49,15 @@ public interface NativeLibrary {
     @Retention(AnnotationRetention.RUNTIME)
     public annotation class Function(val name: String)
 
-    public companion object {
-        public fun <T : NativeLibrary> link(clazz: Class<T>): T {
-            return (@Suppress("UNCHECKED_CAST") (LinkedNativeLibraries[clazz] as T))
-        }
+    public companion object
+}
 
-        public inline fun <reified T : NativeLibrary> link(): T {
-            return link(T::class.java)
-        }
-    }
+public fun <T : NativeLibrary> linkNativeLibrary(clazz: Class<T>): T {
+    return (@Suppress("UNCHECKED_CAST") (LinkedNativeLibraries[clazz] as T))
+}
+
+public inline fun <reified T : NativeLibrary> linkNativeLibrary(): T {
+    return linkNativeLibrary(T::class.java)
 }
 
 private object LinkedNativeLibraries : ClassValue<NativeLibrary>() {
@@ -81,7 +81,11 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
         "$klass is missing a ${NativeLibrary.Name::class.simpleName} annotation"
     }
 
-    val symbolLookup = libraryLookup(libraryName, MemorySession.openImplicit())
+    val symbolLookup = when (libraryName) {
+        "" -> NATIVE_LINKER.defaultLookup()
+        else -> libraryLookup(libraryName, MemorySession.openImplicit())
+    }
+
     val downcallHandles = mutableListOf<MethodHandle>()
 
     val implWriter = ClassWriter(COMPUTE_FRAMES)
