@@ -24,6 +24,102 @@ public fun nativeMemory(startAddress: NativeAddress, size: Long, cleanup: Runnab
     }
 }
 
+public fun nativeBytes(startAddress: NativeAddress, size: Long, attachment: Any? = null): MemoryByteArrayView {
+    return nativeMemory(startAddress, size, attachment).bytes
+}
+
+public fun nativeBytes(startAddress: NativeAddress, size: Long, cleanup: Runnable): MemoryByteArrayView {
+    return nativeMemory(startAddress, size, cleanup).bytes
+}
+
+public fun nativeUBytes(startAddress: NativeAddress, size: Long, attachment: Any? = null): MemoryUByteArrayView {
+    return nativeMemory(startAddress, size, attachment).ubytes
+}
+
+public fun nativeUBytes(startAddress: NativeAddress, size: Long, cleanup: Runnable): MemoryUByteArrayView {
+    return nativeMemory(startAddress, size, cleanup).ubytes
+}
+
+public fun nativeChars(startAddress: NativeAddress, size: Long, attachment: Any? = null): MemoryCharArrayView {
+    return nativeMemory(startAddress, size timesExact 2, attachment).chars
+}
+
+public fun nativeChars(startAddress: NativeAddress, size: Long, cleanup: Runnable): MemoryCharArrayView {
+    return nativeMemory(startAddress, size timesExact 2, cleanup).chars
+}
+
+public fun nativeShorts(startAddress: NativeAddress, size: Long, attachment: Any? = null): MemoryShortArrayView {
+    return nativeMemory(startAddress, size timesExact 2, attachment).shorts
+}
+
+public fun nativeShorts(startAddress: NativeAddress, size: Long, cleanup: Runnable): MemoryShortArrayView {
+    return nativeMemory(startAddress, size timesExact 2, cleanup).shorts
+}
+
+public fun nativeUShorts(startAddress: NativeAddress, size: Long, attachment: Any? = null): MemoryUShortArrayView {
+    return nativeMemory(startAddress, size timesExact 2, attachment).ushorts
+}
+
+public fun nativeUShorts(startAddress: NativeAddress, size: Long, cleanup: Runnable): MemoryUShortArrayView {
+    return nativeMemory(startAddress, size timesExact 2, cleanup).ushorts
+}
+
+public fun nativeInts(startAddress: NativeAddress, size: Long, attachment: Any? = null): MemoryIntArrayView {
+    return nativeMemory(startAddress, size timesExact 4, attachment).ints
+}
+
+public fun nativeInts(startAddress: NativeAddress, size: Long, cleanup: Runnable): MemoryIntArrayView {
+    return nativeMemory(startAddress, size timesExact 4, cleanup).ints
+}
+
+public fun nativeUInts(startAddress: NativeAddress, size: Long, attachment: Any? = null): MemoryUIntArrayView {
+    return nativeMemory(startAddress, size timesExact 4, attachment).uints
+}
+
+public fun nativeUInts(startAddress: NativeAddress, size: Long, cleanup: Runnable): MemoryUIntArrayView {
+    return nativeMemory(startAddress, size timesExact 4, cleanup).uints
+}
+
+public fun nativeLongs(startAddress: NativeAddress, size: Long, attachment: Any? = null): MemoryLongArrayView {
+    return nativeMemory(startAddress, size timesExact 8, attachment).longs
+}
+
+public fun nativeLongs(startAddress: NativeAddress, size: Long, cleanup: Runnable): MemoryLongArrayView {
+    return nativeMemory(startAddress, size timesExact 8, cleanup).longs
+}
+
+public fun nativeULongs(startAddress: NativeAddress, size: Long, attachment: Any? = null): MemoryULongArrayView {
+    return nativeMemory(startAddress, size timesExact 8, attachment).ulongs
+}
+
+public fun nativeULongs(startAddress: NativeAddress, size: Long, cleanup: Runnable): MemoryULongArrayView {
+    return nativeMemory(startAddress, size timesExact 8, cleanup).ulongs
+}
+
+public fun nativeFloats(startAddress: NativeAddress, size: Long, attachment: Any? = null): MemoryFloatArrayView {
+    return nativeMemory(startAddress, size timesExact 4, attachment).floats
+}
+
+public fun nativeFloats(startAddress: NativeAddress, size: Long, cleanup: Runnable): MemoryFloatArrayView {
+    return nativeMemory(startAddress, size timesExact 4, cleanup).floats
+}
+
+public fun nativeDoubles(startAddress: NativeAddress, size: Long, attachment: Any? = null): MemoryDoubleArrayView {
+    return nativeMemory(startAddress, size timesExact 8, attachment).doubles
+}
+
+public fun nativeDoubles(startAddress: NativeAddress, size: Long, cleanup: Runnable): MemoryDoubleArrayView {
+    return nativeMemory(startAddress, size timesExact 8, cleanup).doubles
+}
+
+public fun nativePointers(startAddress: NativeAddress, size: Long, attachment: Any? = null): MemoryPointerArrayView {
+    return nativeMemory(startAddress, size timesExact NativeAddress.BYTE_SIZE, attachment).pointers
+}
+
+public fun nativePointers(startAddress: NativeAddress, size: Long, cleanup: Runnable): MemoryPointerArrayView {
+    return nativeMemory(startAddress, size timesExact NativeAddress.BYTE_SIZE, cleanup).pointers
+}
+
 public fun allocateNativeMemory(size: Long): Memory {
     val startAddress = malloc(size)
     return nativeMemory(startAddress, size) { free(startAddress) }

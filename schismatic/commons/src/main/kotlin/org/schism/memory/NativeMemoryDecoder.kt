@@ -4,146 +4,156 @@ import java.lang.ref.Reference.reachabilityFence
 import java.nio.BufferUnderflowException
 
 internal class NativeMemoryDecoder(
-    private var nextSrc: NativeAddress,
+    private var nextSource: NativeAddress,
     private val end: NativeAddress,
     private val attachment: Any?,
 ) : MemoryDecoder {
     override val position: Long get() {
-        return nextSrc.toBits()
+        return nextSource.toBits()
     }
 
-    private inline fun <R> advance(count: Long, block: (src: NativeAddress) -> R): R {
-        val src = nextSrc
+    private inline fun <R> advance(count: Long, block: (source: NativeAddress) -> R): R {
+        val source = nextSource
 
-        if (count >= end - src) {
+        if (count >= end - source) {
             throw BufferUnderflowException()
         }
 
         val result = try {
-            block(src)
+            block(source)
         } finally {
             reachabilityFence(attachment)
         }
 
-        nextSrc = src + count
+        nextSource = source + count
         return result
+    }
+
+    override fun hasRemaining(): Boolean {
+        return nextSource != end
     }
 
     override fun skip(count: Long) {
         advance(count) {}
     }
 
+    override fun nextBytes(destination: Memory) {
+        advance(destination.size) { source ->
+            memcpy(destination, source)
+        }
+    }
+
     override fun nextByte(): Byte {
-        return advance(1) { src ->
-            src.readByte()
+        return advance(1) { source ->
+            source.readByte()
         }
     }
 
     override fun nextChar(): Char {
-        return advance(2) { src ->
-            src.readChar()
+        return advance(2) { source ->
+            source.readChar()
         }
     }
 
     override fun nextLeChar(): Char {
-        return advance(2) { src ->
-            src.readLeChar()
+        return advance(2) { source ->
+            source.readLeChar()
         }
     }
 
     override fun nextBeChar(): Char {
-        return advance(2) { src ->
-            src.readBeChar()
+        return advance(2) { source ->
+            source.readBeChar()
         }
     }
 
     override fun nextShort(): Short {
-        return advance(2) { src ->
-            src.readShort()
+        return advance(2) { source ->
+            source.readShort()
         }
     }
 
     override fun nextLeShort(): Short {
-        return advance(2) { src ->
-            src.readLeShort()
+        return advance(2) { source ->
+            source.readLeShort()
         }
     }
 
     override fun nextBeShort(): Short {
-        return advance(2) { src ->
-            src.readBeShort()
+        return advance(2) { source ->
+            source.readBeShort()
         }
     }
 
     override fun nextInt(): Int {
-        return advance(4) { src ->
-            src.readInt()
+        return advance(4) { source ->
+            source.readInt()
         }
     }
 
     override fun nextLeInt(): Int {
-        return advance(4) { src ->
-            src.readLeInt()
+        return advance(4) { source ->
+            source.readLeInt()
         }
     }
 
     override fun nextBeInt(): Int {
-        return advance(4) { src ->
-            src.readBeInt()
+        return advance(4) { source ->
+            source.readBeInt()
         }
     }
 
     override fun nextLong(): Long {
-        return advance(8) { src ->
-            src.readLong()
+        return advance(8) { source ->
+            source.readLong()
         }
     }
 
     override fun nextLeLong(): Long {
-        return advance(8) { src ->
-            src.readLeLong()
+        return advance(8) { source ->
+            source.readLeLong()
         }
     }
 
     override fun nextBeLong(): Long {
-        return advance(8) { src ->
-            src.readBeLong()
+        return advance(8) { source ->
+            source.readBeLong()
         }
     }
 
     override fun nextFloat(): Float {
-        return advance(4) { src ->
-            src.readFloat()
+        return advance(4) { source ->
+            source.readFloat()
         }
     }
 
     override fun nextLeFloat(): Float {
-        return advance(4) { src ->
-            src.readLeFloat()
+        return advance(4) { source ->
+            source.readLeFloat()
         }
     }
 
     override fun nextBeFloat(): Float {
-        return advance(4) { src ->
-            src.readBeFloat()
+        return advance(4) { source ->
+            source.readBeFloat()
         }
     }
 
     override fun nextDouble(): Double {
-        return advance(8) { src ->
-            src.readDouble()
+        return advance(8) { source ->
+            source.readDouble()
         }
     }
 
     override fun nextLeDouble(): Double {
-        return advance(8) { src ->
-            src.readLeDouble()
+        return advance(8) { source ->
+            source.readLeDouble()
         }
     }
 
     override fun nextBeDouble(): Double {
-        return advance(8) { src ->
-            src.readBeDouble()
+        return advance(8) { source ->
+            source.readBeDouble()
         }
     }
 }

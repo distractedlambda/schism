@@ -244,21 +244,36 @@ public fun ByteArray.setPointer(value: NativeAddress, offset: Int = 0) {
 }
 
 public fun memcpy(
-    dst: ByteArray,
-    dstOffset: Int = 0,
-    src: ByteArray,
-    srcOffset: Int = 0,
-    size: Int = minOf(dst.size - dstOffset, src.size - srcOffset),
+    destination: ByteArray,
+    destinationOffset: Int = 0,
+    source: ByteArray,
+    sourceOffset: Int = 0,
+    size: Int = minOf(destination.size - destinationOffset, source.size - sourceOffset),
 ) {
-    src.copyInto(dst, destinationOffset = dstOffset, startIndex = srcOffset, endIndex = srcOffset + size)
+    source.copyInto(
+        destination,
+        destinationOffset,
+        startIndex = sourceOffset,
+        endIndex = sourceOffset + size,
+    )
 }
 
-public fun memset(dst: ByteArray, dstOffset: Int = 0, value: Byte, size: Int = dst.size - dstOffset) {
-    dst.fill(value, fromIndex = dstOffset, toIndex = dstOffset + size)
+public fun memset(
+    destination: ByteArray,
+    destinationOffset: Int = 0,
+    value: Byte,
+    size: Int = destination.size - destinationOffset,
+) {
+    destination.fill(value, fromIndex = destinationOffset, toIndex = destinationOffset + size)
 }
 
-public fun memset(dst: ByteArray, dstOffset: Int = 0, value: UByte, size: Int = dst.size - dstOffset) {
-    memset(dst, dstOffset, value.toByte(), size)
+public fun memset(
+    destination: ByteArray,
+    destinationOffset: Int = 0,
+    value: UByte,
+    size: Int = destination.size - destinationOffset,
+) {
+    memset(destination, destinationOffset, value.toByte(), size)
 }
 
 private val NATIVE_CHAR = MethodHandles.byteArrayViewVarHandle(Char::class.java, ByteOrder.nativeOrder())

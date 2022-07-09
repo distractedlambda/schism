@@ -311,25 +311,35 @@ public fun MemoryAddress.toNativeAddress(): NativeAddress {
     return NativeAddress.fromBits(toRawLongValue())
 }
 
-public fun memcpy(dst: NativeAddress, src: NativeAddress, size: Long) {
-    MemorySegment.ofAddress(dst.toMemoryAddress(), size, MemorySession.global())
-        .copyFrom(MemorySegment.ofAddress(src.toMemoryAddress(), size, MemorySession.global()))
+public fun memcpy(destination: NativeAddress, source: NativeAddress, size: Long) {
+    MemorySegment.ofAddress(destination.toMemoryAddress(), size, MemorySession.global())
+        .copyFrom(MemorySegment.ofAddress(source.toMemoryAddress(), size, MemorySession.global()))
 }
 
-public fun memcpy(dst: ByteArray, dstOffset: Int = 0, src: NativeAddress, size: Int = dst.size - dstOffset) {
-    MemorySegment.ofArray(dst).asSlice(dstOffset.toLong(), size.toLong())
-        .copyFrom(MemorySegment.ofAddress(src.toMemoryAddress(), size.toLong(), MemorySession.global()))
+public fun memcpy(
+    destination: ByteArray,
+    destinationOffset: Int = 0,
+    source: NativeAddress,
+    size: Int = destination.size - destinationOffset,
+) {
+    MemorySegment.ofArray(destination).asSlice(destinationOffset.toLong(), size.toLong())
+        .copyFrom(MemorySegment.ofAddress(source.toMemoryAddress(), size.toLong(), MemorySession.global()))
 }
 
-public fun memcpy(dst: NativeAddress, src: ByteArray, srcOffset: Int = 0, size: Int = src.size - srcOffset) {
-    MemorySegment.ofAddress(dst.toMemoryAddress(), size.toLong(), MemorySession.global())
-        .copyFrom(MemorySegment.ofArray(src).asSlice(srcOffset.toLong(), size.toLong()))
+public fun memcpy(
+    destination: NativeAddress,
+    source: ByteArray,
+    sourceOffset: Int = 0,
+    size: Int = source.size - sourceOffset,
+) {
+    MemorySegment.ofAddress(destination.toMemoryAddress(), size.toLong(), MemorySession.global())
+        .copyFrom(MemorySegment.ofArray(source).asSlice(sourceOffset.toLong(), size.toLong()))
 }
 
-public fun memset(dst: NativeAddress, value: Byte, size: Long) {
-    MemorySegment.ofAddress(dst.toMemoryAddress(), size, MemorySession.global()).fill(value)
+public fun memset(destination: NativeAddress, value: Byte, size: Long) {
+    MemorySegment.ofAddress(destination.toMemoryAddress(), size, MemorySession.global()).fill(value)
 }
 
-public fun memset(dst: NativeAddress, value: UByte, size: Long) {
-    memset(dst, value.toByte(), size)
+public fun memset(destination: NativeAddress, value: UByte, size: Long) {
+    memset(destination, value.toByte(), size)
 }

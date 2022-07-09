@@ -41,6 +41,45 @@ internal class HeapMemory(
         }
     }
 
+    override fun asReadOnly(): Memory {
+        return if (flags == READABLE) {
+            this
+        } else {
+            checkReadable()
+            HeapMemory(array, arrayOffset, intSize, READABLE)
+        }
+    }
+
+    override fun copyTo(destination: ByteArray, destinationOffset: Int) {
+        checkReadable()
+        memcpy(destination, destinationOffset, array, arrayOffset, minOf(intSize, destination.size - destinationOffset))
+    }
+
+    override fun copyTo(destination: NativeAddress) {
+        checkReadable()
+        memcpy(destination, array, arrayOffset)
+    }
+
+    override fun copyTo(destination: Memory) {
+        checkReadable()
+        memcpy(destination.slice(size = minOf(destination.size, intSize.toLong())), array, arrayOffset)
+    }
+
+    override fun copyFrom(source: NativeAddress) {
+        checkWritable()
+        memcpy(array, arrayOffset, source, intSize)
+    }
+
+    override fun copyFrom(source: ByteArray, sourceOffset: Int) {
+        checkWritable()
+        memcpy(array, arrayOffset, source, sourceOffset, minOf(intSize, source.size - sourceOffset))
+    }
+
+    override fun fill(value: Byte) {
+        checkWritable()
+        memset(array, arrayOffset, value, intSize)
+    }
+
     override fun encoder(): MemoryEncoder {
         checkWritable()
         return HeapMemoryEncoder(array, arrayOffset, arrayOffset + intSize)

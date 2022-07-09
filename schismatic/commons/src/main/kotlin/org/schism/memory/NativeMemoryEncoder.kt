@@ -12,137 +12,143 @@ internal class NativeMemoryEncoder(
         return nextDst.toBits()
     }
 
-    private inline fun advance(count: Long, block: (dst: NativeAddress) -> Unit) {
-        val dst = nextDst
+    private inline fun advance(count: Long, block: (destination: NativeAddress) -> Unit) {
+        val destination = nextDst
 
-        if (count >= end - dst) {
+        if (count >= end - destination) {
             throw BufferOverflowException()
         }
 
         try {
-            block(dst)
+            block(destination)
         } finally {
             reachabilityFence(attachment)
         }
 
-        nextDst = dst + count
+        nextDst = destination + count
     }
 
     override fun skip(count: Long) {
         advance(count) {}
     }
 
+    override fun putBytes(source: Memory) {
+        advance(source.size) { destination ->
+            memcpy(destination, source)
+        }
+    }
+
     override fun putByte(value: Byte) {
-        advance(1) { dst ->
-            dst.writeByte(value)
+        advance(1) { destination ->
+            destination.writeByte(value)
         }
     }
 
     override fun putChar(value: Char) {
-        advance(2) { dst ->
-            dst.writeChar(value)
+        advance(2) { destination ->
+            destination.writeChar(value)
         }
     }
 
     override fun putLeChar(value: Char) {
-        advance(2) { dst ->
-            dst.writeLeChar(value)
+        advance(2) { destination ->
+            destination.writeLeChar(value)
         }
     }
 
     override fun putBeChar(value: Char) {
-        advance(2) { dst ->
-            dst.writeBeChar(value)
+        advance(2) { destination ->
+            destination.writeBeChar(value)
         }
     }
 
     override fun putShort(value: Short) {
-        advance(2) { dst ->
-            dst.writeShort(value)
+        advance(2) { destination ->
+            destination.writeShort(value)
         }
     }
 
     override fun putLeShort(value: Short) {
-        advance(2) { dst ->
-            dst.writeLeShort(value)
+        advance(2) { destination ->
+            destination.writeLeShort(value)
         }
     }
 
     override fun putBeShort(value: Short) {
-        advance(2) { dst ->
-            dst.writeBeShort(value)
+        advance(2) { destination ->
+            destination.writeBeShort(value)
         }
     }
 
     override fun putInt(value: Int) {
-        advance(4) { dst ->
-            dst.writeInt(value)
+        advance(4) { destination ->
+            destination.writeInt(value)
         }
     }
 
     override fun putLeInt(value: Int) {
-        advance(4) { dst ->
-            dst.writeLeInt(value)
+        advance(4) { destination ->
+            destination.writeLeInt(value)
         }
     }
 
     override fun putBeInt(value: Int) {
-        advance(4) { dst ->
-            dst.writeBeInt(value)
+        advance(4) { destination ->
+            destination.writeBeInt(value)
         }
     }
 
     override fun putLong(value: Long) {
-        advance(8) { dst ->
-            dst.writeLong(value)
+        advance(8) { destination ->
+            destination.writeLong(value)
         }
     }
 
     override fun putLeLong(value: Long) {
-        advance(8) { dst ->
-            dst.writeLeLong(value)
+        advance(8) { destination ->
+            destination.writeLeLong(value)
         }
     }
 
     override fun putBeLong(value: Long) {
-        advance(8) { dst ->
-            dst.writeBeLong(value)
+        advance(8) { destination ->
+            destination.writeBeLong(value)
         }
     }
 
     override fun putFloat(value: Float) {
-        advance(4) { dst ->
-            dst.writeFloat(value)
+        advance(4) { destination ->
+            destination.writeFloat(value)
         }
     }
 
     override fun putLeFloat(value: Float) {
-        advance(4) { dst ->
-            dst.writeLeFloat(value)
+        advance(4) { destination ->
+            destination.writeLeFloat(value)
         }
     }
 
     override fun putBeFloat(value: Float) {
-        advance(4) { dst ->
-            dst.writeBeFloat(value)
+        advance(4) { destination ->
+            destination.writeBeFloat(value)
         }
     }
 
     override fun putDouble(value: Double) {
-        advance(8) { dst ->
-            dst.writeDouble(value)
+        advance(8) { destination ->
+            destination.writeDouble(value)
         }
     }
 
     override fun putLeDouble(value: Double) {
-        advance(8) { dst ->
-            dst.writeLeDouble(value)
+        advance(8) { destination ->
+            destination.writeLeDouble(value)
         }
     }
 
     override fun putBeDouble(value: Double) {
-        advance(8) { dst ->
-            dst.writeBeDouble(value)
+        advance(8) { destination ->
+            destination.writeBeDouble(value)
         }
     }
 }

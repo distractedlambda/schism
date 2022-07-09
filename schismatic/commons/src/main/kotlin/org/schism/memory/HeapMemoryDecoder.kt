@@ -23,8 +23,18 @@ internal class HeapMemoryDecoder(
         }
     }
 
+    override fun hasRemaining(): Boolean {
+        return intPosition != limit
+    }
+
     override fun skip(count: Long) {
         advancing(count) {}
+    }
+
+    override fun nextBytes(destination: Memory) {
+        advancing(destination.size) { offset ->
+            memcpy(destination, array, offset)
+        }
     }
 
     override fun nextByte(): Byte {

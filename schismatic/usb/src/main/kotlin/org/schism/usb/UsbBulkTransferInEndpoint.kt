@@ -1,6 +1,10 @@
 package org.schism.usb
 
+import org.schism.usb.Libusb.EndpointDescriptor
+
 public class UsbBulkTransferInEndpoint internal constructor(
     alternateSetting: UsbAlternateSetting,
-    maxPacketSize: UShort,
-) : UsbEndpoint(alternateSetting, maxPacketSize)
+    descriptor: EndpointDescriptor,
+) : UsbEndpoint(alternateSetting, descriptor) {
+    public companion object
+}

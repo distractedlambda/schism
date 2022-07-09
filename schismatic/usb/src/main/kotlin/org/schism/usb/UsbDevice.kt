@@ -1,17 +1,31 @@
 package org.schism.usb
 
+import kotlinx.collections.immutable.PersistentSet
+import kotlinx.collections.immutable.persistentSetOf
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import org.schism.coroutines.updateMutating
 import org.schism.ffi.address
 import org.schism.ffi.withNativeStruct
 import org.schism.ffi.wrap
 import org.schism.memory.NativeAddress
+import org.schism.memory.nativePointers
 import org.schism.memory.withNativePointer
 import org.schism.memory.withNativeUBytes
 import org.schism.ref.registerCleanup
 import org.schism.usb.Libusb.Companion.checkReturn
 import org.schism.usb.Libusb.Companion.checkSize
 import org.schism.usb.Libusb.Companion.freeConfigDescriptor
+import org.schism.usb.Libusb.Companion.freeDeviceList
 import org.schism.usb.Libusb.Companion.getConfigDescriptor
 import org.schism.usb.Libusb.Companion.getDeviceDescriptor
+import org.schism.usb.Libusb.Companion.getDeviceList
 import org.schism.usb.Libusb.Companion.getPortNumbers
 import org.schism.usb.Libusb.Companion.refDevice
 import org.schism.usb.Libusb.Companion.unrefDevice
@@ -79,8 +93,7 @@ public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
             }
 
             try {
-                val configDescriptor = ConfigDescriptor.wrap(configDescriptorAddress)
-                TODO()
+                UsbConfiguration(this, ConfigDescriptor.wrap(configDescriptorAddress))
             } finally {
                 freeConfigDescriptor(configDescriptorAddress)
             }
@@ -89,5 +102,59 @@ public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
 
     public companion object {
         private const val MAX_PORT_NUMBERS = 7
+
+        private val mutableAllDevices = MutableStateFlow(persistentSetOf<UsbDevice>())
+
+        public val allDevices: StateFlow<PersistentSet<UsbDevice>> = mutableAllDevices.asStateFlow()
+
+        init {
+            @OptIn(DelicateCoroutinesApi::class)
+            GlobalScope.launch(CoroutineName("UsbDevice enumerator")) {
+                var lastDevices = emptySet<UsbDevice>()
+                var lastDevicesByHandle = emptyMap<NativeAddress, Result<UsbDevice>>()
+
+                withNativePointer { deviceListPointer ->
+                    while (true) {
+                        val newDevicesByHandle: MutableMap<NativeAddress, Result<UsbDevice>>
+                        val listSize = checkSize(getDeviceList(Libusb.context, deviceListPointer.address))
+
+                        try {
+                            val deviceList = nativePointers(deviceListPointer.value, listSize.toLong())
+                            newDevicesByHandle = hashMapOf()
+
+                            for (handle in deviceList) {
+                                newDevicesByHandle[handle] = lastDevicesByHandle[handle]
+                                    ?: try {
+                                        Result.success(UsbDevice(handle))
+                                    } catch (exception: UsbException) {
+                                        Result.failure(exception)
+                                    }
+                            }
+                        } finally {
+                            freeDeviceList(deviceListPointer.value, unrefDevices = 1)
+                        }
+
+                        val newDevices = buildSet {
+                            newDevicesByHandle.values.forEach {
+                                it.getOrNull()?.let(::add)
+                            }
+                        }
+
+                        val addedDevices = newDevices - lastDevices
+                        val removedDevices = lastDevices - newDevices
+
+                        mutableAllDevices.updateMutating {
+                            removeAll(removedDevices)
+                            addAll(addedDevices)
+                        }
+
+                        lastDevices = newDevices
+                        lastDevicesByHandle = newDevicesByHandle
+
+                        delay(500)
+                    }
+                }
+            }
+        }
     }
 }

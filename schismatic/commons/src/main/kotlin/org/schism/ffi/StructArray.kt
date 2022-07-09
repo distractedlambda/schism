@@ -42,7 +42,7 @@ public inline fun <S : Struct, R> withNativeStructArray(
 public class StructArray<S : Struct> internal constructor(
     public val elementType: StructType<S>,
     public val memory: Memory,
-) {
+) : Iterable<S> {
     public val startAddress: NativeAddress get() {
         return memory.startAddress
     }
@@ -69,5 +69,19 @@ public class StructArray<S : Struct> internal constructor(
 
     public operator fun get(index: Long): S {
         return elementType.wrap(memory.slice(index timesExact elementType.size, elementType.size))
+    }
+
+    override fun iterator(): Iterator<S> {
+        return object : Iterator<S> {
+            private var index = 0L
+
+            override fun hasNext(): Boolean {
+                return index < size
+            }
+
+            override fun next(): S {
+                return get(index++)
+            }
+        }
     }
 }

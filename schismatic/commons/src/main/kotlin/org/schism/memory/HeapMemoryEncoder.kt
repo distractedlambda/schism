@@ -26,6 +26,12 @@ internal class HeapMemoryEncoder(
         advancing(count) {}
     }
 
+    override fun putBytes(source: Memory) {
+        advancing(source.size) { offset ->
+            memcpy(array, offset, source)
+        }
+    }
+
     override fun putByte(value: Byte) {
         advancing(1) { offset ->
             array[offset] = value

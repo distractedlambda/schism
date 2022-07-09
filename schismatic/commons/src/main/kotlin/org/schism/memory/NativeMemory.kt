@@ -48,6 +48,74 @@ internal class NativeMemory : Memory {
         }
     }
 
+    override fun asReadOnly(): Memory {
+        return if (flags == READABLE) {
+            this
+        } else {
+            checkReadable()
+            NativeMemory(startAddress, size, READABLE, attachment)
+        }
+    }
+
+    override fun copyTo(destination: ByteArray, destinationOffset: Int) {
+        checkReadable()
+        try {
+            memcpy(
+                destination,
+                destinationOffset,
+                startAddress,
+                minOf(size, (destination.size - destinationOffset).toLong()).toInt(),
+            )
+        } finally {
+            reachabilityFence(attachment)
+        }
+    }
+
+    override fun copyTo(destination: NativeAddress) {
+        checkReadable()
+        try {
+            memcpy(destination, startAddress, size)
+        } finally {
+            reachabilityFence(attachment)
+        }
+    }
+
+    override fun copyTo(destination: Memory) {
+        checkReadable()
+        try {
+            memcpy(destination.slice(size = minOf(size, destination.size)), startAddress)
+        } finally {
+            reachabilityFence(attachment)
+        }
+    }
+
+    override fun copyFrom(source: ByteArray, sourceOffset: Int) {
+        checkWritable()
+        try {
+            memcpy(startAddress, source, sourceOffset, minOf(size, (source.size - sourceOffset).toLong()).toInt())
+        } finally {
+            reachabilityFence(attachment)
+        }
+    }
+
+    override fun copyFrom(source: NativeAddress) {
+        checkWritable()
+        try {
+            memcpy(startAddress, source, size)
+        } finally {
+            reachabilityFence(attachment)
+        }
+    }
+
+    override fun fill(value: Byte) {
+        checkWritable()
+        try {
+            memset(startAddress, value, size)
+        } finally {
+            reachabilityFence(attachment)
+        }
+    }
+
     override fun slice(offset: Long, size: Long): Memory {
         checkFromIndexSize(offset, size, this.size)
         return NativeMemory(startAddress + offset, size, flags, attachment)

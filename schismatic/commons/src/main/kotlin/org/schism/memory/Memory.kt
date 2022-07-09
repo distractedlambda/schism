@@ -1,7 +1,5 @@
 package org.schism.memory
 
-import java.awt.Point
-
 public interface Memory {
     public val size: Long
 
@@ -12,6 +10,20 @@ public interface Memory {
     public val isNative: Boolean
 
     public val startAddress: NativeAddress
+
+    public fun asReadOnly(): Memory
+
+    public fun copyTo(destination: ByteArray, destinationOffset: Int = 0)
+
+    public fun copyTo(destination: NativeAddress)
+
+    public fun copyTo(destination: Memory)
+
+    public fun copyFrom(source: ByteArray, sourceOffset: Int = 0)
+
+    public fun copyFrom(source: NativeAddress)
+
+    public fun fill(value: Byte)
 
     public fun encoder(): MemoryEncoder
 
@@ -199,4 +211,32 @@ public fun Memory.setPointer(value: NativeAddress, offset: Long = 0L) {
         64 -> setLong(value.toBits(), offset)
         else -> throw UnsupportedOperationException("Unsupported native address width")
     }
+}
+
+public fun memcpy(destination: Memory, source: Memory) {
+    source.copyTo(destination)
+}
+
+public fun memcpy(destination: Memory, source: ByteArray, sourceOffset: Int = 0) {
+    destination.copyFrom(source, sourceOffset)
+}
+
+public fun memcpy(destination: Memory, source: NativeAddress) {
+    destination.copyFrom(source)
+}
+
+public fun memcpy(destination: ByteArray, destinationOffset: Int = 0, source: Memory) {
+    source.copyTo(destination, destinationOffset)
+}
+
+public fun memcpy(destination: NativeAddress, source: Memory) {
+    source.copyTo(destination)
+}
+
+public fun memset(destination: Memory, value: Byte) {
+    destination.fill(value)
+}
+
+public fun memset(destination: Memory, value: UByte) {
+    destination.fill(value.toByte())
 }

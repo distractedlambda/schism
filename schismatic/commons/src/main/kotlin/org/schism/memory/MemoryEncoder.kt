@@ -5,23 +5,12 @@ import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 
-/**
- * A type that facilitates sequential writes, possibly of multibyte values, into an in-memory buffer.
- *
- * Writes done through a [MemoryEncoder] should be immediate and should not involve I/O or other blocking operations;
- * the purpose of this being an `interface` is _not_ to facilitate abstraction over I/O facilities. Instead, the intent
- * is to abstract over both in-heap and out-of-heap memory destinations (a single concrete type could not do this
- * efficiently, at least not on HotSpot), as well as over additional operations done as part of writing (e.g. logging,
- * checksum calculation, duplication, etc.).
- *
- * Use-sites of [MemoryEncoder]s should strive to be monomorphic (whether statically or dynamically). To that end,
- * generic utility or extension functions should be `inline` so that they do not themselves become megamorphic call
- * sites. Wrapper or adapter types may need to be specialized for the concrete types that they wrap.
- */
 public interface MemoryEncoder {
     public val position: Long
 
     public fun skip(count: Long)
+
+    public fun putBytes(source: Memory)
 
     public fun putByte(value: Byte)
 
