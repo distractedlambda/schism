@@ -1,12 +1,13 @@
+import kotlinx.atomicfu.plugin.gradle.AtomicFUPluginExtension
+
 plugins {
     kotlin("jvm")
 }
 
-group = "org.schism"
-version = "1.0-SNAPSHOT"
+apply(plugin = "kotlinx-atomicfu")
 
 dependencies {
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2")
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.3")
     api("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.5")
 
     implementation(kotlin("reflect"))
@@ -14,5 +15,13 @@ dependencies {
 }
 
 kotlin {
+    jvmToolchain {
+        languageVersion.set(JavaLanguageVersion.of(19))
+    }
+
     explicitApi()
 }
+
+extensions["atomicfu"].delegateClosureOf<AtomicFUPluginExtension> {
+    jvmVariant = "VH"
+}()

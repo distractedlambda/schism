@@ -1,9 +1,10 @@
+import kotlinx.atomicfu.plugin.gradle.AtomicFUPluginExtension
+
 plugins {
     kotlin("jvm")
 }
 
-group = "org.schism"
-version = "1.0-SNAPSHOT"
+apply(plugin = "kotlinx-atomicfu")
 
 dependencies {
     api(project(":commons"))
@@ -12,3 +13,7 @@ dependencies {
 kotlin {
     explicitApi()
 }
+
+extensions["atomicfu"].delegateClosureOf<AtomicFUPluginExtension> {
+    jvmVariant = "VH"
+}()
