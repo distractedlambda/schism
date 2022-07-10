@@ -7,9 +7,7 @@ import org.schism.memory.allocateHeapMemory
 import org.schism.memory.nativeMemory
 import org.schism.memory.nextUByte
 
-public data class UsbDescriptor(val descriptorType: UByte, val contents: Memory) {
-    public companion object
-}
+public data class UsbDescriptor(val descriptorType: UByte, val contents: Memory)
 
 internal fun parseExtraDescriptors(extra: NativeAddress, extraLength: CInt): List<UsbDescriptor> {
     return buildList {

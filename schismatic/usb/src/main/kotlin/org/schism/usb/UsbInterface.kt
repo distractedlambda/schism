@@ -16,6 +16,4 @@ public class UsbInterface internal constructor(public val configuration: UsbConf
             UsbAlternateSetting(this, interfaceDescriptors[it.toLong()])
         }
     }
-
-    public companion object
 }

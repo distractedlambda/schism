@@ -49,8 +49,6 @@ public interface MemoryEncoder {
     public fun putBeDouble(value: Double)
 
     public fun putDouble(value: Double)
-
-    public companion object
 }
 
 public fun MemoryEncoder.putUByte(value: UByte) {

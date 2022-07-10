@@ -73,8 +73,6 @@ public data class AddedOrRemoved<out E>(val element: E, val kind: Kind) {
     public enum class Kind {
         Added,
         Removed;
-
-        public companion object
     }
 
     public companion object {

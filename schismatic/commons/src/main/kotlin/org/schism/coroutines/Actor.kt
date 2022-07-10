@@ -15,6 +15,4 @@ public class Actor(scope: CoroutineScope): Job by Job(scope.coroutineContext[Job
             withContext(coroutineContext, block)
         }
     }
-
-    public companion object
 }

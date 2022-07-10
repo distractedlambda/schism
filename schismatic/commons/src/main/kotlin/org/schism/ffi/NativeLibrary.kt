@@ -48,8 +48,6 @@ public interface NativeLibrary {
     @Target(AnnotationTarget.PROPERTY_GETTER, AnnotationTarget.PROPERTY_SETTER, AnnotationTarget.FUNCTION)
     @Retention(AnnotationRetention.RUNTIME)
     public annotation class Function(val name: String)
-
-    public companion object
 }
 
 public fun <T : NativeLibrary> linkNativeLibrary(clazz: Class<T>): T {

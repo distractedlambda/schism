@@ -11,6 +11,4 @@ public sealed class UsbEndpoint(
     public val maxPacketSize: UShort = descriptor.wMaxPacketSize
 
     public val extraDescriptors: List<UsbDescriptor> = parseExtraDescriptors(descriptor.extra, descriptor.extra_length)
-
-    public companion object
 }

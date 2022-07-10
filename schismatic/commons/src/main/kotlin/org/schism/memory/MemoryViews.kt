@@ -555,11 +555,7 @@ public val Memory.pointers: MemoryPointerArrayView get() {
         public operator fun next(): Byte {
             return elements[index++]
         }
-
-        public companion object
     }
-
-    public companion object
 }
 
 @JvmInline public value class MemoryUByteArrayView internal constructor(public val memory: Memory) {
@@ -609,11 +605,7 @@ public val Memory.pointers: MemoryPointerArrayView get() {
         public operator fun next(): UByte {
             return elements[index++]
         }
-
-        public companion object
     }
-
-    public companion object
 }
 
 @JvmInline public value class MemoryCharArrayView internal constructor(public val memory: Memory) {
@@ -663,11 +655,9 @@ public val Memory.pointers: MemoryPointerArrayView get() {
         public operator fun next(): Char {
             return elements[index++]
         }
-
-        public companion object
     }
 
-    public companion object {
+    private companion object {
         private const val ELEMENT_STRIDE: Long = 2
     }
 }
@@ -719,11 +709,9 @@ public val Memory.pointers: MemoryPointerArrayView get() {
         public operator fun next(): Short {
             return elements[index++]
         }
-
-        public companion object
     }
 
-    public companion object {
+    private companion object {
         private const val ELEMENT_STRIDE: Long = 2
     }
 }
@@ -775,11 +763,9 @@ public val Memory.pointers: MemoryPointerArrayView get() {
         public operator fun next(): UShort {
             return elements[index++]
         }
-
-        public companion object
     }
 
-    public companion object {
+    private companion object {
         private const val ELEMENT_STRIDE: Long = 2
     }
 }
@@ -831,11 +817,9 @@ public val Memory.pointers: MemoryPointerArrayView get() {
         public operator fun next(): Int {
             return elements[index++]
         }
-
-        public companion object
     }
 
-    public companion object {
+    private companion object {
         private const val ELEMENT_STRIDE: Long = 4
     }
 }
@@ -887,11 +871,9 @@ public val Memory.pointers: MemoryPointerArrayView get() {
         public operator fun next(): UInt {
             return elements[index++]
         }
-
-        public companion object
     }
 
-    public companion object {
+    private companion object {
         private const val ELEMENT_STRIDE: Long = 4
     }
 }
@@ -943,11 +925,9 @@ public val Memory.pointers: MemoryPointerArrayView get() {
         public operator fun next(): Float {
             return elements[index++]
         }
-
-        public companion object
     }
 
-    public companion object {
+    private companion object {
         private const val ELEMENT_STRIDE: Long = 4
     }
 }
@@ -999,11 +979,9 @@ public val Memory.pointers: MemoryPointerArrayView get() {
         public operator fun next(): Long {
             return elements[index++]
         }
-
-        public companion object
     }
 
-    public companion object {
+    private companion object {
         private const val ELEMENT_STRIDE: Long = 8
     }
 }
@@ -1055,11 +1033,9 @@ public val Memory.pointers: MemoryPointerArrayView get() {
         public operator fun next(): ULong {
             return elements[index++]
         }
-
-        public companion object
     }
 
-    public companion object {
+    private companion object {
         private const val ELEMENT_STRIDE: Long = 8
     }
 }
@@ -1111,11 +1087,9 @@ public val Memory.pointers: MemoryPointerArrayView get() {
         public operator fun next(): Double {
             return elements[index++]
         }
-
-        public companion object
     }
 
-    public companion object {
+    private companion object {
         private const val ELEMENT_STRIDE: Long = 8
     }
 }

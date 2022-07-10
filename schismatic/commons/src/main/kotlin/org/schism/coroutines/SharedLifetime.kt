@@ -28,7 +28,7 @@ public class SharedLifetime {
             }
 
             nextControlWord = controlWord + Long.MIN_VALUE
-        } while (!vhControlWord.weakCompareAndSet(this, lastControlWord, nextControlWord))
+        } while (!VH_CONTROL_WORD.weakCompareAndSet(this, lastControlWord, nextControlWord))
 
         if (lastControlWord == 0L) {
             endFence.complete()
@@ -64,17 +64,17 @@ public class SharedLifetime {
             check(lastControlWord != Long.MAX_VALUE) { "Retain count overflow" }
             check(lastControlWord != Long.MIN_VALUE) { "Lifetime has ended" }
             nextControlWord = lastControlWord + 1
-        } while (!vhControlWord.weakCompareAndSet(this, lastControlWord, nextControlWord))
+        } while (!VH_CONTROL_WORD.weakCompareAndSet(this, lastControlWord, nextControlWord))
     }
 
     @PublishedApi internal fun release() {
-        if ((vhControlWord.getAndAdd(this, -1L) as Long) == Long.MIN_VALUE + 1L) {
+        if ((VH_CONTROL_WORD.getAndAdd(this, -1L) as Long) == Long.MIN_VALUE + 1L) {
             endFence.complete()
         }
     }
 
-    public companion object {
-        private val vhControlWord = MethodHandles.lookup().findVarHandle(
+    private companion object {
+        private val VH_CONTROL_WORD = MethodHandles.lookup().findVarHandle(
             SharedLifetime::class.java, "controlWord",
             Long::class.java,
         )

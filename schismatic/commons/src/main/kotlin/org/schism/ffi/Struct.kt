@@ -63,8 +63,6 @@ public interface Struct {
     @Target(AnnotationTarget.CLASS)
     @Retention(AnnotationRetention.RUNTIME)
     public annotation class Fields(vararg val value: String)
-
-    public companion object
 }
 
 public interface StructType<out S : Struct> {
@@ -73,8 +71,6 @@ public interface StructType<out S : Struct> {
     public val alignment: Long
 
     public fun wrap(memory: Memory): S
-
-    public companion object
 }
 
 public fun <S : Struct> structType(clazz: Class<S>): StructType<S> {

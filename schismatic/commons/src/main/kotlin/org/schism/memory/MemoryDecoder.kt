@@ -51,8 +51,6 @@ public interface MemoryDecoder {
     public fun nextBeDouble(): Double
 
     public fun nextDouble(): Double
-
-    public companion object
 }
 
 public fun MemoryDecoder.nextUByte(): UByte {

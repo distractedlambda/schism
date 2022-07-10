@@ -281,7 +281,7 @@ internal interface Libusb : NativeLibrary {
     }
 
     companion object : Libusb by linkNativeLibrary() {
-        private fun errorMessage(code: CInt): String {
+        fun errorMessage(code: CInt): String {
             return strerror(code).readUtf8CString()
         }
 

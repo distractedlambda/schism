@@ -15,6 +15,4 @@ public class UsbConfiguration internal constructor(public val device: UsbDevice,
     }
 
     public val extraDescriptors: List<UsbDescriptor> = parseExtraDescriptors(descriptor.extra, descriptor.extra_length)
-
-    public companion object
 }

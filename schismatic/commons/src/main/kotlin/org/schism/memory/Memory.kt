@@ -106,8 +106,6 @@ public interface Memory {
     public fun setLeDouble(value: Double, offset: Long = 0L)
 
     public fun setBeDouble(value: Double, offset: Long = 0L)
-
-    public companion object
 }
 
 public fun Memory.requireAlignedTo(alignment: Long) {

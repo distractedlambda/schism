@@ -30,6 +30,4 @@ public class UsbAlternateSetting internal constructor(
     }
 
     public val extraDescriptors: List<UsbDescriptor> = parseExtraDescriptors(descriptor.extra, descriptor.extra_length)
-
-    public companion object
 }
