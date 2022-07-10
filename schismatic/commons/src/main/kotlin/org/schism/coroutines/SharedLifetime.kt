@@ -56,7 +56,7 @@ public class SharedLifetime {
         }
     }
 
-    @PublishedApi internal fun retain() {
+    public fun retain() {
         var lastControlWord: Long
         var nextControlWord: Long
         do {
@@ -67,7 +67,7 @@ public class SharedLifetime {
         } while (!controlWord.compareAndSet(lastControlWord, nextControlWord))
     }
 
-    @PublishedApi internal fun release() {
+    public fun release() {
         if (controlWord.getAndDecrement() == Long.MIN_VALUE + 1L) {
             endFence.complete()
         }

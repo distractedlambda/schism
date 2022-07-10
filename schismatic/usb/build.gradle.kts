@@ -11,6 +11,10 @@ dependencies {
 }
 
 kotlin {
+    jvmToolchain {
+        languageVersion.set(JavaLanguageVersion.of(19))
+    }
+
     explicitApi()
 }
 
