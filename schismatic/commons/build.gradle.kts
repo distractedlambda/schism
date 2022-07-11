@@ -1,10 +1,7 @@
-import kotlinx.atomicfu.plugin.gradle.AtomicFUPluginExtension
-
 plugins {
     kotlin("jvm")
+    id("kotlinx-atomicfu")
 }
-
-apply(plugin = "kotlinx-atomicfu")
 
 dependencies {
     api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.3")
@@ -22,6 +19,6 @@ kotlin {
     explicitApi()
 }
 
-extensions["atomicfu"].delegateClosureOf<AtomicFUPluginExtension> {
+atomicfu {
     jvmVariant = "VH"
-}()
+}

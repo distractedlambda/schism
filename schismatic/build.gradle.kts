@@ -1,17 +1,8 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath("org.jetbrains.kotlinx:atomicfu-gradle-plugin:0.18.2")
-    }
-}
-
 plugins {
     kotlin("jvm") apply false
+    id("kotlinx-atomicfu") apply false
 }
 
 group = "org.schism"
