@@ -100,7 +100,7 @@ internal interface Libusb : NativeLibrary {
         "iConfiguration",
         "bmAttributes",
         "MaxPower",
-        "interface",
+        "iface",
         "extra",
         "extra_length",
     )
@@ -113,7 +113,7 @@ internal interface Libusb : NativeLibrary {
         val iConfiguration: UByte
         val bmAttributes: UByte
         val MaxPower: UByte
-        val `interface`: NativeAddress
+        val iface: NativeAddress
         val extra: NativeAddress
         val extra_length: CInt
 

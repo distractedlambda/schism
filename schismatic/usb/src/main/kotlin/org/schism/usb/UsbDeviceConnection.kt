@@ -1,8 +1,11 @@
 package org.schism.usb
 
 import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import org.schism.coroutines.SharedLifetime
 import org.schism.coroutines.SuspendingAutocloseable
 import org.schism.ffi.CInt
@@ -10,16 +13,27 @@ import org.schism.ffi.NativeEntrypoint
 import org.schism.ffi.nativeEntrypoint
 import org.schism.ffi.wrap
 import org.schism.memory.Memory
-import org.schism.memory.MemoryEncoder
 import org.schism.memory.NativeAddress
 import org.schism.memory.free
 import org.schism.memory.isNULL
 import org.schism.memory.malloc
 import org.schism.memory.nativeMemory
-import org.schism.memory.positionalDifference
+import org.schism.memory.nextLeUtf16
+import org.schism.memory.plus
+import org.schism.memory.putLeUShort
+import org.schism.memory.putUByte
+import org.schism.memory.readUByte
+import org.schism.memory.withNativeInt
 import org.schism.usb.Libusb.Companion.allocTransfer
 import org.schism.usb.Libusb.Companion.cancelTransfer
+import org.schism.usb.Libusb.Companion.checkReturn
+import org.schism.usb.Libusb.Companion.claimInterface
+import org.schism.usb.Libusb.Companion.clearHalt
 import org.schism.usb.Libusb.Companion.errorMessage
+import org.schism.usb.Libusb.Companion.getConfiguration
+import org.schism.usb.Libusb.Companion.releaseInterface
+import org.schism.usb.Libusb.Companion.resetDevice
+import org.schism.usb.Libusb.Companion.setInterfaceAltSetting
 import org.schism.usb.Libusb.Companion.submitTransfer
 import org.schism.usb.Libusb.TransferStatus
 import org.schism.usb.Libusb.TransferType
@@ -129,10 +143,137 @@ public class UsbDeviceConnection internal constructor(
         }
     }
 
+    private suspend fun getString(index: UByte): String? {
+        if (index == 0.toUByte()) {
+            return null
+        }
+
+        val bufferLength = 8 + 255
+        val buffer = malloc(bufferLength.toLong())
+
+        nativeMemory(buffer, 8).encoder().run {
+            putUByte(0x80u)
+            putUByte(0x06u)
+            putUByte(index)
+            putUByte(0x03u)
+            putShort(0)
+            putLeUShort(255u)
+        }
+
+        transfer(0x00u, nativeInTransferCallback, TransferType.CONTROL, buffer, bufferLength)
+
+        try {
+            val descriptorLength = (buffer + 8).readUByte().toInt()
+            return nativeMemory(buffer, bufferLength.toLong())
+                .slice(offset = 10)
+                .decoder()
+                .nextLeUtf16((descriptorLength - 2) / 2)
+        } finally {
+            free(buffer)
+        }
+    }
+
+    public suspend fun getManufacturerName(): String? {
+        return getString(device.iManufacturer)
+    }
+
+    public suspend fun getProductName(): String? {
+        return getString(device.iProduct)
+    }
+
+    public suspend fun getSerialNumber(): String? {
+        return getString(device.iSerialNumber)
+    }
+
+    public suspend fun getName(alternateSetting: UsbAlternateSetting): String? {
+        require(alternateSetting.device === device)
+        return getString(alternateSetting.iInterface)
+    }
+
+    public suspend fun getActiveConfiguration(): UsbConfiguration? {
+        val activeValue = withContext(Dispatchers.IO) {
+            lifetime.withRetained {
+                withNativeInt { configurationValue ->
+                    checkReturn(getConfiguration(nativeHandle, configurationValue.address))
+                    configurationValue.value
+                }
+            }
+        }
+
+        return device.configurations.firstOrNull { it.value == activeValue.toUByte() }
+    }
+
+    public suspend fun resetDevice() {
+        withContext(Dispatchers.IO) {
+            lifetime.withRetained {
+                checkReturn(resetDevice(nativeHandle))
+            }
+        }
+    }
+
+    public fun claim(iface: UsbInterface) {
+        require(iface.device === device)
+
+        lifetime.withRetained {
+            checkReturn(claimInterface(nativeHandle, iface.number.toInt()))
+        }
+    }
+
+    public suspend fun release(iface: UsbInterface) {
+        require(iface.device === device)
+
+        withContext(NonCancellable + Dispatchers.IO) {
+            lifetime.withRetained {
+                checkReturn(releaseInterface(nativeHandle, iface.number.toInt()))
+            }
+        }
+    }
+
     @OptIn(ExperimentalContracts::class)
-    public suspend fun sendPacket(endpoint: UsbBulkTransferOutEndpoint, encode: suspend MemoryEncoder.() -> Unit) {
+    public suspend inline fun <R> withClaim(iface: UsbInterface, block: () -> R): R {
         contract {
-            callsInPlace(encode, InvocationKind.EXACTLY_ONCE)
+            callsInPlace(block, InvocationKind.EXACTLY_ONCE)
+        }
+
+        claim(iface)
+
+        try {
+            return block()
+        } finally {
+            release(iface)
+        }
+    }
+
+    public suspend fun makeActive(alternateSetting: UsbAlternateSetting) {
+        require(alternateSetting.device === device)
+
+        withContext(Dispatchers.IO) {
+            lifetime.withRetained {
+                checkReturn(
+                    setInterfaceAltSetting(
+                        nativeHandle,
+                        alternateSetting.iface.number.toInt(),
+                        alternateSetting.value.toInt(),
+                    )
+                )
+            }
+        }
+    }
+
+    public suspend fun clearHalt(endpoint: UsbEndpoint) {
+        require(endpoint.device === device)
+
+        withContext(Dispatchers.IO) {
+            lifetime.withRetained {
+                checkReturn(clearHalt(nativeHandle, endpoint.address))
+            }
+        }
+    }
+
+    @OptIn(ExperimentalContracts::class)
+    public suspend fun sendPacket(endpoint: UsbBulkTransferOutEndpoint, fill: suspend (Memory) -> Long) {
+        contract {
+            callsInPlace(fill, InvocationKind.EXACTLY_ONCE)
         }
 
         require(endpoint.device === device)
@@ -140,9 +281,7 @@ public class UsbDeviceConnection internal constructor(
         val buffer = malloc(endpoint.maxPacketSize.toLong())
 
         val length = try {
-            nativeMemory(buffer, endpoint.maxPacketSize.toLong()).encoder().positionalDifference {
-                encode()
-            }
+            fill(nativeMemory(buffer, endpoint.maxPacketSize.toLong()))
         } catch (exception: Throwable) {
             free(buffer)
             throw exception
@@ -185,7 +324,7 @@ public class UsbDeviceConnection internal constructor(
         )
 
         try {
-            return process(nativeMemory(buffer, receivedLength.toLong()))
+            return process(nativeMemory(buffer, receivedLength.toLong()).asReadOnly())
         } finally {
             free(buffer)
         }

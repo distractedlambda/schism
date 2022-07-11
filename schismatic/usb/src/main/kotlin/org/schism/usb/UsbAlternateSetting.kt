@@ -6,19 +6,22 @@ import org.schism.usb.Libusb.InterfaceDescriptor
 import org.schism.util.contextual
 
 public class UsbAlternateSetting internal constructor(
-    public val `interface`: UsbInterface,
+    public val iface: UsbInterface,
     descriptor: InterfaceDescriptor,
 ) {
+    internal val value = descriptor.bAlternateSetting
+    internal val iInterface = descriptor.iInterface
+
     public val interfaceClass: UByte = descriptor.bInterfaceClass
     public val interfaceSubClass: UByte = descriptor.bInterfaceSubClass
     public val interfaceProtocol: UByte = descriptor.bInterfaceProtocol
 
     public val configuration: UsbConfiguration get() {
-        return `interface`.configuration
+        return iface.configuration
     }
 
     public val device: UsbDevice get() {
-        return `interface`.device
+        return iface.device
     }
 
     public val endpoints: List<UsbEndpoint> = kotlin.run {

@@ -40,6 +40,10 @@ public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
 
     private val nativeHandle = nativeHandle
 
+    internal val iManufacturer: UByte
+    internal val iProduct: UByte
+    internal val iSerialNumber: UByte
+
     public val usbVersion: UShort
     public val deviceClass: UByte
     public val deviceSubClass: UByte
@@ -55,6 +59,9 @@ public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
 
         withNativeStruct(DeviceDescriptor) { deviceDescriptor ->
             checkReturn(getDeviceDescriptor(nativeHandle, deviceDescriptor.address()))
+            iManufacturer = deviceDescriptor.iManufacturer
+            iProduct = deviceDescriptor.iProduct
+            iSerialNumber = deviceDescriptor.iSerialNumber
             usbVersion = deviceDescriptor.bcdUSB
             deviceClass = deviceDescriptor.bDeviceClass
             deviceSubClass = deviceDescriptor.bDeviceSubClass

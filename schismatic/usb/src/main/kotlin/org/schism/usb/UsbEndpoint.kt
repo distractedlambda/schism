@@ -12,8 +12,8 @@ public sealed class UsbEndpoint(
 
     public val extraDescriptors: List<UsbDescriptor> = parseExtraDescriptors(descriptor.extra, descriptor.extra_length)
 
-    public val `interface`: UsbInterface get() {
-        return alternateSetting.`interface`
+    public val iface: UsbInterface get() {
+        return alternateSetting.iface
     }
 
     public val configuration: UsbConfiguration get() {
