@@ -9,6 +9,10 @@ public class UsbInterface internal constructor(public val configuration: UsbConf
 
     public val alternateSettings: List<UsbAlternateSetting>
 
+    public val device: UsbDevice get() {
+        return configuration.device
+    }
+
     init {
         val interfaceDescriptors = InterfaceDescriptor.wrapArray(native.altsetting, native.num_altsetting.toLong())
         number = interfaceDescriptors[0].bInterfaceNumber

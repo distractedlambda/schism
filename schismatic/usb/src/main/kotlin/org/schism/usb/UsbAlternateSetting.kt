@@ -13,6 +13,14 @@ public class UsbAlternateSetting internal constructor(
     public val interfaceSubClass: UByte = descriptor.bInterfaceSubClass
     public val interfaceProtocol: UByte = descriptor.bInterfaceProtocol
 
+    public val configuration: UsbConfiguration get() {
+        return `interface`.configuration
+    }
+
+    public val device: UsbDevice get() {
+        return `interface`.device
+    }
+
     public val endpoints: List<UsbEndpoint> = kotlin.run {
         val endpointDescriptors = EndpointDescriptor.wrapArray(descriptor.endpoint, descriptor.bNumEndpoints.toLong())
         buildList {

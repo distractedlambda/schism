@@ -11,4 +11,16 @@ public sealed class UsbEndpoint(
     public val maxPacketSize: UShort = descriptor.wMaxPacketSize
 
     public val extraDescriptors: List<UsbDescriptor> = parseExtraDescriptors(descriptor.extra, descriptor.extra_length)
+
+    public val `interface`: UsbInterface get() {
+        return alternateSetting.`interface`
+    }
+
+    public val configuration: UsbConfiguration get() {
+        return alternateSetting.configuration
+    }
+
+    public val device: UsbDevice get() {
+        return alternateSetting.device
+    }
 }

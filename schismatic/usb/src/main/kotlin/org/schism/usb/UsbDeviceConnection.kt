@@ -9,18 +9,27 @@ import org.schism.ffi.CInt
 import org.schism.ffi.NativeEntrypoint
 import org.schism.ffi.nativeEntrypoint
 import org.schism.ffi.wrap
+import org.schism.memory.Memory
+import org.schism.memory.MemoryEncoder
 import org.schism.memory.NativeAddress
 import org.schism.memory.free
 import org.schism.memory.isNULL
+import org.schism.memory.malloc
+import org.schism.memory.nativeMemory
+import org.schism.memory.positionalDifference
 import org.schism.usb.Libusb.Companion.allocTransfer
 import org.schism.usb.Libusb.Companion.cancelTransfer
 import org.schism.usb.Libusb.Companion.errorMessage
 import org.schism.usb.Libusb.Companion.submitTransfer
 import org.schism.usb.Libusb.TransferStatus
+import org.schism.usb.Libusb.TransferType
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.Result.Companion.failure
 import kotlin.Result.Companion.success
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
 import kotlin.coroutines.resumeWithException
 
 public class UsbDeviceConnection internal constructor(
@@ -76,7 +85,7 @@ public class UsbDeviceConnection internal constructor(
                     }
 
                     continuation.invokeOnCancellation {
-                        // TODO: make lock-free?
+                        // FIXME: make lock-free?
                         synchronized(transfer) {
                             // FIXME: replace this check with something less fragile
                             if (transfer.continuation !== continuation) return@invokeOnCancellation
@@ -98,6 +107,8 @@ public class UsbDeviceConnection internal constructor(
         } catch (exception: Throwable) {
             if (!submitted) {
                 continuation.resumeWithException(exception)
+            } else {
+                throw exception
             }
         } finally {
             if (!submitted && !buffer.isNULL()) {
@@ -116,6 +127,73 @@ public class UsbDeviceConnection internal constructor(
         return suspendCancellableCoroutine { continuation ->
             transfer(continuation, callback, endpointAddress, type, buffer, bufferLength)
         }
+    }
+
+    @OptIn(ExperimentalContracts::class)
+    public suspend fun sendPacket(endpoint: UsbBulkTransferOutEndpoint, encode: suspend MemoryEncoder.() -> Unit) {
+        contract {
+            callsInPlace(encode, InvocationKind.EXACTLY_ONCE)
+        }
+
+        require(endpoint.device === device)
+
+        val buffer = malloc(endpoint.maxPacketSize.toLong())
+
+        val length = try {
+            nativeMemory(buffer, endpoint.maxPacketSize.toLong()).encoder().positionalDifference {
+                encode()
+            }
+        } catch (exception: Throwable) {
+            free(buffer)
+            throw exception
+        }
+
+        val sentLength = transfer(
+            endpoint.address,
+            nativeOutTransferCallback,
+            TransferType.BULK,
+            buffer,
+            length.toInt(),
+        )
+
+        if (sentLength.toLong() != length) {
+            throw UsbException("Incomplete outgoing transfer")
+        }
+    }
+
+    public suspend fun sendZeroLengthPacket(endpoint: UsbBulkTransferOutEndpoint) {
+        require(endpoint.device === device)
+        transfer(endpoint.address, nativeZeroLengthTransferCallback, TransferType.BULK, NativeAddress.NULL, 0)
+    }
+
+    @OptIn(ExperimentalContracts::class)
+    public suspend fun <R> receivePacket(endpoint: UsbBulkTransferInEndpoint, process: suspend (Memory) -> R): R {
+        contract {
+            callsInPlace(process, InvocationKind.EXACTLY_ONCE)
+        }
+
+        require(endpoint.device === device)
+
+        val buffer = malloc(endpoint.maxPacketSize.toLong())
+
+        val receivedLength = transfer(
+            endpoint.address,
+            nativeInTransferCallback,
+            TransferType.BULK,
+            buffer,
+            endpoint.maxPacketSize.toInt(),
+        )
+
+        try {
+            return process(nativeMemory(buffer, receivedLength.toLong()))
+        } finally {
+            free(buffer)
+        }
+    }
+
+    public suspend fun receiveZeroLengthPacket(endpoint: UsbBulkTransferInEndpoint) {
+        require(endpoint.device === device)
+        transfer(endpoint.address, nativeZeroLengthTransferCallback, TransferType.BULK, NativeAddress.NULL, 0)
     }
 
     override suspend fun close() {
@@ -153,13 +231,13 @@ public class UsbDeviceConnection internal constructor(
 
         private fun transferError(status: Int): UsbException {
             return UsbException(when (status) {
-                TransferStatus.ERROR -> "transfer error"
-                TransferStatus.TIMED_OUT -> "transfer timed out"
-                TransferStatus.CANCELED -> "transfer was canceled"
-                TransferStatus.STALL -> "transfer stalled"
-                TransferStatus.NO_DEVICE -> "transfer target no longer connected"
-                TransferStatus.OVERFLOW -> "transfer overflowed"
-                else -> "unknown transfer error"
+                TransferStatus.ERROR -> "Transfer error"
+                TransferStatus.TIMED_OUT -> "Transfer timed out"
+                TransferStatus.CANCELED -> "Transfer was canceled"
+                TransferStatus.STALL -> "Transfer stalled"
+                TransferStatus.NO_DEVICE -> "Transfer target no longer connected"
+                TransferStatus.OVERFLOW -> "Transfer overflowed"
+                else -> "Unknown transfer error"
             })
         }
 
