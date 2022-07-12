@@ -6,10 +6,12 @@ import org.objectweb.asm.Handle
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Opcodes.ACC_FINAL
+import org.objectweb.asm.Opcodes.ACC_PUBLIC
 import org.objectweb.asm.Opcodes.H_INVOKESTATIC
 import org.objectweb.asm.Opcodes.I2L
 import org.objectweb.asm.Opcodes.LAND
 import org.objectweb.asm.Opcodes.LRETURN
+import org.objectweb.asm.Opcodes.RETURN
 import org.objectweb.asm.Opcodes.V19
 import org.objectweb.asm.Type.getInternalName
 import org.objectweb.asm.Type.getMethodDescriptor
@@ -31,6 +33,7 @@ import java.lang.invoke.MethodHandles.Lookup.ClassOption.NESTMATE
 import java.lang.invoke.MethodHandles.classDataAt
 import java.lang.invoke.MethodType
 import java.lang.invoke.MethodType.methodType
+import java.nio.file.Path
 import kotlin.reflect.KCallable
 import kotlin.reflect.KFunction
 import kotlin.reflect.KMutableProperty
@@ -81,7 +84,7 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
 
     val symbolLookup = when (libraryName) {
         "" -> NATIVE_LINKER.defaultLookup()
-        else -> libraryLookup(libraryName, MemorySession.openImplicit())
+        else -> libraryLookup(Path.of(libraryName), MemorySession.openImplicit())
     }
 
     val downcallHandles = mutableListOf<MethodHandle>()
@@ -101,6 +104,8 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
         visitCode()
         visitVarInsn(Opcodes.ALOAD, 0)
         visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false)
+        visitInsn(RETURN)
+        visitMaxs(0, 0)
         visitEnd()
     }
 
@@ -135,13 +140,20 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
             "Could not find $symbolName in library $libraryName"
         }
 
-        val methodWriter = implWriter.visitMethod(0, javaMethod.name, getMethodDescriptor(javaMethod), null, null)
+        val methodWriter = implWriter.visitMethod(
+            ACC_PUBLIC,
+            javaMethod.name,
+            getMethodDescriptor(javaMethod),
+            null,
+            null,
+        )
+
         methodWriter.visitCode()
 
         val argumentLayouts = mutableListOf<MemoryLayout>()
         var nextArgumentLocal = 1
 
-        for ((kParam, jParam) in member.parameters.zip(javaMethod.parameterTypes).drop(1)) when (kParam.type) {
+        for ((kParam, jParam) in member.parameters.drop(1).zip(javaMethod.parameterTypes)) when (kParam.type) {
             typeOf<Byte>(), typeOf<UByte>() -> {
                 require(jParam == Byte::class.java)
 
@@ -333,7 +345,7 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
 
             typeOf<Unit>() -> {
                 require(javaMethod.returnType == Void.TYPE)
-                visitReturn = {}
+                visitReturn = { visitInsn(RETURN) }
                 returnLayout = null
             }
 
@@ -361,6 +373,7 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
         )
 
         methodWriter.visitReturn()
+        methodWriter.visitMaxs(0, 0)
         methodWriter.visitEnd()
     }
 

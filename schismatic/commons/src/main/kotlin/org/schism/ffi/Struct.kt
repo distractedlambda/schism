@@ -6,6 +6,7 @@ import org.objectweb.asm.Handle
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes.ACC_FINAL
 import org.objectweb.asm.Opcodes.ACC_PRIVATE
+import org.objectweb.asm.Opcodes.ACC_PUBLIC
 import org.objectweb.asm.Opcodes.ALOAD
 import org.objectweb.asm.Opcodes.ARETURN
 import org.objectweb.asm.Opcodes.DLOAD
@@ -23,6 +24,7 @@ import org.objectweb.asm.Opcodes.L2I
 import org.objectweb.asm.Opcodes.LAND
 import org.objectweb.asm.Opcodes.LLOAD
 import org.objectweb.asm.Opcodes.LRETURN
+import org.objectweb.asm.Opcodes.RETURN
 import org.objectweb.asm.Opcodes.V19
 import org.objectweb.asm.Type.getConstructorDescriptor
 import org.objectweb.asm.Type.getDescriptor
@@ -168,6 +170,8 @@ private fun generateStructType(clazz: Class<*>): StructType<*> {
             false,
         )
 
+        visitInsn(RETURN)
+        visitMaxs(0, 0)
         visitEnd()
     }
 
@@ -480,23 +484,26 @@ private fun generateStructType(clazz: Class<*>): StructType<*> {
             }
         }
 
-        implWriter.visitMethod(0, getter.name, getMethodDescriptor(getter), null, null).apply {
+        implWriter.visitMethod(ACC_PUBLIC, getter.name, getMethodDescriptor(getter), null, null).apply {
             visitCode()
             visitVarInsn(ALOAD, 0)
             visitFieldInsn(GETFIELD, AbstractStructImpl.INTERNAL_NAME, "memory", MEMORY_DESCRIPTOR)
             visitLdcInsn(offset)
             visitGetterInvokeAndReturn()
+            visitMaxs(0, 0)
             visitEnd()
         }
 
         if (setter != null) {
-            implWriter.visitMethod(0, setter.name, getMethodDescriptor(setter), null, null).apply {
+            implWriter.visitMethod(ACC_PUBLIC, setter.name, getMethodDescriptor(setter), null, null).apply {
                 visitCode()
                 visitVarInsn(ALOAD, 0)
                 visitFieldInsn(GETFIELD, AbstractStructImpl.INTERNAL_NAME, "memory", MEMORY_DESCRIPTOR)
                 visitSetterArgLoad()
                 visitLdcInsn(offset)
                 visitSetterInvoke()
+                visitInsn(RETURN)
+                visitMaxs(0, 0)
                 visitEnd()
             }
         }
@@ -508,10 +515,9 @@ private fun generateStructType(clazz: Class<*>): StructType<*> {
 
     val implLookup = LOOKUP.defineHiddenClass(implWriter.toByteArray(), false, NESTMATE)
 
-    val implConstructor = implLookup.findConstructor(
-        implLookup.lookupClass(),
-        methodType(Void.TYPE, Memory::class.java),
-    )
+    val implConstructor = implLookup
+        .findConstructor(implLookup.lookupClass(), methodType(Void.TYPE, Memory::class.java))
+        .asType(methodType(Struct::class.java, Memory::class.java))
 
     val typeImplWriter = ClassWriter(COMPUTE_FRAMES)
 
@@ -527,7 +533,7 @@ private fun generateStructType(clazz: Class<*>): StructType<*> {
     typeImplWriter.visitMethod(ACC_PRIVATE, "<init>", "()V", null, null).apply {
         visitCode()
 
-        visitInsn(ALOAD)
+        visitVarInsn(ALOAD, 0)
         visitLdcInsn(size)
         visitLdcInsn(alignment)
         visitMethodInsn(
@@ -538,11 +544,13 @@ private fun generateStructType(clazz: Class<*>): StructType<*> {
             false,
         )
 
+        visitInsn(RETURN)
+        visitMaxs(0, 0)
         visitEnd()
     }
 
     typeImplWriter.visitMethod(
-        0,
+        ACC_PUBLIC,
         AbstractStructTypeImpl.CREATE_STRUCT_NAME,
         AbstractStructTypeImpl.CREATE_STRUCT_DESCRIPTOR,
         null,
@@ -550,8 +558,10 @@ private fun generateStructType(clazz: Class<*>): StructType<*> {
     ).apply {
         visitCode()
         visitVarInsn(ALOAD, 1)
-        visitInvokeDynamicInsn("_", implConstructor.type().descriptorString(), STRUCT_FACTORY_BOOTSTRAP_HANDLE)
+        visitInvokeDynamicInsn("_", AbstractStructTypeImpl.CREATE_STRUCT_DESCRIPTOR, STRUCT_FACTORY_BOOTSTRAP_HANDLE)
         visitInsn(ARETURN)
+        visitMaxs(0, 0)
+        visitEnd()
     }
 
     typeImplWriter.visitEnd()

@@ -27,6 +27,7 @@ import org.schism.usb.Libusb.Companion.getConfigDescriptor
 import org.schism.usb.Libusb.Companion.getDeviceDescriptor
 import org.schism.usb.Libusb.Companion.getDeviceList
 import org.schism.usb.Libusb.Companion.getPortNumbers
+import org.schism.usb.Libusb.Companion.open
 import org.schism.usb.Libusb.Companion.refDevice
 import org.schism.usb.Libusb.Companion.unrefDevice
 import org.schism.usb.Libusb.DeviceDescriptor
@@ -105,6 +106,16 @@ public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
                 freeConfigDescriptor(configDescriptorAddress)
             }
         }
+    }
+
+    public fun connect(): UsbDeviceConnection {
+        return UsbDeviceConnection(
+            device = this,
+            nativeHandle = withNativePointer {
+                checkReturn(open(nativeHandle, it.address))
+                it.value
+            },
+        )
     }
 
     public companion object {

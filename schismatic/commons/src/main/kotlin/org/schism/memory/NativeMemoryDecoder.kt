@@ -15,7 +15,7 @@ internal class NativeMemoryDecoder(
     private inline fun <R> advance(count: Long, block: (source: NativeAddress) -> R): R {
         val source = nextSource
 
-        if (count >= end - source) {
+        if (count > end - source) {
             throw BufferUnderflowException()
         }
 

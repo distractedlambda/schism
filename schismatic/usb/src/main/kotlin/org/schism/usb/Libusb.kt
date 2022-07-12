@@ -14,7 +14,7 @@ import org.schism.memory.readUtf8CString
 import org.schism.memory.withNativePointer
 import kotlin.concurrent.thread
 
-@NativeLibrary.Name("usb-1.0")
+@NativeLibrary.Name("/opt/homebrew/lib/libusb-1.0.dylib")
 internal interface Libusb : NativeLibrary {
     @NativeLibrary.Function("libusb_alloc_transfer")
     fun allocTransfer(isoPackets: CInt): NativeAddress

@@ -211,9 +211,11 @@ private val INT_TO_LONG_HANDLE = MethodHandles
     .asType(methodType(Long::class.java, Int::class.java))
 
 private val LONG_TO_INT_HANDLE = MethodHandles
-    .identity(Long::class.java)
-    .asType(methodType(Int::class.java, Long::class.java))
+    .explicitCastArguments(
+        MethodHandles.identity(Long::class.java),
+        methodType(Int::class.java, Long::class.java),
+    )
 
 private val INT_TO_UNSIGNED_LONG_HANDLE = MethodHandles
     .lookup()
-    .unreflect(Integer::toUnsignedLong.javaMethod)
+    .findStatic(Integer::class.java, "toUnsignedLong", methodType(Long::class.java, Int::class.java))

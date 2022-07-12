@@ -15,7 +15,7 @@ internal class NativeMemoryEncoder(
     private inline fun advance(count: Long, block: (destination: NativeAddress) -> Unit) {
         val destination = nextDst
 
-        if (count >= end - destination) {
+        if (count > end - destination) {
             throw BufferOverflowException()
         }
 

@@ -7,14 +7,10 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import org.schism.coroutines.Actor
 import org.schism.coroutines.launchWhileEachPresent
 import org.schism.coroutines.updateMutating
-import org.schism.usb.Libusb
+import org.schism.coroutines.use
 import org.schism.usb.UsbDevice
-import org.schism.usb.connect
-import org.schism.usb.`interface`
-import org.schism.usb.withClaim
 import org.schism.util.contextual
 
 class DeviceManager(scope: CoroutineScope) {
@@ -24,17 +20,17 @@ class DeviceManager(scope: CoroutineScope) {
 
     init {
         scope.launch {
-            Libusb.attachedDevices.launchWhileEachPresent { device ->
+            UsbDevice.allDevices.launchWhileEachPresent { device ->
                 PicobootEndpoints.find(device)?.let { endpoints ->
-                    device.connect {
-                        withClaim(endpoints.inEndpoint.`interface`) {
+                    device.connect().use { connection ->
+                        connection.withClaim(endpoints.inEndpoint.iface) {
                             coroutineScope {
                                 val connectedDevice = ConnectedPicobootDeviceImpl(
                                     scope = contextual(),
                                     device,
-                                    getManufacturerName(),
-                                    getProductName(),
-                                    getSerialNumber(),
+                                    connection.getManufacturerName(),
+                                    connection.getProductName(),
+                                    connection.getSerialNumber(),
                                     endpoints,
                                 )
 
@@ -64,7 +60,7 @@ class DeviceManager(scope: CoroutineScope) {
         override val product: String?,
         override val serialNumber: String?,
         val endpoints: PicobootEndpoints,
-    ) : Actor(scope), ConnectedPicobootDevice
+    ) : ConnectedPicobootDevice
 }
 
 sealed interface ConnectedDevice {

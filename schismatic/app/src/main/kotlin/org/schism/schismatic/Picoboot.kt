@@ -1,42 +1,37 @@
 package org.schism.schismatic
 
-import org.schism.foreign.BufferEncoder
-import org.schism.foreign.NativeBuffer
-import org.schism.foreign.byteOffset
-import org.schism.foreign.positionalDifference
-import org.schism.foreign.putLeUInt
-import org.schism.foreign.putUByte
+import org.schism.memory.Memory
+import org.schism.memory.MemoryEncoder
+import org.schism.memory.positionalDifference
+import org.schism.memory.putLeUInt
+import org.schism.memory.putUByte
 import org.schism.usb.UsbBulkTransferInEndpoint
 import org.schism.usb.UsbBulkTransferOutEndpoint
 import org.schism.usb.UsbDevice
 import org.schism.usb.UsbDeviceConnection
-import org.schism.usb.receiveExact
-import org.schism.usb.receiveZeroLength
-import org.schism.usb.sendExact
-import org.schism.usb.sendZeroLength
 
 data class PicobootEndpoints(val inEndpoint: UsbBulkTransferInEndpoint, val outEndpoint: UsbBulkTransferOutEndpoint) {
     private suspend fun sendCommand(
         connection: UsbDeviceConnection,
         id: UByte,
         transferLength: UInt,
-        fillArgs: BufferEncoder.() -> Unit,
+        fillArgs: MemoryEncoder.() -> Unit,
     ) {
-        NativeBuffer.withUnmanaged(32) { commandBuffer ->
-            val commandSize = commandBuffer.slice(16.byteOffset).encoder().positionalDifference {
+        connection.sendPacket(outEndpoint) { packet ->
+            val commandSize = packet.slice(offset = 16, size = 16).encoder().positionalDifference {
                 fillArgs()
             }
 
-            commandBuffer.encoder().run {
+            packet.slice(size = 16).encoder().run {
                 putLeUInt(0x431fd10bu)
-                skip(4)
+                putInt(0)
                 putUByte(id)
                 putUByte(commandSize.toUByte())
-                skip(4)
+                putInt(0)
                 putLeUInt(transferLength)
             }
 
-            connection.sendExact(outEndpoint, commandBuffer)
+            32
         }
     }
 
@@ -45,7 +40,7 @@ data class PicobootEndpoints(val inEndpoint: UsbBulkTransferInEndpoint, val outE
             putUByte(exclusivity.ordinal.toUByte())
         }
 
-        connection.receiveZeroLength(inEndpoint)
+        connection.receiveZeroLengthPacket(inEndpoint)
     }
 
     suspend fun eraseFlash(connection: UsbDeviceConnection, deviceAddress: UInt, byteCount: UInt) {
@@ -60,51 +55,48 @@ data class PicobootEndpoints(val inEndpoint: UsbBulkTransferInEndpoint, val outE
             putLeUInt(byteCount)
         }
 
-        connection.receiveZeroLength(inEndpoint)
+        connection.receiveZeroLengthPacket(inEndpoint)
     }
 
-    suspend fun readMemory(connection: UsbDeviceConnection, deviceAddress: UInt, destination: NativeBuffer) {
+    suspend fun readMemory(connection: UsbDeviceConnection, deviceAddress: UInt, destination: Memory) {
         // FIXME: bounds-check against RP2040 address space?
 
-        require(destination.size in 1 .. UInt.MAX_VALUE.toLong())
+        TODO()
+        // require(destination.size in 1 .. UInt.MAX_VALUE.toLong())
 
-        sendCommand(connection, id = 0x84u, transferLength = destination.size.toUInt()) {
-            putLeUInt(deviceAddress)
-            putLeUInt(destination.size.toUInt())
-        }
+        // sendCommand(connection, id = 0x84u, transferLength = destination.size.toUInt()) {
+        //     putLeUInt(deviceAddress)
+        //     putLeUInt(destination.size.toUInt())
+        // }
 
-        connection.receiveExact(inEndpoint, destination)
-        connection.sendZeroLength(outEndpoint)
+        // connection.receive(inEndpoint, destination)
+        // connection.sendZeroLength(outEndpoint)
     }
 
-    suspend fun readMemory(connection: UsbDeviceConnection, deviceAddress: UInt, byteCount: UInt): NativeBuffer {
-        return NativeBuffer.allocateUninitialized(byteCount.toLong()).also {
-            readMemory(connection, deviceAddress, it)
-        }
-    }
-
-    suspend fun writeMemory(connection: UsbDeviceConnection, deviceAddress: UInt, data: NativeBuffer) {
+    suspend fun writeMemory(connection: UsbDeviceConnection, deviceAddress: UInt, data: Memory) {
         // FIXME: bounds-check against RP2040 address space?
 
-        require(data.size in 1 .. UInt.MAX_VALUE.toLong())
+        TODO()
 
-        sendCommand(connection, id = 0x05u, transferLength = data.size.toUInt()) {
-            putLeUInt(deviceAddress)
-            putLeUInt(data.size.toUInt())
-        }
+        // require(data.size in 1 .. UInt.MAX_VALUE.toLong())
 
-        connection.sendExact(outEndpoint, data)
-        connection.receiveZeroLength(inEndpoint)
+        // sendCommand(connection, id = 0x05u, transferLength = data.size.toUInt()) {
+        //     putLeUInt(deviceAddress)
+        //     putLeUInt(data.size.toUInt())
+        // }
+
+        // connection.sendExact(outEndpoint, data)
+        // connection.receiveZeroLength(inEndpoint)
     }
 
     suspend fun exitXip(connection: UsbDeviceConnection) {
         sendCommand(connection, id = 0x06u, transferLength = 0u) {}
-        connection.receiveZeroLength(inEndpoint)
+        connection.receiveZeroLengthPacket(inEndpoint)
     }
 
     suspend fun enterXip(connection: UsbDeviceConnection) {
         sendCommand(connection, id = 0x07u, transferLength = 0u) {}
-        connection.receiveZeroLength(inEndpoint)
+        connection.receiveZeroLengthPacket(inEndpoint)
     }
 
     companion object {

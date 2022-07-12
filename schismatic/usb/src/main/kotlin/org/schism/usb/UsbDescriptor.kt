@@ -13,7 +13,7 @@ internal fun parseExtraDescriptors(extra: NativeAddress, extraLength: CInt): Lis
     return buildList {
         nativeMemory(extra, extraLength.toLong()).decoder().run {
             while (hasRemaining()) {
-                val length = nextUByte()
+                val length = nextUByte() - 2u
                 val descriptorType = nextUByte()
                 val contents = allocateHeapMemory(length.toInt()).also(::nextBytes).asReadOnly()
                 add(UsbDescriptor(descriptorType, contents))

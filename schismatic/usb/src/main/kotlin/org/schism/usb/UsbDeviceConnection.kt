@@ -340,115 +340,113 @@ public class UsbDeviceConnection internal constructor(
             Libusb.close(nativeHandle)
         }
     }
+}
 
-    private class Transfer(val nativeAddress: NativeAddress) {
-        var continuation: CancellableContinuation<Int>? = null
-        var deviceConnectionLifetime: SharedLifetime? = null
+private class Transfer(val nativeAddress: NativeAddress) {
+    var continuation: CancellableContinuation<Int>? = null
+    var deviceConnectionLifetime: SharedLifetime? = null
 
-        val native: Libusb.Transfer get() {
-            return Libusb.Transfer.wrap(nativeAddress)
-        }
-
-        fun claimFromCallback(): CancellableContinuation<Int> {
-            val claimedContinuation = synchronized(this) {
-                continuation!!.also { continuation = null }
-            }
-
-            deviceConnectionLifetime!!.release()
-            deviceConnectionLifetime = null
-
-            return claimedContinuation
-        }
+    val native: Libusb.Transfer get() {
+        return Libusb.Transfer.wrap(nativeAddress)
     }
 
-    private companion object {
-        private val transfersByAddress = ConcurrentHashMap<NativeAddress, Transfer>()
-        private val freeTransfers = ConcurrentLinkedQueue<Transfer>()
-        private val nativeInTransferCallback = nativeEntrypoint(::inTransferCallback)
-        private val nativeOutTransferCallback = nativeEntrypoint(::outTransferCallback)
-        private val nativeZeroLengthTransferCallback = nativeEntrypoint(::zeroLengthTransferCallback)
-
-        private fun transferError(status: Int): UsbException {
-            return UsbException(when (status) {
-                TransferStatus.ERROR -> "Transfer error"
-                TransferStatus.TIMED_OUT -> "Transfer timed out"
-                TransferStatus.CANCELED -> "Transfer was canceled"
-                TransferStatus.STALL -> "Transfer stalled"
-                TransferStatus.NO_DEVICE -> "Transfer target no longer connected"
-                TransferStatus.OVERFLOW -> "Transfer overflowed"
-                else -> "Unknown transfer error"
-            })
+    fun claimFromCallback(): CancellableContinuation<Int> {
+        val claimedContinuation = synchronized(this) {
+            continuation!!.also { continuation = null }
         }
 
-        @JvmStatic private fun inTransferCallback(transferAddress: NativeAddress) {
-            val transfer = transfersByAddress[transferAddress]!!
-            val continuation = transfer.claimFromCallback()
+        deviceConnectionLifetime!!.release()
+        deviceConnectionLifetime = null
 
-            val buffer: NativeAddress
-            val status: CInt
-            val actualLength: CInt
+        return claimedContinuation
+    }
+}
 
-            transfer.native.let {
-                buffer = it.buffer
-                status = it.status
-                actualLength = it.actual_length
-                it.buffer = NativeAddress.NULL
-            }
+private val transfersByAddress = ConcurrentHashMap<NativeAddress, Transfer>()
+private val freeTransfers = ConcurrentLinkedQueue<Transfer>()
+private val nativeInTransferCallback = nativeEntrypoint(::inTransferCallback)
+private val nativeOutTransferCallback = nativeEntrypoint(::outTransferCallback)
+private val nativeZeroLengthTransferCallback = nativeEntrypoint(::zeroLengthTransferCallback)
 
-            freeTransfers.add(transfer)
+private fun transferError(status: Int): UsbException {
+    return UsbException(when (status) {
+        TransferStatus.ERROR -> "Transfer error"
+        TransferStatus.TIMED_OUT -> "Transfer timed out"
+        TransferStatus.CANCELED -> "Transfer was canceled"
+        TransferStatus.STALL -> "Transfer stalled"
+        TransferStatus.NO_DEVICE -> "Transfer target no longer connected"
+        TransferStatus.OVERFLOW -> "Transfer overflowed"
+        else -> "Unknown transfer error"
+    })
+}
 
-            if (status == TransferStatus.COMPLETED) {
-                @OptIn(ExperimentalCoroutinesApi::class)
-                continuation.resume(actualLength) {
-                    free(buffer)
-                }
-            } else {
-                free(buffer)
-                continuation.resumeWithException(transferError(status))
-            }
-        }
+private fun inTransferCallback(transferAddress: NativeAddress) {
+    val transfer = transfersByAddress[transferAddress]!!
+    val continuation = transfer.claimFromCallback()
 
-        @JvmStatic private fun outTransferCallback(transferAddress: NativeAddress) {
-            val transfer = transfersByAddress[transferAddress]!!
-            val continuation = transfer.claimFromCallback()
+    val buffer: NativeAddress
+    val status: CInt
+    val actualLength: CInt
 
-            val buffer: NativeAddress
-            val status: CInt
-            val actualLength: CInt
+    transfer.native.let {
+        buffer = it.buffer
+        status = it.status
+        actualLength = it.actual_length
+        it.buffer = NativeAddress.NULL
+    }
 
-            transfer.native.let {
-                buffer = it.buffer
-                status = it.status
-                actualLength = it.actual_length
-                it.buffer = NativeAddress.NULL
-            }
+    freeTransfers.add(transfer)
 
-            freeTransfers.add(transfer)
+    if (status == TransferStatus.COMPLETED) {
+        @OptIn(ExperimentalCoroutinesApi::class)
+        continuation.resume(actualLength) {
             free(buffer)
-
-            continuation.resumeWith(
-                if (status == TransferStatus.COMPLETED) {
-                    success(actualLength)
-                } else {
-                    failure(transferError(status))
-                }
-            )
         }
-
-        @JvmStatic private fun zeroLengthTransferCallback(transferAddress: NativeAddress) {
-            val transfer = transfersByAddress[transferAddress]!!
-            val continuation = transfer.claimFromCallback()
-
-            val status = transfer.native.status
-            freeTransfers.add(transfer)
-
-            continuation.resumeWith(
-                if (status == TransferStatus.COMPLETED) {
-                    success(0)
-                } else {
-                    failure(transferError(status))
-                }
-            )
-        }
+    } else {
+        free(buffer)
+        continuation.resumeWithException(transferError(status))
     }
+}
+
+private fun outTransferCallback(transferAddress: NativeAddress) {
+    val transfer = transfersByAddress[transferAddress]!!
+    val continuation = transfer.claimFromCallback()
+
+    val buffer: NativeAddress
+    val status: CInt
+    val actualLength: CInt
+
+    transfer.native.let {
+        buffer = it.buffer
+        status = it.status
+        actualLength = it.actual_length
+        it.buffer = NativeAddress.NULL
+    }
+
+    freeTransfers.add(transfer)
+    free(buffer)
+
+    continuation.resumeWith(
+        if (status == TransferStatus.COMPLETED) {
+            success(actualLength)
+        } else {
+            failure(transferError(status))
+        }
+    )
+}
+
+private fun zeroLengthTransferCallback(transferAddress: NativeAddress) {
+    val transfer = transfersByAddress[transferAddress]!!
+    val continuation = transfer.claimFromCallback()
+
+    val status = transfer.native.status
+    freeTransfers.add(transfer)
+
+    continuation.resumeWith(
+        if (status == TransferStatus.COMPLETED) {
+            success(0)
+        } else {
+            failure(transferError(status))
+        }
+    )
 }

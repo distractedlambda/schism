@@ -11,11 +11,14 @@ repositories {
 }
 
 dependencies {
+    implementation(project(":usb"))
     implementation(compose.desktop.currentOs)
 }
 
 kotlin {
-    explicitApi()
+    jvmToolchain {
+        languageVersion.set(JavaLanguageVersion.of(19))
+    }
 }
 
 compose.desktop {

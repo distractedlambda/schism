@@ -27,7 +27,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
-import org.schism.collections.IdMapping
+import org.schism.util.IdMapping
 import org.schism.util.contextual
 
 fun main() {
