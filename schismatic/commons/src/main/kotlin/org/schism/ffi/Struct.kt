@@ -61,11 +61,11 @@ import kotlin.reflect.typeOf
 
 public interface Struct {
     public fun memory(): Memory
-
-    @Target(AnnotationTarget.CLASS)
-    @Retention(AnnotationRetention.RUNTIME)
-    public annotation class Fields(vararg val value: String)
 }
+
+@Target(AnnotationTarget.CLASS)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class StructField(val index: Int)
 
 public interface StructType<out S : Struct> {
     public val size: Long
@@ -137,10 +137,6 @@ private fun generateStructType(clazz: Class<*>): StructType<*> {
 
     require(klass.isSubclassOf(Struct::class)) {
         "$klass does not extend ${Struct::class.simpleName}"
-    }
-
-    val fieldNames = requireNotNull(klass.findAnnotation<Struct.Fields>()?.value) {
-        "$klass is missing a ${Struct.Fields::class.simpleName} annotation"
     }
 
     var size = 0L

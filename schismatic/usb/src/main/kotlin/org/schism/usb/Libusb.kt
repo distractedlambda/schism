@@ -4,6 +4,7 @@ import org.schism.ffi.CInt
 import org.schism.ffi.CSSizeT
 import org.schism.ffi.CUnsignedChar
 import org.schism.ffi.CUnsignedInt
+import org.schism.ffi.NativeFunction
 import org.schism.ffi.NativeLibrary
 import org.schism.ffi.Struct
 import org.schism.ffi.StructType
@@ -14,81 +15,81 @@ import org.schism.memory.readUtf8CString
 import org.schism.memory.withNativePointer
 import kotlin.concurrent.thread
 
-@NativeLibrary.Name("/opt/homebrew/lib/libusb-1.0.dylib")
-internal interface Libusb : NativeLibrary {
-    @NativeLibrary.Function("libusb_alloc_transfer")
+@NativeLibrary("usb-1.0")
+internal interface Libusb {
+    @NativeFunction("libusb_alloc_transfer")
     fun allocTransfer(isoPackets: CInt): NativeAddress
 
-    @NativeLibrary.Function("libusb_cancel_transfer")
+    @NativeFunction("libusb_cancel_transfer")
     fun cancelTransfer(transfer: NativeAddress): CInt
 
-    @NativeLibrary.Function("libusb_claim_interface")
+    @NativeFunction("libusb_claim_interface")
     fun claimInterface(devHandle: NativeAddress, interfaceNumber: CInt): CInt
 
-    @NativeLibrary.Function("libusb_clear_halt")
+    @NativeFunction("libusb_clear_halt")
     fun clearHalt(devHandle: NativeAddress, endpoint: CUnsignedChar): CInt
 
-    @NativeLibrary.Function("libusb_close")
+    @NativeFunction("libusb_close")
     fun close(devHandle: NativeAddress)
 
-    @NativeLibrary.Function("libusb_free_config_descriptor")
+    @NativeFunction("libusb_free_config_descriptor")
     fun freeConfigDescriptor(config: NativeAddress)
 
-    @NativeLibrary.Function("libusb_free_device_list")
+    @NativeFunction("libusb_free_device_list")
     fun freeDeviceList(list: NativeAddress, unrefDevices: CInt)
 
-    @NativeLibrary.Function("libusb_free_transfer")
+    @NativeFunction("libusb_free_transfer")
     fun freeTransfer(transfer: NativeAddress)
 
-    @NativeLibrary.Function("libusb_get_bus_number")
+    @NativeFunction("libusb_get_bus_number")
     fun getBusNumber(dev: NativeAddress): UByte
 
-    @NativeLibrary.Function("libusb_get_config_descriptor")
+    @NativeFunction("libusb_get_config_descriptor")
     fun getConfigDescriptor(dev: NativeAddress, configIndex: UByte, config: NativeAddress): CInt
 
-    @NativeLibrary.Function("libusb_get_configuration")
+    @NativeFunction("libusb_get_configuration")
     fun getConfiguration(devHandle: NativeAddress, config: NativeAddress): CInt
 
-    @NativeLibrary.Function("libusb_get_device_address")
+    @NativeFunction("libusb_get_device_address")
     fun getDeviceAddress(dev: NativeAddress): UByte
 
-    @NativeLibrary.Function("libusb_get_device_descriptor")
+    @NativeFunction("libusb_get_device_descriptor")
     fun getDeviceDescriptor(dev: NativeAddress, desc: NativeAddress): CInt
 
-    @NativeLibrary.Function("libusb_get_device_list")
+    @NativeFunction("libusb_get_device_list")
     fun getDeviceList(ctx: NativeAddress, list: NativeAddress): CSSizeT
 
-    @NativeLibrary.Function("libusb_get_port_numbers")
+    @NativeFunction("libusb_get_port_numbers")
     fun getPortNumbers(dev: NativeAddress, portNumbers: NativeAddress, portNumbersLen: CInt): CInt
 
-    @NativeLibrary.Function("libusb_handle_events")
+    @NativeFunction("libusb_handle_events")
     fun handleEvents(ctx: NativeAddress): CInt
 
-    @NativeLibrary.Function("libusb_init")
+    @NativeFunction("libusb_init")
     fun init(ctx: NativeAddress): CInt
 
-    @NativeLibrary.Function("libusb_open")
+    @NativeFunction("libusb_open")
     fun open(dev: NativeAddress, devHandle: NativeAddress): CInt
 
-    @NativeLibrary.Function("libusb_ref_device")
+    @NativeFunction("libusb_ref_device")
     fun refDevice(dev: NativeAddress): NativeAddress
 
-    @NativeLibrary.Function("libusb_release_interface")
+    @NativeFunction("libusb_release_interface")
     fun releaseInterface(devHandle: NativeAddress, interfaceNumber: CInt): CInt
 
-    @NativeLibrary.Function("libusb_reset_device")
+    @NativeFunction("libusb_reset_device")
     fun resetDevice(devHandle: NativeAddress): CInt
 
-    @NativeLibrary.Function("libusb_set_interface_alt_setting")
+    @NativeFunction("libusb_set_interface_alt_setting")
     fun setInterfaceAltSetting(devHandle: NativeAddress, interfaceNumber: CInt, alternateSetting: CInt): CInt
 
-    @NativeLibrary.Function("libusb_strerror")
+    @NativeFunction("libusb_strerror")
     fun strerror(errCode: CInt): NativeAddress
 
-    @NativeLibrary.Function("libusb_submit_transfer")
+    @NativeFunction("libusb_submit_transfer")
     fun submitTransfer(transfer: NativeAddress): CInt
 
-    @NativeLibrary.Function("libusb_unref_device")
+    @NativeFunction("libusb_unref_device")
     fun unrefDevice(dev: NativeAddress)
 
     @Struct.Fields(

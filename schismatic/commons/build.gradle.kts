@@ -4,11 +4,10 @@ plugins {
 }
 
 dependencies {
+    api(kotlin("reflect"))
     api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.3")
     api("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.5")
-
-    implementation(kotlin("reflect"))
-    implementation("org.ow2.asm:asm:9.3")
+    api("org.ow2.asm:asm:9.3")
 }
 
 kotlin {

@@ -39,25 +39,22 @@ import kotlin.reflect.KFunction
 import kotlin.reflect.KMutableProperty
 import kotlin.reflect.KProperty
 import kotlin.reflect.full.findAnnotation
-import kotlin.reflect.full.isSubclassOf
 import kotlin.reflect.jvm.javaMethod
 import kotlin.reflect.typeOf
 
-public interface NativeLibrary {
-    @Target(AnnotationTarget.CLASS)
-    @Retention(AnnotationRetention.RUNTIME)
-    public annotation class Name(val value: String)
+@Target(AnnotationTarget.CLASS)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class NativeLibrary(val value: String)
 
-    @Target(AnnotationTarget.PROPERTY_GETTER, AnnotationTarget.PROPERTY_SETTER, AnnotationTarget.FUNCTION)
-    @Retention(AnnotationRetention.RUNTIME)
-    public annotation class Function(val name: String)
-}
+@Target(AnnotationTarget.PROPERTY_GETTER, AnnotationTarget.PROPERTY_SETTER, AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class NativeFunction(val name: String)
 
-public fun <T : NativeLibrary> linkNativeLibrary(clazz: Class<T>): T {
+public fun <T> linkNativeLibrary(clazz: Class<T>): T {
     return (@Suppress("UNCHECKED_CAST") (LinkedNativeLibraries[clazz] as T))
 }
 
-public inline fun <reified T : NativeLibrary> linkNativeLibrary(): T {
+public inline fun <reified T> linkNativeLibrary(): T {
     return linkNativeLibrary(T::class.java)
 }
 
@@ -74,12 +71,8 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
         "$klass is not an interface"
     }
 
-    require(klass.isSubclassOf(NativeLibrary::class)) {
-        "$klass does not extend ${NativeLibrary::class.simpleName}"
-    }
-
-    val libraryName = requireNotNull(klass.findAnnotation<NativeLibrary.Name>()?.value) {
-        "$klass is missing a ${NativeLibrary.Name::class.simpleName} annotation"
+    val libraryName = requireNotNull(klass.findAnnotation<NativeLibrary>()?.value) {
+        "$klass is missing a ${NativeLibrary::class.simpleName} annotation"
     }
 
     val symbolLookup = when (libraryName) {
@@ -128,8 +121,8 @@ private fun generateLinkedLibrary(clazz: Class<*>): NativeLibrary {
             throw UnsupportedOperationException("Encountered abstract member of unsupported type: $member")
         }
 
-        val symbolName = requireNotNull(member.findAnnotation<NativeLibrary.Function>()?.name) {
-            "Abstract member $member is missing a ${NativeLibrary.Function::class.simpleName} annotation"
+        val symbolName = requireNotNull(member.findAnnotation<NativeFunction>()?.name) {
+            "Abstract member $member is missing a ${NativeFunction::class.simpleName} annotation"
         }
 
         val javaMethod = requireNotNull(member.javaMethod) {
