@@ -8,7 +8,7 @@ public class UsbConfiguration internal constructor(public val device: UsbDevice,
     internal val value = descriptor.bConfigurationValue
 
     public val interfaces: List<UsbInterface> = kotlin.run {
-        val interfaceStructs = Interface.wrapArray(descriptor.iface, descriptor.bNumInterfaces.toLong())
+        val interfaceStructs = Interface.Type.wrapArray(descriptor.iface, descriptor.bNumInterfaces.toLong())
         List(descriptor.bNumInterfaces.toInt()) {
             UsbInterface(this, interfaceStructs[it.toLong()])
         }

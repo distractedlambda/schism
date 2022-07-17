@@ -25,7 +25,11 @@ public class UsbAlternateSetting internal constructor(
     }
 
     public val endpoints: List<UsbEndpoint> = kotlin.run {
-        val endpointDescriptors = EndpointDescriptor.wrapArray(descriptor.endpoint, descriptor.bNumEndpoints.toLong())
+        val endpointDescriptors = EndpointDescriptor.Type.wrapArray(
+            descriptor.endpoint,
+            descriptor.bNumEndpoints.toLong(),
+        )
+
         buildList {
             for (endpointDescriptor in endpointDescriptors) {
                 when (endpointDescriptor.bmAttributes and 0b11u) {

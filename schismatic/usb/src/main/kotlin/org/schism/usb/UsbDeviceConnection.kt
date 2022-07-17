@@ -8,7 +8,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.schism.coroutines.SharedLifetime
 import org.schism.coroutines.SuspendingAutocloseable
-import org.schism.ffi.CInt
 import org.schism.ffi.NativeCallable
 import org.schism.ffi.nativeCallable
 import org.schism.ffi.wrap
@@ -24,17 +23,6 @@ import org.schism.memory.putLeUShort
 import org.schism.memory.putUByte
 import org.schism.memory.readUByte
 import org.schism.memory.withNativeInt
-import org.schism.usb.Libusb.Companion.allocTransfer
-import org.schism.usb.Libusb.Companion.cancelTransfer
-import org.schism.usb.Libusb.Companion.checkReturn
-import org.schism.usb.Libusb.Companion.claimInterface
-import org.schism.usb.Libusb.Companion.clearHalt
-import org.schism.usb.Libusb.Companion.errorMessage
-import org.schism.usb.Libusb.Companion.getConfiguration
-import org.schism.usb.Libusb.Companion.releaseInterface
-import org.schism.usb.Libusb.Companion.resetDevice
-import org.schism.usb.Libusb.Companion.setInterfaceAltSetting
-import org.schism.usb.Libusb.Companion.submitTransfer
 import org.schism.usb.Libusb.TransferStatus
 import org.schism.usb.Libusb.TransferType
 import java.util.concurrent.ConcurrentHashMap
@@ -65,7 +53,7 @@ public class UsbDeviceConnection internal constructor(
             lifetime.retain()
             try {
                 val transfer = freeTransfers.poll() ?: kotlin.run {
-                    val nativeAddress = allocTransfer(0)
+                    val nativeAddress = libusb.alloc_transfer(0)
 
                     if (nativeAddress.isNULL()) {
                         throw OutOfMemoryError("Failed to allocate libusb transfer")
@@ -90,11 +78,11 @@ public class UsbDeviceConnection internal constructor(
                     transfer.deviceConnectionLifetime = lifetime
 
                     submitted = true
-                    when (val returnCode = submitTransfer(transfer.nativeAddress)) {
+                    when (val returnCode = libusb.submit_transfer(transfer.nativeAddress)) {
                         0 -> Unit
                         else -> {
                             submitted = false
-                            throw UsbException(errorMessage(returnCode))
+                            throw UsbException(libusbErrorMessage(returnCode))
                         }
                     }
 
@@ -103,7 +91,7 @@ public class UsbDeviceConnection internal constructor(
                         synchronized(transfer) {
                             // FIXME: replace this check with something less fragile
                             if (transfer.continuation !== continuation) return@invokeOnCancellation
-                            cancelTransfer(transfer.nativeAddress)
+                            libusb.cancel_transfer(transfer.nativeAddress)
                         }
                     }
                 } finally {
@@ -194,7 +182,7 @@ public class UsbDeviceConnection internal constructor(
         val activeValue = withContext(Dispatchers.IO) {
             lifetime.withRetained {
                 withNativeInt { configurationValue ->
-                    checkReturn(getConfiguration(nativeHandle, configurationValue.address))
+                    checkLibusbReturn(libusb.get_configuration(nativeHandle, configurationValue.address))
                     configurationValue.value
                 }
             }
@@ -206,7 +194,7 @@ public class UsbDeviceConnection internal constructor(
     public suspend fun resetDevice() {
         withContext(Dispatchers.IO) {
             lifetime.withRetained {
-                checkReturn(resetDevice(nativeHandle))
+                checkLibusbReturn(libusb.reset_device(nativeHandle))
             }
         }
     }
@@ -215,7 +203,7 @@ public class UsbDeviceConnection internal constructor(
         require(iface.device === device)
 
         lifetime.withRetained {
-            checkReturn(claimInterface(nativeHandle, iface.number.toInt()))
+            checkLibusbReturn(libusb.claim_interface(nativeHandle, iface.number.toInt()))
         }
     }
 
@@ -224,7 +212,7 @@ public class UsbDeviceConnection internal constructor(
 
         withContext(NonCancellable + Dispatchers.IO) {
             lifetime.withRetained {
-                checkReturn(releaseInterface(nativeHandle, iface.number.toInt()))
+                checkLibusbReturn(libusb.release_interface(nativeHandle, iface.number.toInt()))
             }
         }
     }
@@ -249,8 +237,8 @@ public class UsbDeviceConnection internal constructor(
 
         withContext(Dispatchers.IO) {
             lifetime.withRetained {
-                checkReturn(
-                    setInterfaceAltSetting(
+                checkLibusbReturn(
+                    libusb.set_interface_alt_setting(
                         nativeHandle,
                         alternateSetting.iface.number.toInt(),
                         alternateSetting.value.toInt(),
@@ -265,7 +253,7 @@ public class UsbDeviceConnection internal constructor(
 
         withContext(Dispatchers.IO) {
             lifetime.withRetained {
-                checkReturn(clearHalt(nativeHandle, endpoint.address))
+                checkLibusbReturn(libusb.clear_halt(nativeHandle, endpoint.address))
             }
         }
     }
@@ -337,7 +325,7 @@ public class UsbDeviceConnection internal constructor(
 
     override suspend fun close() {
         if (lifetime.end()) {
-            Libusb.close(nativeHandle)
+            libusb.close(nativeHandle)
         }
     }
 }
@@ -347,7 +335,7 @@ private class Transfer(val nativeAddress: NativeAddress) {
     var deviceConnectionLifetime: SharedLifetime? = null
 
     val native: Libusb.Transfer get() {
-        return Libusb.Transfer.wrap(nativeAddress)
+        return Libusb.Transfer.Type.wrap(nativeAddress)
     }
 
     fun claimFromCallback(): CancellableContinuation<Int> {
@@ -385,8 +373,8 @@ private fun inTransferCallback(transferAddress: NativeAddress) {
     val continuation = transfer.claimFromCallback()
 
     val buffer: NativeAddress
-    val status: CInt
-    val actualLength: CInt
+    val status: Int
+    val actualLength: Int
 
     transfer.native.let {
         buffer = it.buffer
@@ -413,8 +401,8 @@ private fun outTransferCallback(transferAddress: NativeAddress) {
     val continuation = transfer.claimFromCallback()
 
     val buffer: NativeAddress
-    val status: CInt
-    val actualLength: CInt
+    val status: Int
+    val actualLength: Int
 
     transfer.native.let {
         buffer = it.buffer

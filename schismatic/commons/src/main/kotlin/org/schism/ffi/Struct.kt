@@ -61,7 +61,7 @@ public interface Struct {
     public fun memory(): Memory
 }
 
-@Target(AnnotationTarget.CLASS)
+@Target(AnnotationTarget.PROPERTY)
 @Retention(AnnotationRetention.RUNTIME)
 public annotation class StructField(val index: Int)
 
