@@ -16,16 +16,16 @@ import kotlin.reflect.KFunction
 import kotlin.reflect.full.valueParameters
 import kotlin.reflect.jvm.javaMethod
 
-public interface NativeEntrypoint {
+public interface NativeCallable {
     public val address: NativeAddress
 }
 
 @Suppress("NOTHING_TO_INLINE")
-public inline fun nativeEntrypoint(function: KFunction<*>): NativeEntrypoint {
-    return nativeEntrypoint(MethodHandles.lookup(), function)
+public inline fun nativeCallable(function: KFunction<*>): NativeCallable {
+    return nativeCallable(MethodHandles.lookup(), function)
 }
 
-public fun nativeEntrypoint(lookup: Lookup, function: KFunction<*>): NativeEntrypoint {
+public fun nativeCallable(lookup: Lookup, function: KFunction<*>): NativeCallable {
     val javaMethod = function.javaMethod
 
     require(javaMethod != null && Modifier.isStatic(javaMethod.modifiers)) {
@@ -80,13 +80,13 @@ public fun nativeEntrypoint(lookup: Lookup, function: KFunction<*>): NativeEntry
         .address()
         .toNativeAddress()
 
-    return NativeEntrypointImpl(address, memorySession)
+    return NativeCallableImpl(address, memorySession)
 }
 
-private class NativeEntrypointImpl(
+private class NativeCallableImpl(
     override val address: NativeAddress,
     private val session: MemorySession,
-) : NativeEntrypoint
+) : NativeCallable
 
 private val NATIVE_LINKER = Linker.nativeLinker()
 

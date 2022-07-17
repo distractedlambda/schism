@@ -9,8 +9,8 @@ import kotlinx.coroutines.withContext
 import org.schism.coroutines.SharedLifetime
 import org.schism.coroutines.SuspendingAutocloseable
 import org.schism.ffi.CInt
-import org.schism.ffi.NativeEntrypoint
-import org.schism.ffi.nativeEntrypoint
+import org.schism.ffi.NativeCallable
+import org.schism.ffi.nativeCallable
 import org.schism.ffi.wrap
 import org.schism.memory.Memory
 import org.schism.memory.NativeAddress
@@ -54,7 +54,7 @@ public class UsbDeviceConnection internal constructor(
 
     private fun transfer(
         continuation: CancellableContinuation<Int>,
-        callback: NativeEntrypoint,
+        callback: NativeCallable,
         endpointAddress: UByte,
         type: UByte,
         buffer: NativeAddress,
@@ -133,7 +133,7 @@ public class UsbDeviceConnection internal constructor(
 
     private suspend inline fun transfer(
         endpointAddress: UByte,
-        callback: NativeEntrypoint,
+        callback: NativeCallable,
         type: UByte,
         buffer: NativeAddress,
         bufferLength: Int,
@@ -364,9 +364,9 @@ private class Transfer(val nativeAddress: NativeAddress) {
 
 private val transfersByAddress = ConcurrentHashMap<NativeAddress, Transfer>()
 private val freeTransfers = ConcurrentLinkedQueue<Transfer>()
-private val nativeInTransferCallback = nativeEntrypoint(::inTransferCallback)
-private val nativeOutTransferCallback = nativeEntrypoint(::outTransferCallback)
-private val nativeZeroLengthTransferCallback = nativeEntrypoint(::zeroLengthTransferCallback)
+private val nativeInTransferCallback = nativeCallable(::inTransferCallback)
+private val nativeOutTransferCallback = nativeCallable(::outTransferCallback)
+private val nativeZeroLengthTransferCallback = nativeCallable(::zeroLengthTransferCallback)
 
 private fun transferError(status: Int): UsbException {
     return UsbException(when (status) {

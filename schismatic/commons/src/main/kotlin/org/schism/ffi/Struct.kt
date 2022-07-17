@@ -3,7 +3,6 @@ package org.schism.ffi
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.ClassWriter.COMPUTE_FRAMES
 import org.objectweb.asm.Handle
-import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes.ACC_FINAL
 import org.objectweb.asm.Opcodes.ACC_PRIVATE
 import org.objectweb.asm.Opcodes.ACC_PUBLIC
@@ -26,10 +25,9 @@ import org.objectweb.asm.Opcodes.LLOAD
 import org.objectweb.asm.Opcodes.LRETURN
 import org.objectweb.asm.Opcodes.RETURN
 import org.objectweb.asm.Opcodes.V19
-import org.objectweb.asm.Type.getConstructorDescriptor
 import org.objectweb.asm.Type.getDescriptor
 import org.objectweb.asm.Type.getInternalName
-import org.objectweb.asm.Type.getMethodDescriptor
+import org.schism.invoke.HiddenClassDefiner
 import org.schism.math.alignForwardsTo
 import org.schism.memory.Memory
 import org.schism.memory.NativeAddress
@@ -37,27 +35,27 @@ import org.schism.memory.allocateNativeMemory
 import org.schism.memory.nativeMemory
 import org.schism.memory.requireAlignedTo
 import org.schism.memory.withNativeMemory
+import org.schism.reflect.descriptorString
+import org.schism.reflect.internalName
 import java.lang.invoke.CallSite
 import java.lang.invoke.ConstantCallSite
 import java.lang.invoke.MethodHandle
-import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodHandles.Lookup
-import java.lang.invoke.MethodHandles.Lookup.ClassOption.NESTMATE
 import java.lang.invoke.MethodHandles.classData
 import java.lang.invoke.MethodType
 import java.lang.invoke.MethodType.methodType
-import java.lang.reflect.Modifier
+import java.util.TreeMap
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
+import kotlin.reflect.KClass
 import kotlin.reflect.KMutableProperty1
+import kotlin.reflect.KProperty1
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.isSubclassOf
-import kotlin.reflect.full.memberProperties
 import kotlin.reflect.jvm.javaGetter
 import kotlin.reflect.jvm.javaMethod
 import kotlin.reflect.jvm.javaSetter
-import kotlin.reflect.typeOf
 
 public interface Struct {
     public fun memory(): Memory
@@ -73,14 +71,6 @@ public interface StructType<out S : Struct> {
     public val alignment: Long
 
     public fun wrap(memory: Memory): S
-}
-
-public fun <S : Struct> structType(clazz: Class<S>): StructType<S> {
-    return (@Suppress("UNCHECKED_CAST") (GeneratedStructTypes[clazz] as StructType<S>))
-}
-
-public inline fun <reified S : Struct> structType(): StructType<S> {
-    return structType(S::class.java)
 }
 
 public fun Struct.isNative(): Boolean {
@@ -122,17 +112,14 @@ public inline fun <S : Struct, R> withNativeStruct(type: StructType<S>, block: (
     }
 }
 
-private object GeneratedStructTypes : ClassValue<StructType<*>>() {
-    override fun computeValue(type: Class<*>): StructType<*> {
-        return generateStructType(type)
-    }
+public inline fun <reified S : Struct> StructType(): StructType<S> {
+    return StructType(S::class, HiddenClassDefiner())
 }
 
-private fun generateStructType(clazz: Class<*>): StructType<*> {
-    val klass = clazz.kotlin
-
-    require(clazz.isInterface) {
-        "$klass is not an interface type"
+@PublishedApi
+internal fun <S : Struct> StructType(klass: KClass<S>, definer: HiddenClassDefiner): StructType<S> {
+    require(klass.java.isInterface) {
+        "$klass is not an interface"
     }
 
     require(klass.isSubclassOf(Struct::class)) {
@@ -142,16 +129,24 @@ private fun generateStructType(clazz: Class<*>): StructType<*> {
     var size = 0L
     var alignment = 1L
 
+    val fields = TreeMap<Int, KProperty1<*, *>>()
+
+    klass.members.forEach { member ->
+        val field = (member.findAnnotation<StructField>() ?: return@forEach).index
+
+        require(member is KProperty1<*, *>) {
+            "$member is not a non-extension property"
+        }
+
+        fields.put(field, member)?.let { otherMember ->
+            throw IllegalArgumentException("Field index $field is used by both $member and $otherMember")
+        }
+    }
+
+    val implName = "${definer.internalNamePrefix}${klass.simpleName}Impl"
     val implWriter = ClassWriter(COMPUTE_FRAMES)
 
-    implWriter.visit(
-        V19,
-        ACC_FINAL,
-        "org/schism/ffi/StructImpl",
-        null,
-        AbstractStructImpl.INTERNAL_NAME,
-        arrayOf(getInternalName(clazz)),
-    )
+    implWriter.visit(V19, ACC_FINAL, implName, null, AbstractStructImpl.INTERNAL_NAME, arrayOf(klass.java.internalName))
 
     implWriter.visitMethod(ACC_PRIVATE, "<init>", AbstractStructImpl.CONSTRUCTOR_DESCRIPTOR, null, null).apply {
         visitCode()
@@ -171,333 +166,133 @@ private fun generateStructType(clazz: Class<*>): StructType<*> {
         visitEnd()
     }
 
-    for (fieldName in fieldNames) {
-        val member = requireNotNull(klass.memberProperties.firstOrNull { it.name == fieldName }) {
-            "$klass does not have a member property named '$fieldName'"
-        }
-
-        val getter = member.javaGetter
-        val setter = (member as? KMutableProperty1)?.javaSetter
+    fields.values.forEach { property ->
+        val getter = property.javaGetter
+        val setter = (property as? KMutableProperty1)?.javaSetter
 
         requireNotNull(getter) {
-            "$member has no getter"
+            "$property has no getter"
         }
 
-        require(Modifier.isAbstract(getter.modifiers)) {
-            "$member has a non-abstract getter"
-        }
+        val handling = ffiHandlingFor(property.returnType)
 
-        require(setter == null || Modifier.isAbstract(setter.modifiers)) {
-            "$member has a non-abstract setter"
-        }
+        val offset = size.alignForwardsTo(handling.memoryLayout.byteAlignment())
+        size = offset + handling.memoryLayout.byteSize()
+        alignment = maxOf(alignment, handling.memoryLayout.byteAlignment())
 
-        val offset: Long
-        val visitGetterInvokeAndReturn: MethodVisitor.() -> Unit
-        val visitSetterArgLoad: MethodVisitor.() -> Unit
-        val visitSetterInvoke: MethodVisitor.() -> Unit
-
-        // FIXME: clean the duplicated code
-        when (member.returnType) {
-            typeOf<Byte>(), typeOf<UByte>() -> {
-                offset = size
-                size = offset + 1
-
-                visitGetterInvokeAndReturn = {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getByte", "(J)B", true)
-                    visitInsn(IRETURN)
-                }
-
-                visitSetterArgLoad = {
-                    visitVarInsn(ILOAD, 1)
-                }
-
-                visitSetterInvoke = {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setByte", "(BJ)V", true)
-                }
-            }
-
-            typeOf<Short>(), typeOf<UShort>() -> {
-                offset = size.alignForwardsTo(2)
-                size = offset + 2
-                alignment = maxOf(alignment, 2)
-
-                visitGetterInvokeAndReturn = {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getShort", "(J)S", true)
-                    visitInsn(IRETURN)
-                }
-
-                visitSetterArgLoad = {
-                    visitVarInsn(ILOAD, 1)
-                }
-
-                visitSetterInvoke = {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setShort", "(SJ)V", true)
-                }
-            }
-
-            typeOf<Int>(), typeOf<UInt>() -> {
-                offset = size.alignForwardsTo(4)
-                size = offset + 4
-                alignment = maxOf(alignment, 4)
-
-                visitGetterInvokeAndReturn = {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getInt", "(J)I", true)
-                    visitInsn(IRETURN)
-                }
-
-                visitSetterArgLoad = {
-                    visitVarInsn(ILOAD, 1)
-                }
-
-                visitSetterInvoke = {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setInt", "(IJ)V", true)
-                }
-            }
-
-            typeOf<Long>(), typeOf<ULong>() -> {
-                offset = size.alignForwardsTo(8)
-                size = offset + 8
-                alignment = maxOf(alignment, 8)
-
-                visitGetterInvokeAndReturn = {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getLong", "(J)J", true)
-                    visitInsn(LRETURN)
-                }
-
-                visitSetterArgLoad = {
-                    visitVarInsn(LLOAD, 1)
-                }
-
-                visitSetterInvoke = {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setLong", "(JJ)V", true)
-                }
-            }
-
-            typeOf<Float>() -> {
-                offset = size.alignForwardsTo(4)
-                size = offset + 4
-                alignment = maxOf(alignment, 4)
-
-                visitGetterInvokeAndReturn = {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getFloat", "(J)F", true)
-                    visitInsn(FRETURN)
-                }
-
-                visitSetterArgLoad = {
-                    visitVarInsn(FLOAD, 1)
-                }
-
-                visitSetterInvoke = {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setFloat", "(FJ)V", true)
-                }
-            }
-
-            typeOf<Double>() -> {
-                offset = size.alignForwardsTo(8)
-                size = offset + 8
-                alignment = maxOf(alignment, 8)
-
-                visitGetterInvokeAndReturn = {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getDouble", "(J)D", true)
-                    visitInsn(DRETURN)
-                }
-
-                visitSetterArgLoad = {
-                    visitVarInsn(DLOAD, 1)
-                }
-
-                visitSetterInvoke = {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setDouble", "(DJ)V", true)
-                }
-            }
-
-            typeOf<CLong>() -> {
-                if (C_LONG_IS_4_BYTES) {
-                    offset = size.alignForwardsTo(4)
-                    size = offset + 4
-                    alignment = maxOf(alignment, 4)
-
-                    visitGetterInvokeAndReturn = {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getInt", "(J)I", true)
-                        visitInsn(I2L)
-                        visitInsn(LRETURN)
-                    }
-
-                    visitSetterArgLoad = {
-                        visitVarInsn(LLOAD, 1)
-                        visitInsn(L2I)
-                    }
-
-                    visitSetterInvoke = {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setInt", "(IJ)V", true)
-                    }
-                } else {
-                    offset = size.alignForwardsTo(8)
-                    size = offset + 8
-                    alignment = maxOf(alignment, 8)
-
-                    visitGetterInvokeAndReturn = {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getLong", "(J)J", true)
-                        visitInsn(LRETURN)
-                    }
-
-                    visitSetterArgLoad = {
-                        visitVarInsn(LLOAD, 1)
-                    }
-
-                    visitSetterInvoke = {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setLong", "(JJ)V", true)
-                    }
-                }
-            }
-
-            typeOf<CUnsignedLong>() -> {
-                if (C_LONG_IS_4_BYTES) {
-                    offset = size.alignForwardsTo(4)
-                    size = offset + 4
-                    alignment = maxOf(alignment, 4)
-
-                    visitGetterInvokeAndReturn = {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getInt", "(J)I", true)
-                        visitInsn(I2L)
-                        visitLdcInsn(0xFFFF_FFFFL)
-                        visitInsn(LAND)
-                        visitInsn(LRETURN)
-                    }
-
-                    visitSetterArgLoad = {
-                        visitVarInsn(LLOAD, 1)
-                        visitInsn(L2I)
-                    }
-
-                    visitSetterInvoke = {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setInt", "(IJ)V", true)
-                    }
-                } else {
-                    offset = size.alignForwardsTo(8)
-                    size = offset + 8
-                    alignment = maxOf(alignment, 8)
-
-                    visitGetterInvokeAndReturn = {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getLong", "(J)J", true)
-                        visitInsn(LRETURN)
-                    }
-
-                    visitSetterArgLoad = {
-                        visitVarInsn(LLOAD, 1)
-                    }
-
-                    visitSetterInvoke = {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setLong", "(JJ)V", true)
-                    }
-                }
-            }
-
-            typeOf<CPtrDiffT>() -> {
-                if (ADDRESS_IS_4_BYTES) {
-                    offset = size.alignForwardsTo(4)
-                    size = offset + 4
-                    alignment = maxOf(alignment, 4)
-
-                    visitGetterInvokeAndReturn = {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getInt", "(J)I", true)
-                        visitInsn(I2L)
-                        visitInsn(LRETURN)
-                    }
-
-                    visitSetterArgLoad = {
-                        visitVarInsn(LLOAD, 1)
-                        visitInsn(L2I)
-                    }
-
-                    visitSetterInvoke = {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setInt", "(IJ)V", true)
-                    }
-                } else {
-                    offset = size.alignForwardsTo(8)
-                    size = offset + 8
-                    alignment = maxOf(alignment, 8)
-
-                    visitGetterInvokeAndReturn = {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getLong", "(J)J", true)
-                        visitInsn(LRETURN)
-                    }
-
-                    visitSetterArgLoad = {
-                        visitVarInsn(LLOAD, 1)
-                    }
-
-                    visitSetterInvoke = {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setLong", "(JJ)V", true)
-                    }
-                }
-            }
-
-            typeOf<CSizeT>(), typeOf<NativeAddress>() -> {
-                if (ADDRESS_IS_4_BYTES) {
-                    offset = size.alignForwardsTo(4)
-                    size = offset + 4
-                    alignment = maxOf(alignment, 4)
-
-                    visitGetterInvokeAndReturn = {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getInt", "(J)I", true)
-                        visitInsn(I2L)
-                        visitLdcInsn(0xFFFF_FFFFL)
-                        visitInsn(LAND)
-                        visitInsn(LRETURN)
-                    }
-
-                    visitSetterArgLoad = {
-                        visitVarInsn(LLOAD, 1)
-                        visitInsn(L2I)
-                    }
-
-                    visitSetterInvoke = {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setInt", "(IJ)V", true)
-                    }
-                } else {
-                    offset = size.alignForwardsTo(8)
-                    size = offset + 8
-                    alignment = maxOf(alignment, 8)
-
-                    visitGetterInvokeAndReturn = {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getLong", "(J)J", true)
-                        visitInsn(LRETURN)
-                    }
-
-                    visitSetterArgLoad = {
-                        visitVarInsn(LLOAD, 1)
-                    }
-
-                    visitSetterInvoke = {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setLong", "(JJ)V", true)
-                    }
-                }
-            }
-
-            else -> {
-                throw UnsupportedOperationException("Unsupported field type: ${member.returnType}")
-            }
-        }
-
-        implWriter.visitMethod(ACC_PUBLIC, getter.name, getMethodDescriptor(getter), null, null).apply {
+        implWriter.visitMethod(ACC_PUBLIC, getter.name, getter.descriptorString, null, null).apply {
             visitCode()
             visitVarInsn(ALOAD, 0)
             visitFieldInsn(GETFIELD, AbstractStructImpl.INTERNAL_NAME, "memory", MEMORY_DESCRIPTOR)
             visitLdcInsn(offset)
-            visitGetterInvokeAndReturn()
+
+            when (handling) {
+                FfiHandling.I8AsByte -> {
+                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getByte", "(J)B", true)
+                    visitInsn(IRETURN)
+                }
+
+                FfiHandling.I16AsShort -> {
+                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getShort", "(J)S", true)
+                    visitInsn(IRETURN)
+                }
+
+                FfiHandling.I32AsInt -> {
+                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getInt", "(J)I", true)
+                    visitInsn(IRETURN)
+                }
+
+                FfiHandling.I64AsLong -> {
+                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getLong", "(J)J", true)
+                    visitInsn(LRETURN)
+                }
+
+                FfiHandling.F32AsFloat -> {
+                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getFloat", "(J)F", true)
+                    visitInsn(FRETURN)
+                }
+
+                FfiHandling.F64AsDouble -> {
+                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getDouble", "(J)D", true)
+                    visitInsn(DRETURN)
+                }
+
+                FfiHandling.I32AsSignedLong -> {
+                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getInt", "(J)I", true)
+                    visitInsn(I2L)
+                    visitInsn(LRETURN)
+                }
+
+                FfiHandling.I32AsUnsignedLong -> {
+                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getInt", "(J)I", true)
+                    visitInsn(I2L)
+                    visitLdcInsn(0xFFFF_FFFFL)
+                    visitInsn(LAND)
+                    visitInsn(LRETURN)
+                }
+            }
+
             visitMaxs(0, 0)
             visitEnd()
         }
 
         if (setter != null) {
-            implWriter.visitMethod(ACC_PUBLIC, setter.name, getMethodDescriptor(setter), null, null).apply {
+            implWriter.visitMethod(ACC_PUBLIC, setter.name, setter.descriptorString, null, null).apply {
                 visitCode()
                 visitVarInsn(ALOAD, 0)
                 visitFieldInsn(GETFIELD, AbstractStructImpl.INTERNAL_NAME, "memory", MEMORY_DESCRIPTOR)
-                visitSetterArgLoad()
+
+                when (handling) {
+                    FfiHandling.I8AsByte, FfiHandling.I16AsShort, FfiHandling.I32AsInt -> {
+                        visitVarInsn(ILOAD, 1)
+                    }
+
+                    FfiHandling.I64AsLong -> {
+                        visitVarInsn(LLOAD, 1)
+                    }
+
+                    FfiHandling.F32AsFloat -> {
+                        visitVarInsn(FLOAD, 1)
+                    }
+
+                    FfiHandling.F64AsDouble -> {
+                        visitVarInsn(DLOAD, 1)
+                    }
+
+                    FfiHandling.I32AsSignedLong, FfiHandling.I32AsUnsignedLong -> {
+                        visitVarInsn(LLOAD, 1)
+                        visitInsn(L2I)
+                    }
+                }
+
                 visitLdcInsn(offset)
-                visitSetterInvoke()
+
+                when (handling) {
+                    FfiHandling.I8AsByte -> {
+                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setByte", "(BJ)V", true)
+                    }
+
+                    FfiHandling.I16AsShort -> {
+                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setShort", "(SJ)V", true)
+                    }
+
+                    FfiHandling.I32AsInt, FfiHandling.I32AsSignedLong, FfiHandling.I32AsUnsignedLong -> {
+                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setInt", "(IJ)V", true)
+                    }
+
+                    FfiHandling.I64AsLong -> {
+                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setLong", "(JJ)V", true)
+                    }
+
+                    FfiHandling.F32AsFloat -> {
+                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setFloat", "(FJ)V", true)
+                    }
+
+                    FfiHandling.F64AsDouble -> {
+                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setDouble", "(DJ)V", true)
+                    }
+                }
+
                 visitInsn(RETURN)
                 visitMaxs(0, 0)
                 visitEnd()
@@ -509,22 +304,16 @@ private fun generateStructType(clazz: Class<*>): StructType<*> {
 
     implWriter.visitEnd()
 
-    val implLookup = LOOKUP.defineHiddenClass(implWriter.toByteArray(), false, NESTMATE)
+    val implLookup = definer.define(implWriter.toByteArray())
 
     val implConstructor = implLookup
         .findConstructor(implLookup.lookupClass(), methodType(Void.TYPE, Memory::class.java))
         .asType(methodType(Struct::class.java, Memory::class.java))
 
+    val typeImplName = "${definer.internalNamePrefix}${klass.simpleName}TypeImpl"
     val typeImplWriter = ClassWriter(COMPUTE_FRAMES)
 
-    typeImplWriter.visit(
-        V19,
-        ACC_FINAL,
-        "org/schism/ffi/StructTypeImpl",
-        null,
-        AbstractStructTypeImpl.INTERNAL_NAME,
-        null,
-    )
+    typeImplWriter.visit(V19, ACC_FINAL, typeImplName, null, AbstractStructTypeImpl.INTERNAL_NAME, null)
 
     typeImplWriter.visitMethod(ACC_PRIVATE, "<init>", "()V", null, null).apply {
         visitCode()
@@ -547,14 +336,14 @@ private fun generateStructType(clazz: Class<*>): StructType<*> {
 
     typeImplWriter.visitMethod(
         ACC_PUBLIC,
-        AbstractStructTypeImpl.CREATE_STRUCT_NAME,
-        AbstractStructTypeImpl.CREATE_STRUCT_DESCRIPTOR,
+        AbstractStructTypeImpl.WRAP_SAFE_NAME,
+        AbstractStructTypeImpl.WRAP_SAFE_DESCRIPTOR,
         null,
         null,
     ).apply {
         visitCode()
         visitVarInsn(ALOAD, 1)
-        visitInvokeDynamicInsn("_", AbstractStructTypeImpl.CREATE_STRUCT_DESCRIPTOR, STRUCT_FACTORY_BOOTSTRAP_HANDLE)
+        visitInvokeDynamicInsn("_", AbstractStructTypeImpl.WRAP_SAFE_DESCRIPTOR, STRUCT_FACTORY_BOOTSTRAP_HANDLE)
         visitInsn(ARETURN)
         visitMaxs(0, 0)
         visitEnd()
@@ -562,57 +351,49 @@ private fun generateStructType(clazz: Class<*>): StructType<*> {
 
     typeImplWriter.visitEnd()
 
-    val typeImplLookup = LOOKUP.defineHiddenClassWithClassData(
-        typeImplWriter.toByteArray(),
-        implConstructor,
-        false,
-        NESTMATE,
-    )
+    val typeImplLookup = definer.define(typeImplWriter.toByteArray(), classData = implConstructor)
 
-    val typeImplConstructor = typeImplLookup.findConstructor(typeImplLookup.lookupClass(), methodType(Void.TYPE))
-
-    return (@Suppress("UNCHECKED_CAST") (typeImplConstructor.invoke() as StructType<*>))
+    @Suppress("UNCHECKED_CAST")
+    return typeImplLookup
+        .findConstructor(typeImplLookup.lookupClass(), methodType(Void.TYPE))
+        .invoke() as StructType<S>
 }
 
-private abstract class AbstractStructImpl(@JvmField protected val memory: Memory) : Struct {
+internal abstract class AbstractStructImpl(@JvmField protected val memory: Memory) : Struct {
     final override fun memory(): Memory {
         return memory
     }
 
     companion object {
-        val INTERNAL_NAME = getInternalName(AbstractStructImpl::class.java)!!
+        val INTERNAL_NAME = AbstractStructImpl::class.java.internalName
 
-        val CONSTRUCTOR_DESCRIPTOR = getConstructorDescriptor(
-            AbstractStructImpl::class.java.declaredConstructors.single()
-        )!!
+        val CONSTRUCTOR_DESCRIPTOR = AbstractStructImpl::class.java.declaredConstructors.single().descriptorString
     }
 }
 
-private abstract class AbstractStructTypeImpl<S : Struct>(
+internal abstract class AbstractStructTypeImpl<S : Struct>(
     final override val size: Long,
     final override val alignment: Long,
 ) : StructType<S> {
     final override fun wrap(memory: Memory): S {
         memory.requireAlignedTo(alignment)
-        return createStruct(memory.slice(size = size))
+        return wrapSafe(memory.slice(size = size))
     }
 
-    protected abstract fun createStruct(memory: Memory): S
+    protected abstract fun wrapSafe(memory: Memory): S
 
     companion object {
-        val INTERNAL_NAME = getInternalName(AbstractStructTypeImpl::class.java)!!
+        val INTERNAL_NAME = AbstractStructTypeImpl::class.java.internalName
 
-        val CONSTRUCTOR_DESCRIPTOR = getConstructorDescriptor(
-            AbstractStructTypeImpl::class.java.declaredConstructors.single()
-        )!!
+        val CONSTRUCTOR_DESCRIPTOR = AbstractStructTypeImpl::class.java.declaredConstructors.single().descriptorString
 
-        val CREATE_STRUCT_NAME = AbstractStructTypeImpl<*>::createStruct.javaMethod!!.name!!
+        val WRAP_SAFE_NAME = AbstractStructTypeImpl<*>::wrapSafe.javaMethod!!.name
 
-        val CREATE_STRUCT_DESCRIPTOR = getMethodDescriptor(AbstractStructTypeImpl<*>::createStruct.javaMethod!!)!!
+        val WRAP_SAFE_DESCRIPTOR = AbstractStructTypeImpl<*>::wrapSafe.javaMethod!!.descriptorString
     }
 }
 
-private fun structFactoryBootstrap(lookup: Lookup, name: String, type: MethodType): CallSite {
+internal fun structFactoryBootstrap(lookup: Lookup, name: String, type: MethodType): CallSite {
     val constructorHandle = classData(lookup, "_", MethodHandle::class.java)
     return ConstantCallSite(constructorHandle)
 }
@@ -620,14 +401,12 @@ private fun structFactoryBootstrap(lookup: Lookup, name: String, type: MethodTyp
 private val STRUCT_FACTORY_BOOTSTRAP_HANDLE = ::structFactoryBootstrap.javaMethod!!.let { javaMethod ->
     Handle(
         H_INVOKESTATIC,
-        getInternalName(javaMethod.declaringClass),
+        javaMethod.declaringClass.internalName,
         javaMethod.name,
-        getMethodDescriptor(javaMethod),
+        javaMethod.descriptorString,
         false,
     )
 }
-
-private val LOOKUP = MethodHandles.lookup()
 
 private val MEMORY_INTERNAL_NAME = getInternalName(Memory::class.java)
 
