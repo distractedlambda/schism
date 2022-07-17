@@ -1,5 +1,8 @@
 package org.schism.memory
 
+import org.schism.ffi.ADDRESS_TYPE
+import org.schism.ffi.IntOrLong
+
 public interface Memory {
     public val size: Long
 
@@ -196,18 +199,16 @@ public fun Memory.setBeULong(value: ULong, offset: Long = 0L) {
 }
 
 public fun Memory.getPointer(offset: Long = 0L): NativeAddress {
-    return NativeAddress.fromBits(when (NativeAddress.BIT_SIZE) {
-        32 -> getULong(offset).toLong()
-        64 -> getLong(offset)
-        else -> throw UnsupportedOperationException("Unsupported native address width")
+    return NativeAddress.fromBits(when (ADDRESS_TYPE) {
+        IntOrLong.INT -> getULong(offset).toLong()
+        IntOrLong.LONG -> getLong(offset)
     })
 }
 
 public fun Memory.setPointer(value: NativeAddress, offset: Long = 0L) {
-    when (NativeAddress.BIT_SIZE) {
-        32 -> setInt(value.toBits().toInt(), offset)
-        64 -> setLong(value.toBits(), offset)
-        else -> throw UnsupportedOperationException("Unsupported native address width")
+    when (ADDRESS_TYPE) {
+        IntOrLong.INT -> setInt(value.toBits().toInt(), offset)
+        IntOrLong.LONG -> setLong(value.toBits(), offset)
     }
 }
 

@@ -1,5 +1,7 @@
 package org.schism.memory
 
+import org.schism.ffi.ADDRESS_TYPE
+import org.schism.ffi.IntOrLong
 import java.lang.invoke.MethodHandles
 import java.nio.ByteOrder
 
@@ -228,18 +230,16 @@ public fun ByteArray.setBeULong(value: ULong, offset: Int = 0) {
 }
 
 public fun ByteArray.getPointer(offset: Int = 0): NativeAddress {
-    return when (NativeAddress.BYTE_SIZE) {
-        4 -> NativeAddress.fromBits(getUInt(offset).toLong())
-        8 -> NativeAddress.fromBits(getLong(offset))
-        else -> throw UnsupportedOperationException("Unsupported native address size")
+    return when (ADDRESS_TYPE) {
+        IntOrLong.INT -> NativeAddress.fromBits(getUInt(offset).toLong())
+        IntOrLong.LONG -> NativeAddress.fromBits(getLong(offset))
     }
 }
 
 public fun ByteArray.setPointer(value: NativeAddress, offset: Int = 0) {
-    when (NativeAddress.BYTE_SIZE) {
-        4 -> setInt(value.toBits().toInt(), offset)
-        8 -> setLong(value.toBits())
-        else -> throw UnsupportedOperationException("Unsupported native address size")
+    when (ADDRESS_TYPE) {
+        IntOrLong.INT -> setInt(value.toBits().toInt(), offset)
+        IntOrLong.LONG -> setLong(value.toBits())
     }
 }
 

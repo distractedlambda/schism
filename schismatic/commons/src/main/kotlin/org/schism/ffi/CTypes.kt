@@ -1,589 +1,261 @@
 package org.schism.ffi
 
-import org.schism.math.toIntExact
+import org.schism.memory.NativeAddress
+import java.lang.foreign.MemoryLayout
+import java.lang.foreign.ValueLayout.JAVA_BYTE
+import java.lang.foreign.ValueLayout.JAVA_DOUBLE
+import java.lang.foreign.ValueLayout.JAVA_FLOAT
+import java.lang.foreign.ValueLayout.JAVA_INT
+import java.lang.foreign.ValueLayout.JAVA_LONG
+import java.lang.foreign.ValueLayout.JAVA_SHORT
+import kotlin.reflect.KClass
+import kotlin.reflect.KType
+import kotlin.reflect.full.findAnnotation
 
-public typealias CChar = Byte
+internal enum class ScalarFfiType {
+    I8,
+    I16,
+    I32,
+    I64,
+    F32,
+    F64,
+    SIGNED_WORD,
+    UNSIGNED_WORD,
+    SIGNED_C_LONG,
+    UNSIGNED_C_LONG;
 
-public typealias CUnsignedChar = UByte
+    val handling: FfiHandling get() = when (this) {
+        I8 -> FfiHandling.I8AsByte
+        I16 -> FfiHandling.I16AsShort
+        I32 -> FfiHandling.I32AsInt
+        I64 -> FfiHandling.I64AsLong
+        F32 -> FfiHandling.F32AsFloat
+        F64 -> FfiHandling.F64AsDouble
 
-public typealias CShort = Short
-
-public typealias CUnsignedShort = UShort
-
-public typealias CInt = Int
-
-public typealias CUnsignedInt = UInt
-
-public typealias CFloat = Float
-
-public typealias CDouble = Double
-
-public typealias CIntPtrT = CPtrDiffT
-
-public typealias CUIntPtrT = CSizeT
-
-public typealias CSSizeT = CPtrDiffT
-
-@JvmInline public value class CLong internal constructor(private val value: Long) {
-    public fun toIntExact(): Int {
-        return if (C_LONG_IS_4_BYTES) {
-            value.toInt()
-        } else {
-            value.toIntExact()
+        SIGNED_WORD -> when (ADDRESS_TYPE) {
+            IntOrLong.INT -> FfiHandling.I32AsSignedLong
+            IntOrLong.LONG -> FfiHandling.I64AsLong
         }
-    }
 
-    public fun toInt(): Int {
-        return value.toInt()
-    }
-
-    public fun toLong(): Long {
-        return value
-    }
-
-    public operator fun unaryPlus(): CLong {
-        return this
-    }
-
-    public operator fun unaryMinus(): CLong {
-        return CLong(if (C_LONG_IS_4_BYTES) {
-            (-value.toInt()).toLong()
-        } else {
-            -value
-        })
-    }
-
-    public operator fun plus(other: CLong): CLong {
-        return CLong(if (C_LONG_IS_4_BYTES) {
-            (value.toInt() + other.value.toInt()).toLong()
-        } else {
-            value + other.value
-        })
-    }
-
-    public operator fun minus(other: CLong): CLong {
-        return CLong(if (C_LONG_IS_4_BYTES) {
-            (value.toInt() - other.value.toInt()).toLong()
-        } else {
-            value - other.value
-        })
-    }
-
-    public operator fun times(other: CLong): CLong {
-        return CLong(if (C_LONG_IS_4_BYTES) {
-            (value.toInt() * other.value.toInt()).toLong()
-        } else {
-            value * other.value
-        })
-    }
-
-    public operator fun div(other: CLong): CLong {
-        return CLong(if (C_LONG_IS_4_BYTES) {
-            (value.toInt() / other.value.toInt()).toLong()
-        } else {
-            value / other.value
-        })
-    }
-
-    public operator fun rem(other: CLong): CLong {
-        return CLong(if (C_LONG_IS_4_BYTES) {
-            (value.toInt() % other.value.toInt()).toLong()
-        } else {
-            value % other.value
-        })
-    }
-
-    public operator fun inc(): CLong {
-        return CLong(if (C_LONG_IS_4_BYTES) {
-            value.toInt().inc().toLong()
-        } else {
-            value.inc()
-        })
-    }
-
-    public operator fun dec(): CLong {
-        return CLong(if (C_LONG_IS_4_BYTES) {
-            value.toInt().dec().toLong()
-        } else {
-            value.dec()
-        })
-    }
-
-    public operator fun compareTo(rhs: CLong): Int {
-        return if (C_LONG_IS_4_BYTES) {
-            value.toInt().compareTo(rhs.value.toInt())
-        } else {
-            value.compareTo(rhs.value)
+        UNSIGNED_WORD -> when (ADDRESS_TYPE) {
+            IntOrLong.INT -> FfiHandling.I32AsUnsignedLong
+            IntOrLong.LONG -> FfiHandling.I64AsLong
         }
-    }
 
-    public operator fun compareTo(rhs: Long): Int {
-        return if (C_LONG_IS_4_BYTES) {
-            value.toInt().toLong().compareTo(rhs)
-        } else {
-            value.compareTo(rhs)
+        SIGNED_C_LONG -> when (C_LONG_TYPE) {
+            IntOrLong.INT -> FfiHandling.I32AsSignedLong
+            IntOrLong.LONG -> FfiHandling.I64AsLong
         }
-    }
 
-    public operator fun compareTo(rhs: Int): Int {
-        return if (C_LONG_IS_4_BYTES) {
-            value.toInt().compareTo(rhs)
-        } else {
-            value.compareTo(rhs)
-        }
-    }
-
-    public companion object {
-        public val SIZE_BITS: Int
-
-        public val SIZE_BYTES: Int
-
-        public val MIN_VALUE: CLong
-
-        public val MAX_VALUE: CLong
-
-        init {
-            if (C_LONG_IS_4_BYTES) {
-                SIZE_BITS = 32
-                SIZE_BYTES = 4
-                MIN_VALUE = CLong(Int.MIN_VALUE.toLong())
-                MAX_VALUE = CLong(Int.MAX_VALUE.toLong())
-            } else {
-                SIZE_BITS = 64
-                SIZE_BYTES = 8
-                MIN_VALUE = CLong(Long.MIN_VALUE)
-                MAX_VALUE = CLong(Long.MAX_VALUE)
-            }
+        UNSIGNED_C_LONG -> when (C_LONG_TYPE) {
+            IntOrLong.INT -> FfiHandling.I32AsUnsignedLong
+            IntOrLong.LONG -> FfiHandling.I64AsLong
         }
     }
 }
 
-public fun Int.toCLong(): CLong {
-    return CLong(toLong())
-}
+internal sealed interface FfiHandling {
+    val memoryLayout: MemoryLayout
 
-public fun Long.toCLongExact(): CLong {
-    return CLong(if (C_LONG_IS_4_BYTES) {
-        toIntExact().toLong()
-    } else {
-        this
-    })
-}
+    val jvmType: Class<*>
 
-public fun Long.toCLong(): CLong {
-    return CLong(if (C_LONG_IS_4_BYTES) {
-        toInt().toLong()
-    } else {
-        this
-    })
-}
+    object I8AsByte : FfiHandling {
+        override val memoryLayout: MemoryLayout get() {
+            return JAVA_BYTE
+        }
 
-@JvmInline public value class CUnsignedLong internal constructor(private val value: ULong) {
-    public fun toUIntExact(): UInt {
-        if (!C_LONG_IS_4_BYTES && value > UInt.MAX_VALUE) {
-            throw ArithmeticException()
-        } else {
-            return value.toUInt()
+        override val jvmType: Class<*> get() {
+            return Byte::class.java
         }
     }
 
-    public fun toUInt(): UInt {
-        return value.toUInt()
-    }
+    object I16AsShort : FfiHandling {
+        override val memoryLayout: MemoryLayout get() {
+            return JAVA_SHORT
+        }
 
-    public fun toULong(): ULong {
-        return value
-    }
-
-    public operator fun unaryPlus(): CUnsignedLong {
-        return this
-    }
-
-    public operator fun plus(other: CUnsignedLong): CUnsignedLong {
-        return CUnsignedLong(if (C_LONG_IS_4_BYTES) {
-            (value.toUInt() + other.value.toUInt()).toULong()
-        } else {
-            value + other.value
-        })
-    }
-
-    public operator fun minus(other: CUnsignedLong): CUnsignedLong {
-        return CUnsignedLong(if (C_LONG_IS_4_BYTES) {
-            (value.toUInt() - other.value.toUInt()).toULong()
-        } else {
-            value - other.value
-        })
-    }
-
-    public operator fun times(other: CUnsignedLong): CUnsignedLong {
-        return CUnsignedLong(if (C_LONG_IS_4_BYTES) {
-            (value.toUInt() * other.value.toUInt()).toULong()
-        } else {
-            value * other.value
-        })
-    }
-
-    public operator fun div(other: CUnsignedLong): CUnsignedLong {
-        return CUnsignedLong(if (C_LONG_IS_4_BYTES) {
-            (value.toUInt() / other.value.toUInt()).toULong()
-        } else {
-            value / other.value
-        })
-    }
-
-    public operator fun rem(other: CUnsignedLong): CUnsignedLong {
-        return CUnsignedLong(if (C_LONG_IS_4_BYTES) {
-            (value.toUInt() % other.value.toUInt()).toULong()
-        } else {
-            value % other.value
-        })
-    }
-
-    public operator fun inc(): CUnsignedLong {
-        return CUnsignedLong(if (C_LONG_IS_4_BYTES) {
-            value.toUInt().inc().toULong()
-        } else {
-            value.inc()
-        })
-    }
-
-    public operator fun dec(): CUnsignedLong {
-        return CUnsignedLong(if (C_LONG_IS_4_BYTES) {
-            value.toUInt().dec().toULong()
-        } else {
-            value.dec()
-        })
-    }
-
-    public operator fun compareTo(rhs: CUnsignedLong): Int {
-        return if (C_LONG_IS_4_BYTES) {
-            value.toUInt().compareTo(rhs.value.toUInt())
-        } else {
-            value.compareTo(rhs.value)
+        override val jvmType: Class<*> get() {
+            return Short::class.java
         }
     }
 
-    public companion object {
-        public val SIZE_BITS: Int
+    object I32AsInt : FfiHandling {
+        override val memoryLayout: MemoryLayout get() {
+            return JAVA_INT
+        }
 
-        public val SIZE_BYTES: Int
+        override val jvmType: Class<*> get() {
+            return Int::class.java
+        }
+    }
 
-        public val MIN_VALUE: CUnsignedLong = CUnsignedLong(0u)
+    object I64AsLong : FfiHandling {
+        override val memoryLayout: MemoryLayout get() {
+            return JAVA_LONG
+        }
 
-        public val MAX_VALUE: CUnsignedLong
+        override val jvmType: Class<*> get() {
+            return Long::class.java
+        }
+    }
 
-        init {
-            if (C_LONG_IS_4_BYTES) {
-                SIZE_BITS = 32
-                SIZE_BYTES = 4
-                MAX_VALUE = CUnsignedLong(UInt.MAX_VALUE.toULong())
-            } else {
-                SIZE_BITS = 64
-                SIZE_BYTES = 8
-                MAX_VALUE = CUnsignedLong(ULong.MAX_VALUE)
-            }
+    object F32AsFloat : FfiHandling {
+        override val memoryLayout: MemoryLayout get() {
+            return JAVA_FLOAT
+        }
+
+        override val jvmType: Class<*> get() {
+            return Float::class.java
+        }
+    }
+
+    object F64AsDouble : FfiHandling {
+        override val memoryLayout: MemoryLayout get() {
+            return JAVA_DOUBLE
+        }
+
+        override val jvmType: Class<*> get() {
+            return Double::class.java
+        }
+    }
+
+    object I32AsSignedLong : FfiHandling {
+        override val memoryLayout: MemoryLayout get() {
+            return JAVA_INT
+        }
+
+        override val jvmType: Class<*> get() {
+            return Long::class.java
+        }
+    }
+
+    object I32AsUnsignedLong : FfiHandling {
+        override val memoryLayout: MemoryLayout get() {
+            return JAVA_INT
+        }
+
+        override val jvmType: Class<*> get() {
+            return Long::class.java
         }
     }
 }
 
-public fun UInt.toCUnsignedLong(): CUnsignedLong {
-    return CUnsignedLong(toULong())
-}
-
-public fun ULong.toCUnsignedLongExact(): CUnsignedLong {
-    if (C_LONG_IS_4_BYTES && this > UInt.MAX_VALUE) {
-        throw ArithmeticException()
-    } else {
-        return CUnsignedLong(this)
+internal fun ffiHandlingFor(kType: KType): FfiHandling {
+    val scalarTypeAnnotations = kType.annotations.mapNotNull {
+        it.annotationClass.findAnnotation<ScalarFfiTypeMarker>()
     }
-}
 
-public fun ULong.toCUnsignedLong(): CUnsignedLong {
-    return CUnsignedLong(if (C_LONG_IS_4_BYTES) {
-        toUInt().toULong()
-    } else {
-        this
-    })
-}
-
-@JvmInline public value class CPtrDiffT internal constructor(private val value: Long) {
-    public fun toIntExact(): Int {
-        return if (ADDRESS_IS_4_BYTES) {
-            value.toInt()
-        } else {
-            value.toIntExact()
+    if (scalarTypeAnnotations.isNotEmpty()) {
+        require(scalarTypeAnnotations.size == 1) {
+            "Type '$kType' has multiple FFI type annotations"
         }
-    }
 
-    public fun toInt(): Int {
-        return value.toInt()
-    }
+        val scalarTypeAnnotation = scalarTypeAnnotations.single()
 
-    public fun toLong(): Long {
-        return value
-    }
-
-    public operator fun unaryPlus(): CPtrDiffT {
-        return this
-    }
-
-    public operator fun unaryMinus(): CPtrDiffT {
-        return CPtrDiffT(if (ADDRESS_IS_4_BYTES) {
-            (-value.toInt()).toLong()
-        } else {
-            -value
-        })
-    }
-
-    public operator fun plus(other: CPtrDiffT): CPtrDiffT {
-        return CPtrDiffT(if (ADDRESS_IS_4_BYTES) {
-            (value.toInt() + other.value.toInt()).toLong()
-        } else {
-            value + other.value
-        })
-    }
-
-    public operator fun minus(other: CPtrDiffT): CPtrDiffT {
-        return CPtrDiffT(if (ADDRESS_IS_4_BYTES) {
-            (value.toInt() - other.value.toInt()).toLong()
-        } else {
-            value - other.value
-        })
-    }
-
-    public operator fun times(other: CPtrDiffT): CPtrDiffT {
-        return CPtrDiffT(if (ADDRESS_IS_4_BYTES) {
-            (value.toInt() * other.value.toInt()).toLong()
-        } else {
-            value * other.value
-        })
-    }
-
-    public operator fun div(other: CPtrDiffT): CPtrDiffT {
-        return CPtrDiffT(if (ADDRESS_IS_4_BYTES) {
-            (value.toInt() / other.value.toInt()).toLong()
-        } else {
-            value / other.value
-        })
-    }
-
-    public operator fun rem(other: CPtrDiffT): CPtrDiffT {
-        return CPtrDiffT(if (ADDRESS_IS_4_BYTES) {
-            (value.toInt() % other.value.toInt()).toLong()
-        } else {
-            value % other.value
-        })
-    }
-
-    public operator fun inc(): CPtrDiffT {
-        return CPtrDiffT(if (ADDRESS_IS_4_BYTES) {
-            value.toInt().inc().toLong()
-        } else {
-            value.inc()
-        })
-    }
-
-    public operator fun dec(): CPtrDiffT {
-        return CPtrDiffT(if (ADDRESS_IS_4_BYTES) {
-            value.toInt().dec().toLong()
-        } else {
-            value.dec()
-        })
-    }
-
-    public operator fun compareTo(rhs: CPtrDiffT): Int {
-        return if (ADDRESS_IS_4_BYTES) {
-            value.toInt().compareTo(rhs.value.toInt())
-        } else {
-            value.compareTo(rhs.value)
+        require(kType.classifier == scalarTypeAnnotation.klass) {
+            "FFI type '$scalarTypeAnnotation' cannot be applied to class '${scalarTypeAnnotation.klass}'"
         }
+
+        return scalarTypeAnnotation.ffiType.handling
     }
 
-    public operator fun compareTo(rhs: Long): Int {
-        return if (ADDRESS_IS_4_BYTES) {
-            value.toInt().toLong().compareTo(rhs)
-        } else {
-            value.compareTo(rhs)
-        }
-    }
-
-    public operator fun compareTo(rhs: Int): Int {
-        return if (ADDRESS_IS_4_BYTES) {
-            value.toInt().compareTo(rhs)
-        } else {
-            value.compareTo(rhs)
-        }
-    }
-
-    public companion object {
-        public val SIZE_BITS: Int
-
-        public val SIZE_BYTES: Int
-
-        public val MIN_VALUE: CPtrDiffT
-
-        public val MAX_VALUE: CPtrDiffT
-
-        init {
-            if (ADDRESS_IS_4_BYTES) {
-                SIZE_BITS = 32
-                SIZE_BYTES = 4
-                MIN_VALUE = CPtrDiffT(Int.MIN_VALUE.toLong())
-                MAX_VALUE = CPtrDiffT(Int.MAX_VALUE.toLong())
-            } else {
-                SIZE_BITS = 64
-                SIZE_BYTES = 8
-                MIN_VALUE = CPtrDiffT(Long.MIN_VALUE)
-                MAX_VALUE = CPtrDiffT(Long.MAX_VALUE)
-            }
-        }
+    return when (kType.classifier) {
+        Byte::class, UByte::class -> FfiHandling.I8AsByte
+        Short::class, UShort::class -> FfiHandling.I16AsShort
+        Int::class, UInt::class -> FfiHandling.I32AsInt
+        Long::class, ULong::class -> FfiHandling.I64AsLong
+        Float::class -> FfiHandling.F32AsFloat
+        Double::class -> FfiHandling.F64AsDouble
+        NativeAddress::class -> ScalarFfiType.UNSIGNED_WORD.handling
+        else -> throw IllegalArgumentException("Type '$kType' is not FFI-compatible")
     }
 }
 
-public fun Int.toCPtrdiffT(): CPtrDiffT {
-    return CPtrDiffT(toLong())
-}
+@Target(AnnotationTarget.ANNOTATION_CLASS)
+@Retention(AnnotationRetention.RUNTIME)
+internal annotation class ScalarFfiTypeMarker(val ffiType: ScalarFfiType, val klass: KClass<*>)
 
-public fun Long.toCPtrdiffTExact(): CPtrDiffT {
-    return CPtrDiffT(if (ADDRESS_IS_4_BYTES) {
-        toIntExact().toLong()
-    } else {
-        this
-    })
-}
+@ScalarFfiTypeMarker(ScalarFfiType.I8, Byte::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CChar
 
-public fun Long.toCPtrdiffT(): CPtrDiffT {
-    return CPtrDiffT(if (ADDRESS_IS_4_BYTES) {
-        toInt().toLong()
-    } else {
-        this
-    })
-}
+@ScalarFfiTypeMarker(ScalarFfiType.I8, UByte::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CUnsignedChar
 
-@JvmInline public value class CSizeT internal constructor(private val value: ULong) {
-    public fun toUIntExact(): UInt {
-        if (!ADDRESS_IS_4_BYTES && value > UInt.MAX_VALUE) {
-            throw ArithmeticException()
-        } else {
-            return value.toUInt()
-        }
-    }
+@ScalarFfiTypeMarker(ScalarFfiType.I16, Short::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CShort
 
-    public fun toUInt(): UInt {
-        return value.toUInt()
-    }
+@ScalarFfiTypeMarker(ScalarFfiType.I16, UShort::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CUnsignedShort
 
-    public fun toULong(): ULong {
-        return value
-    }
+@ScalarFfiTypeMarker(ScalarFfiType.I32, Int::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CInt
 
-    public operator fun unaryPlus(): CSizeT {
-        return this
-    }
+@ScalarFfiTypeMarker(ScalarFfiType.I32, UInt::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CUnsignedInt
 
-    public operator fun plus(other: CSizeT): CSizeT {
-        return CSizeT(if (ADDRESS_IS_4_BYTES) {
-            (value.toUInt() + other.value.toUInt()).toULong()
-        } else {
-            value + other.value
-        })
-    }
+@ScalarFfiTypeMarker(ScalarFfiType.SIGNED_C_LONG, Long::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CLong
 
-    public operator fun minus(other: CSizeT): CSizeT {
-        return CSizeT(if (ADDRESS_IS_4_BYTES) {
-            (value.toUInt() - other.value.toUInt()).toULong()
-        } else {
-            value - other.value
-        })
-    }
+@ScalarFfiTypeMarker(ScalarFfiType.UNSIGNED_C_LONG, ULong::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CUnsignedLong
 
-    public operator fun times(other: CSizeT): CSizeT {
-        return CSizeT(if (ADDRESS_IS_4_BYTES) {
-            (value.toUInt() * other.value.toUInt()).toULong()
-        } else {
-            value * other.value
-        })
-    }
+@ScalarFfiTypeMarker(ScalarFfiType.I64, Long::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CLongLong
 
-    public operator fun div(other: CSizeT): CSizeT {
-        return CSizeT(if (ADDRESS_IS_4_BYTES) {
-            (value.toUInt() / other.value.toUInt()).toULong()
-        } else {
-            value / other.value
-        })
-    }
+@ScalarFfiTypeMarker(ScalarFfiType.I64, ULong::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CUnsignedLongLong
 
-    public operator fun rem(other: CSizeT): CSizeT {
-        return CSizeT(if (ADDRESS_IS_4_BYTES) {
-            (value.toUInt() % other.value.toUInt()).toULong()
-        } else {
-            value % other.value
-        })
-    }
+@ScalarFfiTypeMarker(ScalarFfiType.UNSIGNED_WORD, ULong::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CSizeT
 
-    public operator fun inc(): CSizeT {
-        return CSizeT(if (ADDRESS_IS_4_BYTES) {
-            value.toUInt().inc().toULong()
-        } else {
-            value.inc()
-        })
-    }
+@ScalarFfiTypeMarker(ScalarFfiType.UNSIGNED_WORD, ULong::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CUIntPtrT
 
-    public operator fun dec(): CSizeT {
-        return CSizeT(if (ADDRESS_IS_4_BYTES) {
-            value.toUInt().dec().toULong()
-        } else {
-            value.dec()
-        })
-    }
+@ScalarFfiTypeMarker(ScalarFfiType.SIGNED_WORD, Long::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CSSizeT
 
-    public operator fun compareTo(rhs: CSizeT): Int {
-        return if (ADDRESS_IS_4_BYTES) {
-            value.toUInt().compareTo(rhs.value.toUInt())
-        } else {
-            value.compareTo(rhs.value)
-        }
-    }
+@ScalarFfiTypeMarker(ScalarFfiType.SIGNED_WORD, Long::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CPtrDiffT
 
-    public companion object {
-        public val SIZE_BITS: Int
+@ScalarFfiTypeMarker(ScalarFfiType.SIGNED_WORD, Long::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CIntPtrT
 
-        public val SIZE_BYTES: Int
+@ScalarFfiTypeMarker(ScalarFfiType.F32, Float::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CFloat
 
-        public val MIN_VALUE: CSizeT = CSizeT(0u)
-
-        public val MAX_VALUE: CSizeT
-
-        init {
-            if (ADDRESS_IS_4_BYTES) {
-                SIZE_BITS = 32
-                SIZE_BYTES = 4
-                MAX_VALUE = CSizeT(UInt.MAX_VALUE.toULong())
-            } else {
-                SIZE_BITS = 64
-                SIZE_BYTES = 8
-                MAX_VALUE = CSizeT(ULong.MAX_VALUE)
-            }
-        }
-    }
-}
-
-public fun UInt.toCSizeT(): CSizeT {
-    return CSizeT(toULong())
-}
-
-public fun ULong.toCSizeTExact(): CSizeT {
-    if (ADDRESS_IS_4_BYTES && this > UInt.MAX_VALUE) {
-        throw ArithmeticException()
-    } else {
-        return CSizeT(this)
-    }
-}
-
-public fun ULong.toCSizeT(): CSizeT {
-    return CSizeT(if (ADDRESS_IS_4_BYTES) {
-        toUInt().toULong()
-    } else {
-        this
-    })
-}
+@ScalarFfiTypeMarker(ScalarFfiType.F64, Double::class)
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+public annotation class CDouble

@@ -3,7 +3,21 @@ package org.schism.ffi
 import java.lang.System.getProperty
 import java.lang.foreign.ValueLayout.ADDRESS
 
-internal val ADDRESS_IS_4_BYTES = ADDRESS.bitSize() == 32L
+internal enum class IntOrLong {
+    INT,
+    LONG;
+}
 
-// FIXME: use less fragile detection logic
-internal val C_LONG_IS_4_BYTES = ADDRESS.bitSize() == 32L || getProperty("os.name").startsWith("Windows")
+internal val ADDRESS_TYPE = when (ADDRESS.bitSize()) {
+    32L -> IntOrLong.INT
+    64L -> IntOrLong.LONG
+    else -> throw UnsupportedOperationException("Unexpected native address bit size: ${ADDRESS.bitSize()}")
+}
+
+internal val C_LONG_TYPE = when (ADDRESS_TYPE) {
+    IntOrLong.INT -> IntOrLong.INT
+    IntOrLong.LONG -> when {
+        getProperty("os.name").startsWith("Windows") -> IntOrLong.INT
+        else -> IntOrLong.LONG
+    }
+}

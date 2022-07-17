@@ -1,5 +1,7 @@
 package org.schism.memory
 
+import org.schism.ffi.ADDRESS_TYPE
+import org.schism.ffi.IntOrLong
 import org.schism.math.requireAlignedTo
 import java.lang.Math.addExact
 import java.lang.Math.subtractExact
@@ -292,18 +294,16 @@ public fun NativeAddress.readUtf8CString(): String {
 }
 
 public fun NativeAddress.readPointer(): NativeAddress {
-    return when (NativeAddress.BYTE_SIZE) {
-        4 -> NativeAddress.fromBits(readUInt().toLong())
-        8 -> NativeAddress.fromBits(readLong())
-        else -> throw UnsupportedOperationException("Unsupported native address size")
+    return when (ADDRESS_TYPE) {
+        IntOrLong.INT -> NativeAddress.fromBits(readUInt().toLong())
+        IntOrLong.LONG -> NativeAddress.fromBits(readLong())
     }
 }
 
 public fun NativeAddress.writePointer(value: NativeAddress) {
-    when (NativeAddress.BYTE_SIZE) {
-        4 -> writeInt(value.toBits().toInt())
-        8 -> writeLong(value.toBits())
-        else -> throw UnsupportedOperationException("Unsupported native address size")
+    when (ADDRESS_TYPE) {
+        IntOrLong.INT -> writeInt(value.toBits().toInt())
+        IntOrLong.LONG -> writeLong(value.toBits())
     }
 }
 
