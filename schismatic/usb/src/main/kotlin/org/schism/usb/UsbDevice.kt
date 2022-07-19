@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.schism.coroutines.SharedLifetime
 import org.schism.coroutines.updateMutating
 import org.schism.ffi.address
 import org.schism.ffi.withNativeStruct
@@ -21,6 +22,9 @@ import org.schism.memory.withNativeUBytes
 import org.schism.ref.registerCleanup
 import org.schism.usb.Libusb.ConfigDescriptor
 import org.schism.usb.Libusb.DeviceDescriptor
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
 
 public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
     init {
@@ -97,14 +101,25 @@ public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
         }
     }
 
-    public fun connect(): UsbDeviceConnection {
-        return UsbDeviceConnection(
-            device = this,
-            nativeHandle = withNativePointer {
-                checkLibusbReturn(libusb.open(nativeHandle, it.address))
-                it.value
-            },
-        )
+    @OptIn(ExperimentalContracts::class)
+    public suspend fun <R> connect(block: suspend (UsbDeviceConnection) -> R): R {
+        contract {
+            callsInPlace(block, InvocationKind.EXACTLY_ONCE)
+        }
+
+        val lifetime = SharedLifetime()
+
+        val nativeConnectionHandle = withNativePointer {
+            checkLibusbReturn(libusb.open(nativeHandle, it.address))
+            it.value
+        }
+
+        try {
+            return block(UsbDeviceConnection(this, nativeConnectionHandle, lifetime))
+        } finally {
+            lifetime.end()
+            libusb.close(nativeConnectionHandle)
+        }
     }
 
     public companion object {
@@ -123,7 +138,13 @@ public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
                 withNativePointer { deviceListPointer ->
                     while (true) {
                         val newDevicesByHandle: MutableMap<NativeAddress, Result<UsbDevice>>
-                        val listSize = checkLibusbSizeReturn(libusb.get_device_list(libusbContext, deviceListPointer.address))
+
+                        val listSize = checkLibusbSizeReturn(
+                            libusb.get_device_list(
+                                libusbContext,
+                                deviceListPointer.address,
+                            )
+                        )
 
                         try {
                             val deviceList = nativePointers(deviceListPointer.value, listSize.toLong())

@@ -7,7 +7,6 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.schism.coroutines.SharedLifetime
-import org.schism.coroutines.SuspendingAutocloseable
 import org.schism.ffi.NativeCallable
 import org.schism.ffi.nativeCallable
 import org.schism.ffi.wrap
@@ -37,9 +36,8 @@ import kotlin.coroutines.resumeWithException
 public class UsbDeviceConnection internal constructor(
     public val device: UsbDevice,
     private val nativeHandle: NativeAddress,
-) : SuspendingAutocloseable {
-    private val lifetime = SharedLifetime()
-
+    private val lifetime: SharedLifetime,
+) {
     private fun transfer(
         continuation: CancellableContinuation<Int>,
         callback: NativeCallable,
@@ -321,12 +319,6 @@ public class UsbDeviceConnection internal constructor(
     public suspend fun receiveZeroLengthPacket(endpoint: UsbBulkTransferInEndpoint) {
         require(endpoint.device === device)
         transfer(endpoint.address, nativeZeroLengthTransferCallback, TransferType.BULK, NativeAddress.NULL, 0)
-    }
-
-    override suspend fun close() {
-        if (lifetime.end()) {
-            libusb.close(nativeHandle)
-        }
     }
 }
 
