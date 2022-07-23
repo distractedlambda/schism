@@ -3,8 +3,36 @@ package org.schism.collections
 import org.schism.math.incSaturating
 import java.util.TreeMap
 
-public class SparseIndexSet : MutableIndexSet {
-    private val rangesLastsByFirsts = TreeMap<Long, Long>()
+public class SparseIndexSet private constructor(private val rangesLastsByFirsts: TreeMap<Long, Long>): MutableIndexSet {
+    public constructor() : this(TreeMap())
+
+    override val ascendingIndices: Sequence<Long> get() = sequence {
+        for ((first, last) in rangesLastsByFirsts) {
+            for (element in first .. last) {
+                yield(element)
+            }
+        }
+    }
+
+    override val descendingIndices: Sequence<Long> get() = sequence {
+        for ((first, last) in rangesLastsByFirsts.descendingMap()) {
+            for (element in last downTo first) {
+                yield(element)
+            }
+        }
+    }
+
+    override val ascendingRanges: Sequence<LongRange> get() = sequence {
+        for ((first, last) in rangesLastsByFirsts) {
+            yield(first .. last)
+        }
+    }
+
+    override val descendingRanges: Sequence<LongRange> get() = sequence {
+        for ((first, last) in rangesLastsByFirsts.descendingMap()) {
+            yield(first .. last)
+        }
+    }
 
     override fun contains(index: Long): Boolean {
         val (_, last) = rangesLastsByFirsts.floorEntry(index) ?: return false
@@ -114,5 +142,85 @@ public class SparseIndexSet : MutableIndexSet {
         }
 
         rangesLastsByFirsts.subMap(indices.first, true, indices.last, true).clear()
+    }
+
+    override fun clear() {
+        rangesLastsByFirsts.clear()
+    }
+
+    override fun toSparseIndexSet(): SparseIndexSet {
+        return SparseIndexSet(TreeMap(rangesLastsByFirsts))
+    }
+
+    override fun equals(other: Any?): Boolean {
+        return when {
+            other !is IndexSet -> false
+
+            other is SparseIndexSet -> {
+                rangesLastsByFirsts == other.rangesLastsByFirsts
+            }
+
+            else -> {
+                val thisIterator = rangesLastsByFirsts.iterator()
+                val otherIterator = other.ascendingRanges.iterator()
+
+                while (thisIterator.hasNext()) {
+                    if (!otherIterator.hasNext()) {
+                        return false
+                    }
+
+                    val thisRange = thisIterator.next()
+                    val otherRange = otherIterator.next()
+
+                    if (thisRange.key != otherRange.first || thisRange.value != otherRange.last) {
+                        return false
+                    }
+                }
+
+                true
+            }
+        }
+    }
+
+    override fun hashCode(): Int {
+        var hash = 0
+
+        for ((first, last) in rangesLastsByFirsts) {
+            hash = 31 * (31 * hash + first.hashCode()) + last.hashCode()
+        }
+
+        return hash
+    }
+
+    override fun toString(): String {
+        val iterator = rangesLastsByFirsts.iterator()
+
+        if (!iterator.hasNext()) {
+            return "[]"
+        }
+
+        return buildString {
+            append('[')
+
+            appendRange(iterator.next())
+
+            while (iterator.hasNext()) {
+                append(", ")
+                appendRange(iterator.next())
+            }
+
+            append(']')
+        }
+    }
+}
+
+private fun StringBuilder.appendRange(range: Map.Entry<Long, Long>) {
+    val (first, last) = range
+
+    append(first)
+
+    if (first != last) {
+        append("..")
+        append(last)
     }
 }
