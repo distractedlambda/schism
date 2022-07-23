@@ -10,6 +10,12 @@ public fun heapMemory(array: ByteArray, offset: Int = 0, size: Int = array.size 
     return HeapMemory(array, offset, size, HeapMemory.READABLE or HeapMemory.WRITABLE)
 }
 
+public fun emptyHeapMemory(): Memory {
+    return EMPTY_HEAP_MEMORY
+}
+
+private val EMPTY_HEAP_MEMORY = allocateHeapMemory(0)
+
 public fun allocateHeapMemory(size: Int): Memory {
     return heapMemory(ByteArray(size))
 }
