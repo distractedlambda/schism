@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.launch
+import org.schism.math.plusExact
 import org.schism.math.toIntExact
 import org.schism.memory.Memory
 import org.schism.memory.allocateHeapMemory
@@ -42,23 +43,34 @@ public interface MemoryFlow : Flow<Memory> {
     public fun unpackComponents(to: MutableList<MemoryFlow>) {
         to.add(this)
     }
+
+    public operator fun plus(other: MemoryFlow): MemoryFlow {
+        val components = buildList {
+            unpackComponents(this@buildList)
+            other.unpackComponents(this@buildList)
+        }
+
+        return concatenateComponents(components, size plusExact other.size)
+    }
 }
 
 public fun MemoryFlow(size: Long, load: suspend () -> Memory): MemoryFlow {
-    require(size >= 0)
-    return if (size == 0L) {
-        EmptyMemoryFlow
-    } else {
-        DeferredMemoryFlow(size, load)
+    return when (size) {
+        0L -> EmptyMemoryFlow
+        else -> DeferredMemoryFlow(size, load)
     }
 }
 
-private fun concatenateComponents(components: List<MemoryFlow>, size: Long): MemoryFlow {
-    return when (components.size) {
-        0 -> EmptyMemoryFlow
-        1 -> components.single()
-        else -> ConcatenatedMemoryFlow(components.toTypedArray(), size)
+public fun MemoryFlow(size: Long, pageSize: Long, loadPage: suspend (pageIndex: Long) -> Memory): MemoryFlow {
+    return when (size) {
+        0L -> EmptyMemoryFlow
+        pageSize -> DeferredMemoryFlow(size) { loadPage(0) }
+        else -> PageDeferredMemoryFlow(size, pageSize, loadPage)
     }
+}
+
+public fun emptyMemoryFlow(): MemoryFlow {
+    return EmptyMemoryFlow
 }
 
 public fun concatenate(vararg flows: MemoryFlow): MemoryFlow {
@@ -70,7 +82,7 @@ public fun concatenate(vararg flows: MemoryFlow): MemoryFlow {
 
             val components = buildList {
                 flows.forEach {
-                    size += it.size
+                    size = size plusExact it.size
                     it.unpackComponents(this@buildList)
                 }
             }
@@ -85,12 +97,20 @@ public fun concatenate(flows: Iterable<MemoryFlow>): MemoryFlow {
 
     val components = buildList {
         flows.forEach {
-            size += it.size
+            size = size plusExact it.size
             it.unpackComponents(this@buildList)
         }
     }
 
     return concatenateComponents(components, size)
+}
+
+private fun concatenateComponents(components: List<MemoryFlow>, size: Long): MemoryFlow {
+    return when (components.size) {
+        0 -> EmptyMemoryFlow
+        1 -> components.single()
+        else -> ConcatenatedMemoryFlow(components.toTypedArray(), size)
+    }
 }
 
 private class PageDeferredMemoryFlow(
@@ -114,10 +134,9 @@ private class PageDeferredMemoryFlow(
             loadPage(pageIndex.toLong())
         }
 
-        return if (pages[pageIndex].compareAndSet(null, newPage)) {
-            newPage
-        } else {
-            pages[pageIndex].value!!
+        return when {
+            pages[pageIndex].compareAndSet(null, newPage) -> newPage
+            else -> pages[pageIndex].value!!
         }
     }
 
@@ -141,28 +160,34 @@ private class PageDeferredMemoryFlow(
 
         return when (size) {
             0L -> EmptyMemoryFlow
+
             this.size -> this
+
             else -> {
                 val firstPageIndex = (offset / pageSize).toIntExact()
                 val lastPageIndex = ((offset + size - 1) / pageSize).toIntExact()
                 val firstPageOffset = offset % pageSize
 
-                if (firstPageIndex == lastPageIndex) {
-                    getOrCreatePage(firstPageIndex).slice(firstPageOffset, size)
-                } else {
-                    val componentPages = Array(lastPageIndex - firstPageIndex + 1) {
-                        getOrCreatePage(firstPageIndex + it)
+                when (firstPageIndex) {
+                    lastPageIndex -> {
+                        getOrCreatePage(firstPageIndex).slice(firstPageOffset, size)
                     }
 
-                    componentPages[0] = componentPages
-                        .first()
-                        .slice(firstPageOffset)
+                    else -> {
+                        val components = Array(lastPageIndex - firstPageIndex + 1) {
+                            getOrCreatePage(firstPageIndex + it)
+                        }
 
-                    componentPages[componentPages.lastIndex] = componentPages
-                        .last()
-                        .slice(size = size - ((pages.size - 1) * pageSize) + firstPageOffset)
+                        components[0] = components
+                            .first()
+                            .slice(firstPageOffset)
 
-                    ConcatenatedMemoryFlow(componentPages, size)
+                        components[components.lastIndex] = components
+                            .last()
+                            .slice(size = size - ((pages.size - 1) * pageSize) + firstPageOffset)
+
+                        ConcatenatedMemoryFlow(components, size)
+                    }
                 }
             }
         }
@@ -259,7 +284,6 @@ private class DeferredMemoryFlow(override val size: Long, private val load: susp
 
     private companion object {
         private val EMPTY = Token("EMPTY")
-
         private val LOADING = Token("LOADING")
     }
 }
@@ -425,6 +449,10 @@ private object EmptyMemoryFlow : MemoryFlow {
 
     override fun unpackComponents(to: MutableList<MemoryFlow>) {
         return
+    }
+
+    override fun plus(other: MemoryFlow): MemoryFlow {
+        return other
     }
 
     override suspend fun collect(collector: FlowCollector<Memory>) {
