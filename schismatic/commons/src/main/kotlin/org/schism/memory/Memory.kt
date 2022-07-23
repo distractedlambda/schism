@@ -2,6 +2,7 @@ package org.schism.memory
 
 import org.schism.ffi.ADDRESS_TYPE
 import org.schism.ffi.IntOrLong
+import org.schism.math.toIntExact
 
 public interface Memory {
     public val size: Long
@@ -238,4 +239,10 @@ public fun memset(destination: Memory, value: Byte) {
 
 public fun memset(destination: Memory, value: UByte) {
     destination.fill(value.toByte())
+}
+
+public fun heapCopyOf(memory: Memory): Memory {
+    return allocateHeapMemory(memory.size.toIntExact()).also {
+        memcpy(it, memory)
+    }
 }
