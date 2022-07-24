@@ -1,7 +1,6 @@
 package org.schism.memory
 
 import org.schism.math.timesExact
-import java.nio.ByteOrder
 import kotlin.reflect.KProperty
 
 public val Memory.byte: MemoryByteView get() {

@@ -1,9 +1,5 @@
 package org.schism.memory
 
-import org.schism.math.AHash
-import java.lang.foreign.MemorySegment
-import java.lang.foreign.MemorySession
-import java.util.Arrays
 import java.util.Objects.checkFromIndexSize
 import java.util.Objects.checkIndex
 
@@ -97,19 +93,6 @@ internal class HeapMemory(
     override fun slice(offset: Long, size: Long): Memory {
         checkFromIndexSize(offset, size, this.size)
         return HeapMemory(array, arrayOffset + offset.toInt(), size.toInt(), flags)
-    }
-
-    override fun firstMismatchWith(other: NativeAddress): Long {
-        checkReadable()
-        return MemorySegment
-            .ofArray(array)
-            .asSlice(arrayOffset.toLong(), size)
-            .mismatch(MemorySegment.ofAddress(other.toMemoryAddress(), size, MemorySession.global()))
-    }
-
-    override fun firstMismatchWith(other: ByteArray, otherOffset: Int): Long {
-        checkReadable()
-        return Arrays.mismatch(array, arrayOffset, arrayOffset + intSize, other, otherOffset, other.size).toLong()
     }
 
     override fun getByte(offset: Long): Byte {
@@ -338,15 +321,6 @@ internal class HeapMemory(
         checkWritable()
         checkFromIndexSize(offset, 8, size)
         array.setBeDouble(value, arrayOffset + offset.toInt())
-    }
-
-    override fun equals(other: Any?): Boolean {
-        return other is Memory && size == other.size && other.firstMismatchWith(array, arrayOffset) == -1L
-    }
-
-    override fun hashCode(): Int {
-        val longHash = AHash.run { finish(fold(initial(), array, arrayOffset, intSize)) }
-        return longHash.toInt() xor (longHash shr 32).toInt()
     }
 
     override fun toString(): String {

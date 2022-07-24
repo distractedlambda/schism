@@ -21,7 +21,7 @@ fun MemoryHexView(source: MemoryFlow, bytesPerRow: Int = 8) {
                 val bytes = source.slice(startAddress, bytesPerRow.toLong()).collectAsState(initial = null)
 
                 for (byteIndex in 0 until bytesPerRow) {
-
+                    
                 }
             }
         }
