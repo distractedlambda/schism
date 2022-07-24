@@ -73,6 +73,10 @@ public fun emptyMemoryFlow(): MemoryFlow {
     return EmptyMemoryFlow
 }
 
+public fun memoryFlowOf(memory: Memory): MemoryFlow {
+    return ImmediateMemoryFlow(memory)
+}
+
 public fun concatenate(vararg flows: MemoryFlow): MemoryFlow {
     return when (flows.size) {
         0 -> EmptyMemoryFlow
@@ -411,7 +415,11 @@ private class ConcatenatedMemoryFlow(
     private data class ComponentUpdate(val componentIndex: Int, val byteOffset: Long, val data: Memory)
 }
 
-private class SlicedMemoryFlow(val source: MemoryFlow, val sourceOffset: Long, override val size: Long) : MemoryFlow {
+private class SlicedMemoryFlow(
+    private val source: MemoryFlow,
+    private val sourceOffset: Long,
+    override val size: Long,
+) : MemoryFlow {
     init {
         require(size > 0)
     }
@@ -434,6 +442,31 @@ private class SlicedMemoryFlow(val source: MemoryFlow, val sourceOffset: Long, o
         source.collect {
             collector.emit(it.slice(sourceOffset, size))
         }
+    }
+}
+
+private class ImmediateMemoryFlow(private val memory: Memory) : MemoryFlow {
+    override val size: Long get() {
+        return memory.size
+    }
+
+    override fun slice(offset: Long, size: Long): MemoryFlow {
+        checkFromIndexSize(offset, size, memory.size)
+        return when (size) {
+            memory.size -> this
+            else -> ImmediateMemoryFlow(memory.slice(offset, size))
+        }
+    }
+
+    override fun unpackComponents(to: MutableList<MemoryFlow>) {
+        if (memory.size != 0L) {
+            to.add(this)
+        }
+    }
+
+    override suspend fun collect(collector: FlowCollector<Memory>) {
+        collector.emit(memory)
+        awaitCancellation()
     }
 }
 

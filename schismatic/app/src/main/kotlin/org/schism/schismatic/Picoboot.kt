@@ -2,8 +2,11 @@ package org.schism.schismatic
 
 import kotlinx.coroutines.coroutineScope
 import org.schism.coroutines.Actor
+import org.schism.coroutines.MemoryFlow
+import org.schism.math.toIntExact
 import org.schism.memory.Memory
 import org.schism.memory.MemoryEncoder
+import org.schism.memory.allocateHeapMemory
 import org.schism.memory.positionalDifference
 import org.schism.memory.putLeUInt
 import org.schism.memory.putUByte
@@ -21,6 +24,24 @@ class PicobootConnection private constructor(
     private val inEndpoint: UsbBulkTransferInEndpoint,
     private val outEndpoint: UsbBulkTransferOutEndpoint,
 ) {
+    val rom: MemoryFlow = memoryFlow(address = 0x00000000u, size = 0x4000u)
+
+    val flash: MemoryFlow = memoryFlow(address = 0x10000000u, size = 0x1000000u)
+
+    val sram: MemoryFlow = memoryFlow(address = 0x20000000u, size = 0x42000u)
+
+    private fun memoryFlow(address: UInt, size: UInt): MemoryFlow {
+        return MemoryFlow(size.toLong(), 256) { pageIndex ->
+            allocateHeapMemory(PAGE_SIZE.toIntExact()).apply {
+                encoder().apply {
+                    readMemory(address + pageIndex.toUInt() * 256u, 256u) {
+                        putBytes(it)
+                    }
+                }
+            }
+        }
+    }
+
     @OptIn(ExperimentalContracts::class)
     private suspend fun sendCommand(id: UByte, transferLength: UInt, fillArgs: MemoryEncoder.() -> Unit) {
         contract {
@@ -69,7 +90,7 @@ class PicobootConnection private constructor(
         }
     }
 
-    suspend fun eraseFlash(deviceAddress: UInt, byteCount: UInt) {
+    private suspend fun eraseFlash(deviceAddress: UInt, byteCount: UInt) {
         require(deviceAddress % 4096u == 0u)
         require(byteCount % 4096u == 0u)
         require(byteCount != 0u)
@@ -85,7 +106,7 @@ class PicobootConnection private constructor(
     }
 
     @OptIn(ExperimentalContracts::class)
-    suspend fun readMemory(deviceAddress: UInt, size: UInt, onEachPart: suspend (Memory) -> Unit) {
+    private suspend fun readMemory(deviceAddress: UInt, size: UInt, onEachPart: suspend (Memory) -> Unit) {
         contract {
             callsInPlace(onEachPart, InvocationKind.AT_LEAST_ONCE)
         }
@@ -112,7 +133,7 @@ class PicobootConnection private constructor(
     }
 
     @OptIn(ExperimentalContracts::class)
-    suspend fun writeMemory(deviceAddress: UInt, size: UInt, writePart: suspend (Memory) -> Unit) {
+    private suspend fun writeMemory(deviceAddress: UInt, size: UInt, writePart: suspend (Memory) -> Unit) {
         contract {
             callsInPlace(writePart, InvocationKind.AT_LEAST_ONCE)
         }
@@ -234,3 +255,5 @@ private const val PRODUCT_ID: UShort = 0x0003u
 private const val INTERFACE_CLASS: UByte = 0xFFu
 private const val INTERFACE_SUB_CLASS: UByte = 0x00u
 private const val INTERFACE_PROTOCOL: UByte = 0x00u
+
+private const val PAGE_SIZE = 256L

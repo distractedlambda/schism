@@ -15,7 +15,7 @@ import kotlin.contracts.contract
 import kotlin.experimental.ExperimentalTypeInference
 
 @OptIn(ExperimentalContracts::class, ExperimentalTypeInference::class)
-inline fun <E> buildPersistentList(@BuilderInference block: MutableList<E>.() -> Unit): PersistentList<E> {
+public inline fun <E> buildPersistentList(@BuilderInference block: MutableList<E>.() -> Unit): PersistentList<E> {
     contract {
         callsInPlace(block, InvocationKind.EXACTLY_ONCE)
     }
@@ -24,7 +24,7 @@ inline fun <E> buildPersistentList(@BuilderInference block: MutableList<E>.() ->
 }
 
 @OptIn(ExperimentalContracts::class, ExperimentalTypeInference::class)
-inline fun <E> buildPersistentSet(@BuilderInference block: MutableSet<E>.() -> Unit): PersistentSet<E> {
+public inline fun <E> buildPersistentSet(@BuilderInference block: MutableSet<E>.() -> Unit): PersistentSet<E> {
     contract {
         callsInPlace(block, InvocationKind.EXACTLY_ONCE)
     }
@@ -33,7 +33,7 @@ inline fun <E> buildPersistentSet(@BuilderInference block: MutableSet<E>.() -> U
 }
 
 @OptIn(ExperimentalContracts::class, ExperimentalTypeInference::class)
-inline fun <E> buildPersistentHashSet(@BuilderInference block: MutableSet<E>.() -> Unit): PersistentSet<E> {
+public inline fun <E> buildPersistentHashSet(@BuilderInference block: MutableSet<E>.() -> Unit): PersistentSet<E> {
     contract {
         callsInPlace(block, InvocationKind.EXACTLY_ONCE)
     }
@@ -42,7 +42,7 @@ inline fun <E> buildPersistentHashSet(@BuilderInference block: MutableSet<E>.() 
 }
 
 @OptIn(ExperimentalTypeInference::class, ExperimentalContracts::class)
-inline fun <K, V> buildPersistentMap(@BuilderInference block: MutableMap<K, V>.() -> Unit): PersistentMap<K, V> {
+public inline fun <K, V> buildPersistentMap(@BuilderInference block: MutableMap<K, V>.() -> Unit): PersistentMap<K, V> {
     contract {
         callsInPlace(block, InvocationKind.EXACTLY_ONCE)
     }
@@ -51,7 +51,7 @@ inline fun <K, V> buildPersistentMap(@BuilderInference block: MutableMap<K, V>.(
 }
 
 @OptIn(ExperimentalContracts::class, ExperimentalTypeInference::class)
-inline fun <K, V> buildPersistentHashMap(@BuilderInference block: MutableMap<K, V>.() -> Unit): PersistentMap<K, V> {
+public inline fun <K, V> buildPersistentHashMap(@BuilderInference block: MutableMap<K, V>.() -> Unit): PersistentMap<K, V> {
     contract {
         callsInPlace(block, InvocationKind.EXACTLY_ONCE)
     }
