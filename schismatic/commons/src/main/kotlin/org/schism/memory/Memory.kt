@@ -35,6 +35,10 @@ public interface Memory {
 
     public fun slice(offset: Long = 0L, size: Long = this.size - offset): Memory
 
+    public fun firstMismatchWith(other: ByteArray, otherOffset: Int = 0): Long
+
+    public fun firstMismatchWith(other: NativeAddress): Long
+
     public fun getByte(offset: Long = 0L): Byte
 
     public fun getChar(offset: Long = 0L): Char
@@ -110,6 +114,10 @@ public interface Memory {
     public fun setLeDouble(value: Double, offset: Long = 0L)
 
     public fun setBeDouble(value: Double, offset: Long = 0L)
+
+    override fun equals(other: Any?): Boolean
+
+    override fun hashCode(): Int
 }
 
 public fun Memory.requireAlignedTo(alignment: Long) {

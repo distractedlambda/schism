@@ -2,6 +2,8 @@ package org.schism.memory
 
 import org.schism.ffi.ADDRESS_TYPE
 import org.schism.ffi.IntOrLong
+import java.lang.foreign.MemorySegment
+import java.lang.foreign.MemorySession
 import java.lang.invoke.MethodHandles
 import java.nio.ByteOrder
 
@@ -241,6 +243,28 @@ public fun ByteArray.setPointer(value: NativeAddress, offset: Int = 0) {
         IntOrLong.INT -> setInt(value.toBits().toInt(), offset)
         IntOrLong.LONG -> setLong(value.toBits())
     }
+}
+
+public fun ByteArray.firstMismatchWith(
+    other: ByteArray,
+    offset: Int = 0,
+    otherOffset: Int = 0,
+): Int {
+    return MemorySegment
+        .ofArray(this)
+        .asSlice(offset.toLong())
+        .mismatch(MemorySegment.ofArray(other).asSlice(otherOffset.toLong())).toInt()
+}
+
+public fun ByteArray.firstMismatchWith(
+    other: NativeAddress,
+    offset: Int = 0,
+    size: Int = this.size - offset,
+): Int {
+    return MemorySegment
+        .ofArray(this)
+        .asSlice(offset.toLong(), size.toLong())
+        .mismatch(MemorySegment.ofAddress(other.toMemoryAddress(), size.toLong(), MemorySession.global())).toInt()
 }
 
 public fun memcpy(

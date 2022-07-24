@@ -35,3 +35,20 @@ public fun Long.incSaturating(): Long {
 public fun Long.decSaturating(): Long {
     return if (this == Long.MIN_VALUE) this else this.dec()
 }
+
+public infix fun UInt.foldedMultiply(rhs: UInt): UInt {
+    val longProduct = toULong() * rhs.toULong()
+    return longProduct.toUInt() xor (longProduct shr 32).toUInt()
+}
+
+public infix fun Long.multiplyHigh(rhs: Long): Long {
+    return Math.multiplyHigh(this, rhs)
+}
+
+public infix fun ULong.multiplyHigh(rhs: ULong): ULong {
+    return Math.unsignedMultiplyHigh(toLong(), rhs.toLong()).toULong()
+}
+
+public infix fun ULong.foldedMultiply(rhs: ULong): ULong {
+    return (this * rhs) xor (this multiplyHigh rhs)
+}

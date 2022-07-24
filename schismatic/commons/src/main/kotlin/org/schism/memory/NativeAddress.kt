@@ -17,7 +17,7 @@ import java.lang.foreign.ValueLayout.JAVA_BYTE
     }
 
     override fun toString(): String {
-        return "NativeAddress(0x${bits.toString(16).padStart(16, '0')})"
+        return "<${bits.toString(16).padStart(16, '0')}>"
     }
 
     public companion object {

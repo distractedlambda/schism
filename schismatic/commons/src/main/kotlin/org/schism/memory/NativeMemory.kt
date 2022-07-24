@@ -549,6 +549,11 @@ internal class NativeMemory : Memory {
         }
     }
 
+    override fun toString(): String {
+        val lastAddress = startAddress + (size - 1)
+        return "Memory($startAddress..$lastAddress, isReadable=$isReadable, isWritable=$isWritable)"
+    }
+
     companion object {
         const val READABLE = 0x1
         const val WRITABLE = 0x2
