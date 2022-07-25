@@ -1,75 +1,77 @@
 package org.schism.memory
 
 import org.schism.math.foldHashCode
+import org.schism.ref.keepingReachable
+import java.lang.foreign.MemorySegment
+import java.lang.foreign.MemorySession
 import java.lang.ref.Reference.reachabilityFence
 import java.util.Objects.checkFromIndexSize
 import java.util.Objects.checkIndex
 
-internal class NativeMemory : Memory {
+internal class NativeMemory : AbstractMemory {
     override val startAddress: NativeAddress
-    override val size: Long
-    private val flags: Int
     private val attachment: Any?
 
-    constructor(startAddress: NativeAddress, size: Long, flags: Int, attachment: Any?) {
+    constructor(
+        startAddress: NativeAddress,
+        attachment: Any?,
+        size: Long,
+        isReadable: Boolean,
+        isWritable: Boolean,
+    ) : super(size, isReadable, isWritable) {
         this.startAddress = startAddress
-        this.size = size
-        this.flags = flags
         this.attachment = attachment
     }
 
-    constructor(startAddress: NativeAddress, size: Long, flags: Int) {
+    constructor(
+        startAddress: NativeAddress,
+        size: Long,
+        isReadable: Boolean,
+        isWritable: Boolean,
+    ) : super(size, isReadable, isWritable) {
         this.startAddress = startAddress
-        this.size = size
-        this.flags = flags
         this.attachment = this
-    }
-
-    override val isReadable: Boolean get() {
-        return (flags and READABLE) != 0
-    }
-
-    override val isWritable: Boolean get() {
-        return (flags and WRITABLE) != 0
     }
 
     override val isNative: Boolean get() {
         return true
     }
 
-    private fun checkReadable() {
-        if (!isReadable) {
-            throw UnsupportedOperationException()
+    override fun shallowReadOnlyCopy(): Memory {
+        return NativeMemory(startAddress, attachment, size, isReadable = true, isWritable = false)
+    }
+
+    override fun copyToSafe(destination: ByteArray, destinationOffset: Int, copySize: Int) {
+        keepingReachable(attachment) {
+            MemorySegment
+                .ofArray(destination)
+                .asSlice(destinationOffset.toLong(), copySize.toLong())
+                .copyFrom(
+                    MemorySegment.ofAddress(
+                        startAddress.toMemoryAddress(),
+                        copySize.toLong(),
+                        MemorySession.global()
+                    )
+                )
         }
     }
 
-    private fun checkWritable() {
-        if (!isWritable) {
-            throw UnsupportedOperationException()
+    override fun copyToSafe(destination: NativeAddress) {
+        keepingReachable(attachment) {
+            MemorySegment
+                .ofAddress(destination.toMemoryAddress(), size, MemorySession.global())
+                .copyFrom(
+                    MemorySegment.ofAddress(
+                        startAddress.toMemoryAddress(),
+                        size,
+                        MemorySession.global(),
+                    )
+                )
         }
     }
 
-    override fun asReadOnly(): Memory {
-        return if (flags == READABLE) {
-            this
-        } else {
-            checkReadable()
-            NativeMemory(startAddress, size, READABLE, attachment)
-        }
-    }
-
-    override fun copyTo(destination: ByteArray, destinationOffset: Int) {
-        checkReadable()
-        try {
-            memcpy(
-                destination,
-                destinationOffset,
-                startAddress,
-                minOf(size, (destination.size - destinationOffset).toLong()).toInt(),
-            )
-        } finally {
-            reachabilityFence(attachment)
-        }
+    override fun copyFromSafe(source: ReadOnlyByteArray, sourceOffset: Int, copySize: Int) {
+        TODO("Not yet implemented")
     }
 
     override fun copyTo(destination: NativeAddress) {

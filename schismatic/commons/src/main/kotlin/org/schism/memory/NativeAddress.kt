@@ -7,7 +7,6 @@ import java.lang.Math.addExact
 import java.lang.Math.subtractExact
 import java.lang.foreign.MemoryAddress
 import java.lang.foreign.MemorySegment
-import java.lang.foreign.MemorySession
 import java.lang.foreign.ValueLayout.ADDRESS
 import java.lang.foreign.ValueLayout.JAVA_BYTE
 
@@ -35,6 +34,14 @@ import java.lang.foreign.ValueLayout.JAVA_BYTE
 
 public fun NativeAddress.toMemoryAddress(): MemoryAddress {
     return MemoryAddress.ofLong(toBits())
+}
+
+public fun NativeAddress.toMemorySegment(size: Long): MemorySegment {
+    
+}
+
+public fun MemoryAddress.toNativeAddress(): NativeAddress {
+    return NativeAddress.fromBits(toRawLongValue())
 }
 
 public operator fun NativeAddress.plus(offset: Long): NativeAddress {
@@ -289,10 +296,6 @@ public fun NativeAddress.writeBeDouble(value: Double) {
     toMemoryAddress()[UNALIGNED_BE_DOUBLE, 0] = value
 }
 
-public fun NativeAddress.readUtf8CString(): String {
-    return toMemoryAddress().getUtf8String(0)
-}
-
 public fun NativeAddress.readPointer(): NativeAddress {
     return when (ADDRESS_TYPE) {
         IntOrLong.INT -> NativeAddress.fromBits(readUInt().toLong())
@@ -307,39 +310,6 @@ public fun NativeAddress.writePointer(value: NativeAddress) {
     }
 }
 
-public fun MemoryAddress.toNativeAddress(): NativeAddress {
-    return NativeAddress.fromBits(toRawLongValue())
-}
-
-public fun memcpy(destination: NativeAddress, source: NativeAddress, size: Long) {
-    MemorySegment.ofAddress(destination.toMemoryAddress(), size, MemorySession.global())
-        .copyFrom(MemorySegment.ofAddress(source.toMemoryAddress(), size, MemorySession.global()))
-}
-
-public fun memcpy(
-    destination: ByteArray,
-    destinationOffset: Int = 0,
-    source: NativeAddress,
-    size: Int = destination.size - destinationOffset,
-) {
-    MemorySegment.ofArray(destination).asSlice(destinationOffset.toLong(), size.toLong())
-        .copyFrom(MemorySegment.ofAddress(source.toMemoryAddress(), size.toLong(), MemorySession.global()))
-}
-
-public fun memcpy(
-    destination: NativeAddress,
-    source: ByteArray,
-    sourceOffset: Int = 0,
-    size: Int = source.size - sourceOffset,
-) {
-    MemorySegment.ofAddress(destination.toMemoryAddress(), size.toLong(), MemorySession.global())
-        .copyFrom(MemorySegment.ofArray(source).asSlice(sourceOffset.toLong(), size.toLong()))
-}
-
-public fun memset(destination: NativeAddress, value: Byte, size: Long) {
-    MemorySegment.ofAddress(destination.toMemoryAddress(), size, MemorySession.global()).fill(value)
-}
-
-public fun memset(destination: NativeAddress, value: UByte, size: Long) {
-    memset(destination, value.toByte(), size)
+public fun NativeAddress.readUtf8CString(): String {
+    return toMemoryAddress().getUtf8String(0)
 }

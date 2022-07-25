@@ -2,8 +2,6 @@ package org.schism.memory
 
 import org.schism.ffi.ADDRESS_TYPE
 import org.schism.ffi.IntOrLong
-import java.lang.foreign.MemorySegment
-import java.lang.foreign.MemorySession
 import java.lang.invoke.MethodHandles
 import java.nio.ByteOrder
 
@@ -243,61 +241,6 @@ public fun ByteArray.setPointer(value: NativeAddress, offset: Int = 0) {
         IntOrLong.INT -> setInt(value.toBits().toInt(), offset)
         IntOrLong.LONG -> setLong(value.toBits())
     }
-}
-
-public fun ByteArray.firstMismatchWith(
-    other: ByteArray,
-    offset: Int = 0,
-    otherOffset: Int = 0,
-): Int {
-    return MemorySegment
-        .ofArray(this)
-        .asSlice(offset.toLong())
-        .mismatch(MemorySegment.ofArray(other).asSlice(otherOffset.toLong())).toInt()
-}
-
-public fun ByteArray.firstMismatchWith(
-    other: NativeAddress,
-    offset: Int = 0,
-    size: Int = this.size - offset,
-): Int {
-    return MemorySegment
-        .ofArray(this)
-        .asSlice(offset.toLong(), size.toLong())
-        .mismatch(MemorySegment.ofAddress(other.toMemoryAddress(), size.toLong(), MemorySession.global())).toInt()
-}
-
-public fun memcpy(
-    destination: ByteArray,
-    destinationOffset: Int = 0,
-    source: ByteArray,
-    sourceOffset: Int = 0,
-    size: Int = minOf(destination.size - destinationOffset, source.size - sourceOffset),
-) {
-    source.copyInto(
-        destination,
-        destinationOffset,
-        startIndex = sourceOffset,
-        endIndex = sourceOffset + size,
-    )
-}
-
-public fun memset(
-    destination: ByteArray,
-    destinationOffset: Int = 0,
-    value: Byte,
-    size: Int = destination.size - destinationOffset,
-) {
-    destination.fill(value, fromIndex = destinationOffset, toIndex = destinationOffset + size)
-}
-
-public fun memset(
-    destination: ByteArray,
-    destinationOffset: Int = 0,
-    value: UByte,
-    size: Int = destination.size - destinationOffset,
-) {
-    memset(destination, destinationOffset, value.toByte(), size)
 }
 
 private val NATIVE_CHAR = MethodHandles.byteArrayViewVarHandle(Char::class.java, ByteOrder.nativeOrder())

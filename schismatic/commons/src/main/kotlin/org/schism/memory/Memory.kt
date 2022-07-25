@@ -2,7 +2,6 @@ package org.schism.memory
 
 import org.schism.ffi.ADDRESS_TYPE
 import org.schism.ffi.IntOrLong
-import org.schism.math.toIntExact
 
 public interface Memory {
     public val size: Long
@@ -23,7 +22,7 @@ public interface Memory {
 
     public fun copyTo(destination: Memory)
 
-    public fun copyFrom(source: ByteArray, sourceOffset: Int = 0)
+    public fun copyFrom(source: ReadOnlyByteArray, sourceOffset: Int = 0)
 
     public fun copyFrom(source: NativeAddress)
 
@@ -36,12 +35,6 @@ public interface Memory {
     public fun slice(offset: Long = 0L, size: Long = this.size - offset): Memory
 
     public fun getByte(offset: Long = 0L): Byte
-
-    public fun getChar(offset: Long = 0L): Char
-
-    public fun getLeChar(offset: Long = 0L): Char
-
-    public fun getBeChar(offset: Long = 0L): Char
 
     public fun getShort(offset: Long = 0L): Short
 
@@ -74,12 +67,6 @@ public interface Memory {
     public fun getBeDouble(offset: Long = 0L): Double
 
     public fun setByte(value: Byte, offset: Long = 0L)
-
-    public fun setChar(value: Char, offset: Long = 0L)
-
-    public fun setLeChar(value: Char, offset: Long = 0L)
-
-    public fun setBeChar(value: Char, offset: Long = 0L)
 
     public fun setShort(value: Short, offset: Long = 0L)
 
@@ -135,6 +122,18 @@ public fun Memory.getBeUShort(offset: Long = 0L): UShort {
     return getBeShort(offset).toUShort()
 }
 
+public fun Memory.getChar(offset: Long = 0L): Char {
+    return Char(getUShort(offset))
+}
+
+public fun Memory.getLeChar(offset: Long = 0L): Char {
+    return Char(getLeUShort(offset))
+}
+
+public fun Memory.getBeChar(offset: Long = 0L): Char {
+    return Char(getBeUShort(offset))
+}
+
 public fun Memory.getUInt(offset: Long = 0L): UInt {
     return getInt(offset).toUInt()
 }
@@ -175,6 +174,18 @@ public fun Memory.setBeUShort(value: UShort, offset: Long = 0L) {
     setBeShort(value.toShort(), offset)
 }
 
+public fun Memory.setChar(value: Char, offset: Long = 0L) {
+    setShort(value.code.toShort(), offset)
+}
+
+public fun Memory.setLeChar(value: Char, offset: Long = 0L) {
+    setLeShort(value.code.toShort(), offset)
+}
+
+public fun Memory.setBeChar(value: Char, offset: Long = 0L) {
+    setBeShort(value.code.toShort(), offset)
+}
+
 public fun Memory.setUInt(value: UInt, offset: Long = 0L) {
     setInt(value.toInt(), offset)
 }
@@ -210,39 +221,5 @@ public fun Memory.setPointer(value: NativeAddress, offset: Long = 0L) {
     when (ADDRESS_TYPE) {
         IntOrLong.INT -> setInt(value.toBits().toInt(), offset)
         IntOrLong.LONG -> setLong(value.toBits(), offset)
-    }
-}
-
-public fun memcpy(destination: Memory, source: Memory) {
-    source.copyTo(destination)
-}
-
-public fun memcpy(destination: Memory, source: ByteArray, sourceOffset: Int = 0) {
-    destination.copyFrom(source, sourceOffset)
-}
-
-public fun memcpy(destination: Memory, source: NativeAddress) {
-    destination.copyFrom(source)
-}
-
-public fun memcpy(destination: ByteArray, destinationOffset: Int = 0, source: Memory) {
-    source.copyTo(destination, destinationOffset)
-}
-
-public fun memcpy(destination: NativeAddress, source: Memory) {
-    source.copyTo(destination)
-}
-
-public fun memset(destination: Memory, value: Byte) {
-    destination.fill(value)
-}
-
-public fun memset(destination: Memory, value: UByte) {
-    destination.fill(value.toByte())
-}
-
-public fun heapCopyOf(memory: Memory): Memory {
-    return allocateHeapMemory(memory.size.toIntExact()).also {
-        memcpy(it, memory)
     }
 }

@@ -2,351 +2,220 @@ package org.schism.memory
 
 import org.schism.math.foldHashCode
 import java.lang.System.identityHashCode
-import java.util.Objects.checkFromIndexSize
-import java.util.Objects.checkIndex
+import java.lang.foreign.MemorySegment
+import java.lang.foreign.MemorySession
 
 internal class HeapMemory(
     private val array: ByteArray,
     private val arrayOffset: Int,
-    private val intSize: Int,
-    private val flags: Int,
-) : Memory {
-    override val size: Long get() {
-        return intSize.toLong()
-    }
-
-    override val isReadable: Boolean get() {
-        return (flags and READABLE) != 0
-    }
-
-    override val isWritable: Boolean get() {
-        return (flags and WRITABLE) != 0
-    }
-
+    size: Long,
+    isReadable: Boolean,
+    isWritable: Boolean,
+) : AbstractMemory(size, isReadable, isWritable) {
     override val isNative: Boolean get() {
         return false
     }
 
     override val startAddress: NativeAddress get() {
-        throw UnsupportedOperationException()
+        throw UnsupportedOperationException("Memory is not native")
     }
 
-    private fun checkReadable() {
-        if (!isReadable) {
-            throw UnsupportedOperationException()
-        }
+    private fun effectiveOffset(offset: Long): Int {
+        return arrayOffset + offset.toInt()
     }
 
-    private fun checkWritable() {
-        if (!isWritable) {
-            throw UnsupportedOperationException()
-        }
+    override fun shallowReadOnlyCopy(): Memory {
+        return HeapMemory(array, arrayOffset, size, isReadable = true, isWritable = false)
     }
 
-    override fun asReadOnly(): Memory {
-        return if (flags == READABLE) {
-            this
-        } else {
-            checkReadable()
-            HeapMemory(array, arrayOffset, intSize, READABLE)
-        }
+    override fun copyToSafe(destination: ByteArray, destinationOffset: Int, copySize: Int) {
+        array.copyInto(destination, destinationOffset, arrayOffset, arrayOffset + copySize)
     }
 
-    override fun copyTo(destination: ByteArray, destinationOffset: Int) {
-        checkReadable()
-        memcpy(destination, destinationOffset, array, arrayOffset, minOf(intSize, destination.size - destinationOffset))
+    override fun copyToSafe(destination: NativeAddress) {
+        MemorySegment
+            .ofAddress(destination.toMemoryAddress(), size, MemorySession.global())
+            .copyFrom(MemorySegment.ofArray(array).asSlice(arrayOffset.toLong(), size))
     }
 
-    override fun copyTo(destination: NativeAddress) {
-        checkReadable()
-        memcpy(destination, array, arrayOffset)
+    override fun copyToSafe(destination: Memory) {
+        destination.copyFrom(ReadOnlyByteArray(array), arrayOffset)
     }
 
-    override fun copyTo(destination: Memory) {
-        checkReadable()
-        memcpy(destination.slice(size = minOf(destination.size, intSize.toLong())), array, arrayOffset)
+    override fun copyFromSafe(source: ReadOnlyByteArray, sourceOffset: Int, copySize: Int) {
+        source.copyInto(array, arrayOffset, sourceOffset, sourceOffset + copySize)
     }
 
-    override fun copyFrom(source: NativeAddress) {
-        checkWritable()
-        memcpy(array, arrayOffset, source, intSize)
+    override fun copyFromSafe(source: NativeAddress) {
+        MemorySegment
+            .ofArray(array)
+            .asSlice(arrayOffset.toLong(), size)
+            .copyFrom(MemorySegment.ofAddress(source.toMemoryAddress(), size, MemorySession.global()))
     }
 
-    override fun copyFrom(source: ByteArray, sourceOffset: Int) {
-        checkWritable()
-        memcpy(array, arrayOffset, source, sourceOffset, minOf(intSize, source.size - sourceOffset))
+    override fun fillSafe(value: Byte) {
+        array.fill(value, arrayOffset, effectiveOffset(size))
     }
 
-    override fun fill(value: Byte) {
-        checkWritable()
-        memset(array, arrayOffset, value, intSize)
+    override fun encoderSafe(): MemoryEncoder {
+        return HeapMemoryEncoder(array, arrayOffset, effectiveOffset(size))
     }
 
-    override fun encoder(): MemoryEncoder {
-        checkWritable()
-        return HeapMemoryEncoder(array, arrayOffset, arrayOffset + intSize)
+    override fun decoderSafe(): MemoryDecoder {
+        return HeapMemoryDecoder(array, arrayOffset, effectiveOffset(size))
     }
 
-    override fun decoder(): MemoryDecoder {
-        checkReadable()
-        return HeapMemoryDecoder(array, arrayOffset, arrayOffset + intSize)
+    override fun sliceSafe(offset: Long, size: Long): Memory {
+        return HeapMemory(array, effectiveOffset(offset), size, isReadable, isWritable)
     }
 
-    override fun slice(offset: Long, size: Long): Memory {
-        checkFromIndexSize(offset, size, this.size)
-        return HeapMemory(array, arrayOffset + offset.toInt(), size.toInt(), flags)
+    override fun getByteSafe(offset: Long): Byte {
+        return array[effectiveOffset(offset)]
     }
 
-    override fun getByte(offset: Long): Byte {
-        checkReadable()
-        checkIndex(offset, size)
-        return array[arrayOffset + offset.toInt()]
+    override fun getShortSafe(offset: Long): Short {
+        return array.getShort(effectiveOffset(offset))
     }
 
-    override fun getChar(offset: Long): Char {
-        checkReadable()
-        checkFromIndexSize(offset, 2, size)
-        return array.getChar(arrayOffset + offset.toInt())
+    override fun getLeShortSafe(offset: Long): Short {
+        return array.getLeShort(effectiveOffset(offset))
     }
 
-    override fun getLeChar(offset: Long): Char {
-        checkReadable()
-        checkFromIndexSize(offset, 2, size)
-        return array.getLeChar(arrayOffset + offset.toInt())
+    override fun getBeShortSafe(offset: Long): Short {
+        return array.getBeShort(effectiveOffset(offset))
     }
 
-    override fun getBeChar(offset: Long): Char {
-        checkReadable()
-        checkFromIndexSize(offset, 2, size)
-        return array.getBeChar(arrayOffset + offset.toInt())
+    override fun getIntSafe(offset: Long): Int {
+        return array.getInt(effectiveOffset(offset))
     }
 
-    override fun getShort(offset: Long): Short {
-        checkReadable()
-        checkFromIndexSize(offset, 2, size)
-        return array.getShort(arrayOffset + offset.toInt())
+    override fun getLeIntSafe(offset: Long): Int {
+        return array.getLeInt(effectiveOffset(offset))
     }
 
-    override fun getLeShort(offset: Long): Short {
-        checkReadable()
-        checkFromIndexSize(offset, 2, size)
-        return array.getLeShort(arrayOffset + offset.toInt())
+    override fun getBeIntSafe(offset: Long): Int {
+        return array.getBeInt(effectiveOffset(offset))
     }
 
-    override fun getBeShort(offset: Long): Short {
-        checkReadable()
-        checkFromIndexSize(offset, 2, size)
-        return array.getBeShort(arrayOffset + offset.toInt())
+    override fun getLongSafe(offset: Long): Long {
+        return array.getLong(effectiveOffset(offset))
     }
 
-    override fun getInt(offset: Long): Int {
-        checkReadable()
-        checkFromIndexSize(offset, 4, size)
-        return array.getInt(arrayOffset + offset.toInt())
+    override fun getLeLongSafe(offset: Long): Long {
+        return array.getLeLong(effectiveOffset(offset))
     }
 
-    override fun getLeInt(offset: Long): Int {
-        checkReadable()
-        checkFromIndexSize(offset, 4, size)
-        return array.getLeInt(arrayOffset + offset.toInt())
+    override fun getBeLongSafe(offset: Long): Long {
+        return array.getBeLong(effectiveOffset(offset))
     }
 
-    override fun getBeInt(offset: Long): Int {
-        checkReadable()
-        checkFromIndexSize(offset, 4, size)
-        return array.getBeInt(arrayOffset + offset.toInt())
+    override fun getFloatSafe(offset: Long): Float {
+        return array.getFloat(effectiveOffset(offset))
     }
 
-    override fun getLong(offset: Long): Long {
-        checkReadable()
-        checkFromIndexSize(offset, 8, size)
-        return array.getLong(arrayOffset + offset.toInt())
+    override fun getLeFloatSafe(offset: Long): Float {
+        return array.getLeFloat(effectiveOffset(offset))
     }
 
-    override fun getLeLong(offset: Long): Long {
-        checkReadable()
-        checkFromIndexSize(offset, 8, size)
-        return array.getLeLong(arrayOffset + offset.toInt())
+    override fun getBeFloatSafe(offset: Long): Float {
+        return array.getBeFloat(effectiveOffset(offset))
     }
 
-    override fun getBeLong(offset: Long): Long {
-        checkReadable()
-        checkFromIndexSize(offset, 8, size)
-        return array.getBeLong(arrayOffset + offset.toInt())
+    override fun getDoubleSafe(offset: Long): Double {
+        return array.getDouble(effectiveOffset(offset))
     }
 
-    override fun getFloat(offset: Long): Float {
-        checkReadable()
-        checkFromIndexSize(offset, 4, size)
-        return array.getFloat(arrayOffset + offset.toInt())
+    override fun getLeDoubleSafe(offset: Long): Double {
+        return array.getLeDouble(effectiveOffset(offset))
     }
 
-    override fun getLeFloat(offset: Long): Float {
-        checkReadable()
-        checkFromIndexSize(offset, 4, size)
-        return array.getLeFloat(arrayOffset + offset.toInt())
+    override fun getBeDoubleSafe(offset: Long): Double {
+        return array.getBeDouble(effectiveOffset(offset))
     }
 
-    override fun getBeFloat(offset: Long): Float {
-        checkReadable()
-        checkFromIndexSize(offset, 4, size)
-        return array.getBeFloat(arrayOffset + offset.toInt())
+    override fun setByteSafe(value: Byte, offset: Long) {
+        array[effectiveOffset(offset)] = value
     }
 
-    override fun getDouble(offset: Long): Double {
-        checkReadable()
-        checkFromIndexSize(offset, 8, size)
-        return array.getDouble(arrayOffset + offset.toInt())
+    override fun setShortSafe(value: Short, offset: Long) {
+        array.setShort(value, effectiveOffset(offset))
     }
 
-    override fun getLeDouble(offset: Long): Double {
-        checkReadable()
-        checkFromIndexSize(offset, 8, size)
-        return array.getLeDouble(arrayOffset + offset.toInt())
+    override fun setLeShortSafe(value: Short, offset: Long) {
+        array.setLeShort(value, effectiveOffset(offset))
     }
 
-    override fun getBeDouble(offset: Long): Double {
-        checkReadable()
-        checkFromIndexSize(offset, 8, size)
-        return array.getBeDouble(arrayOffset + offset.toInt())
+    override fun setBeShortSafe(value: Short, offset: Long) {
+        array.setBeShort(value, effectiveOffset(offset))
     }
 
-    override fun setByte(value: Byte, offset: Long) {
-        checkWritable()
-        checkIndex(offset, size)
-        array[arrayOffset + offset.toInt()] = value
+    override fun setIntSafe(value: Int, offset: Long) {
+        array.setInt(value, effectiveOffset(offset))
     }
 
-    override fun setChar(value: Char, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 2, size)
-        array.setChar(value, arrayOffset + offset.toInt())
+    override fun setLeIntSafe(value: Int, offset: Long) {
+        array.setLeInt(value, effectiveOffset(offset))
     }
 
-    override fun setLeChar(value: Char, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 2, size)
-        array.setLeChar(value, arrayOffset + offset.toInt())
+    override fun setBeIntSafe(value: Int, offset: Long) {
+        array.setBeInt(value, effectiveOffset(offset))
     }
 
-    override fun setBeChar(value: Char, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 2, size)
-        array.setBeChar(value, arrayOffset + offset.toInt())
+    override fun setLongSafe(value: Long, offset: Long) {
+        array.setLong(value, effectiveOffset(offset))
     }
 
-    override fun setShort(value: Short, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 2, size)
-        array.setShort(value, arrayOffset + offset.toInt())
+    override fun setLeLongSafe(value: Long, offset: Long) {
+        array.setLeLong(value, effectiveOffset(offset))
     }
 
-    override fun setLeShort(value: Short, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 2, size)
-        array.setLeShort(value, arrayOffset + offset.toInt())
+    override fun setBeLongSafe(value: Long, offset: Long) {
+        array.setBeLong(value, effectiveOffset(offset))
     }
 
-    override fun setBeShort(value: Short, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 2, size)
-        array.setBeShort(value, arrayOffset + offset.toInt())
+    override fun setFloatSafe(value: Float, offset: Long) {
+        array.setFloat(value, effectiveOffset(offset))
     }
 
-    override fun setInt(value: Int, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 4, size)
-        array.setInt(value, arrayOffset + offset.toInt())
+    override fun setLeFloatSafe(value: Float, offset: Long) {
+        array.setLeFloat(value, effectiveOffset(offset))
     }
 
-    override fun setLeInt(value: Int, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 4, size)
-        array.setLeInt(value, arrayOffset + offset.toInt())
+    override fun setBeFloatSafe(value: Float, offset: Long) {
+        array.setBeFloat(value, effectiveOffset(offset))
     }
 
-    override fun setBeInt(value: Int, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 4, size)
-        array.setBeInt(value, arrayOffset + offset.toInt())
+    override fun setDoubleSafe(value: Double, offset: Long) {
+        array.setDouble(value, effectiveOffset(offset))
     }
 
-    override fun setLong(value: Long, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 8, size)
-        array.setLong(value, arrayOffset + offset.toInt())
+    override fun setLeDoubleSafe(value: Double, offset: Long) {
+        array.setLeDouble(value, effectiveOffset(offset))
     }
 
-    override fun setLeLong(value: Long, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 8, size)
-        array.setLeLong(value, arrayOffset + offset.toInt())
-    }
-
-    override fun setBeLong(value: Long, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 8, size)
-        array.setBeLong(value, arrayOffset + offset.toInt())
-    }
-
-    override fun setFloat(value: Float, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 4, size)
-        array.setFloat(value, arrayOffset + offset.toInt())
-    }
-
-    override fun setLeFloat(value: Float, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 4, size)
-        array.setLeFloat(value, arrayOffset + offset.toInt())
-    }
-
-    override fun setBeFloat(value: Float, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 4, size)
-        array.setBeFloat(value, arrayOffset + offset.toInt())
-    }
-
-    override fun setDouble(value: Double, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 8, size)
-        array.setDouble(value, arrayOffset + offset.toInt())
-    }
-
-    override fun setLeDouble(value: Double, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 8, size)
-        array.setLeDouble(value, arrayOffset + offset.toInt())
-    }
-
-    override fun setBeDouble(value: Double, offset: Long) {
-        checkWritable()
-        checkFromIndexSize(offset, 8, size)
-        array.setBeDouble(value, arrayOffset + offset.toInt())
+    override fun setBeDoubleSafe(value: Double, offset: Long) {
+        array.setBeDouble(value, effectiveOffset(offset))
     }
 
     override fun equals(other: Any?): Boolean {
         return other is HeapMemory
             && array === other.array
             && arrayOffset == other.arrayOffset
-            && intSize == other.intSize
-            && flags == other.flags
+            && size == other.size
+            && isReadable == other.isReadable
+            && isWritable == other.isWritable
     }
 
     override fun hashCode(): Int {
         return identityHashCode(array) foldHashCode
             arrayOffset.hashCode() foldHashCode
-            intSize.hashCode() foldHashCode
-            flags.hashCode()
+            size.hashCode() foldHashCode
+            isReadable.hashCode() foldHashCode
+            isWritable.hashCode()
     }
 
     override fun toString(): String {
-        val arrayLastIndex = arrayOffset + intSize - 1
+        val arrayLastIndex = arrayOffset + size.toInt() - 1
         return "Memory($array[$arrayOffset..${arrayLastIndex}], isReadable=$isReadable, isWritable=$isWritable)"
-    }
-
-    companion object {
-        const val READABLE = 0x1
-        const val WRITABLE = 0x2
     }
 }
