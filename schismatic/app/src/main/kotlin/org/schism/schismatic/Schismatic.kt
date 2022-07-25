@@ -27,6 +27,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import org.schism.coroutines.memoryFlowOf
+import org.schism.memory.heapMemory
 import org.schism.util.IdMapping
 import org.schism.util.contextual
 
@@ -112,6 +114,6 @@ private fun DeviceListEntry(device: ConnectedDevice, selectedDevice: MutableStat
 @Composable
 private fun DeviceContent(selectedDevice: ConnectedDevice?) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Text("Hi")
+        MemoryHexView(memoryFlowOf(heapMemory(ByteArray(16384) { it.toByte() })), bytesPerRow = 16)
     }
 }

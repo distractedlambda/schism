@@ -15,9 +15,9 @@ class DeviceManager(scope: CoroutineScope) {
 
     init {
         scope.launch {
-            UsbDevice.allDevices.launchWhileEachPresent { device ->
-                TODO()
-            }
+            // UsbDevice.allDevices.launchWhileEachPresent { device ->
+            //     TODO()
+            // }
         }
     }
 

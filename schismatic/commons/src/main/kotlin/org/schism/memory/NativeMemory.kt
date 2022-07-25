@@ -1,5 +1,6 @@
 package org.schism.memory
 
+import org.schism.math.foldHashCode
 import java.lang.ref.Reference.reachabilityFence
 import java.util.Objects.checkFromIndexSize
 import java.util.Objects.checkIndex
@@ -547,6 +548,17 @@ internal class NativeMemory : Memory {
         } finally {
             reachabilityFence(attachment)
         }
+    }
+
+    override fun equals(other: Any?): Boolean {
+        return other is NativeMemory
+            && startAddress == other.startAddress
+            && size == other.size
+            && flags == other.flags
+    }
+
+    override fun hashCode(): Int {
+        return startAddress.hashCode() foldHashCode size.hashCode() foldHashCode flags.hashCode()
     }
 
     override fun toString(): String {

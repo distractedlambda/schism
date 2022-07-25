@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.launch
+import org.schism.math.foldHashCode
 import org.schism.math.plusExact
 import org.schism.math.toIntExact
 import org.schism.memory.Memory
@@ -412,6 +413,14 @@ private class ConcatenatedMemoryFlow(
         }
     }
 
+    override fun equals(other: Any?): Boolean {
+        return other is ConcatenatedMemoryFlow && components.contentEquals(other.components)
+    }
+
+    override fun hashCode(): Int {
+        return components.contentHashCode()
+    }
+
     private data class ComponentUpdate(val componentIndex: Int, val byteOffset: Long, val data: Memory)
 }
 
@@ -443,6 +452,17 @@ private class SlicedMemoryFlow(
             collector.emit(it.slice(sourceOffset, size))
         }
     }
+
+    override fun equals(other: Any?): Boolean {
+        return other is SlicedMemoryFlow
+            && source == other.source
+            && sourceOffset == other.sourceOffset
+            && size == other.size
+    }
+
+    override fun hashCode(): Int {
+        return source.hashCode() foldHashCode sourceOffset.hashCode() foldHashCode size.hashCode()
+    }
 }
 
 private class ImmediateMemoryFlow(private val memory: Memory) : MemoryFlow {
@@ -467,6 +487,14 @@ private class ImmediateMemoryFlow(private val memory: Memory) : MemoryFlow {
     override suspend fun collect(collector: FlowCollector<Memory>) {
         collector.emit(memory)
         awaitCancellation()
+    }
+
+    override fun equals(other: Any?): Boolean {
+        return other is ImmediateMemoryFlow && memory == other.memory
+    }
+
+    override fun hashCode(): Int {
+        return memory.hashCode()
     }
 }
 

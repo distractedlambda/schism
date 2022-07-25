@@ -1,5 +1,7 @@
 package org.schism.memory
 
+import org.schism.math.foldHashCode
+import java.lang.System.identityHashCode
 import java.util.Objects.checkFromIndexSize
 import java.util.Objects.checkIndex
 
@@ -321,6 +323,21 @@ internal class HeapMemory(
         checkWritable()
         checkFromIndexSize(offset, 8, size)
         array.setBeDouble(value, arrayOffset + offset.toInt())
+    }
+
+    override fun equals(other: Any?): Boolean {
+        return other is HeapMemory
+            && array === other.array
+            && arrayOffset == other.arrayOffset
+            && intSize == other.intSize
+            && flags == other.flags
+    }
+
+    override fun hashCode(): Int {
+        return identityHashCode(array) foldHashCode
+            arrayOffset.hashCode() foldHashCode
+            intSize.hashCode() foldHashCode
+            flags.hashCode()
     }
 
     override fun toString(): String {
