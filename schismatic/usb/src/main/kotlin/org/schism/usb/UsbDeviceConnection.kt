@@ -7,9 +7,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.schism.coroutines.SharedLifetime
-import org.schism.ffi.NativeCallable
-import org.schism.ffi.nativeCallable
-import org.schism.ffi.wrap
+import org.schism.foreign.NativeCallable
+import org.schism.foreign.nativeCallable
 import org.schism.memory.Memory
 import org.schism.memory.NativeAddress
 import org.schism.memory.free

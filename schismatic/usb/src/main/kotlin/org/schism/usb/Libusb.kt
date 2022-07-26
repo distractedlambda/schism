@@ -1,14 +1,14 @@
 package org.schism.usb
 
-import org.schism.ffi.CInt
-import org.schism.ffi.CSSizeT
-import org.schism.ffi.CUnsignedChar
-import org.schism.ffi.CUnsignedInt
-import org.schism.ffi.NativeFunction
-import org.schism.ffi.Struct
-import org.schism.ffi.StructField
-import org.schism.ffi.StructType
-import org.schism.ffi.linkNativeLibrary
+import org.schism.foreign.CInt
+import org.schism.foreign.CSSizeT
+import org.schism.foreign.CUnsignedChar
+import org.schism.foreign.CUnsignedInt
+import org.schism.foreign.NativeFunction
+import org.schism.foreign.Struct
+import org.schism.foreign.StructField
+import org.schism.foreign.StructType
+import org.schism.foreign.linkNativeLibrary
 import org.schism.memory.NativeAddress
 import org.schism.memory.readUtf8CString
 import org.schism.memory.withNativePointer

@@ -1,4 +1,4 @@
-package org.schism.ffi
+package org.schism.foreign
 
 import org.schism.math.timesExact
 import org.schism.memory.Memory

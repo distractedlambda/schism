@@ -1,7 +1,8 @@
-package org.schism.ffi
+package org.schism.foreign
 
-import org.schism.memory.NativeAddress
+import java.lang.foreign.MemoryAddress
 import java.lang.foreign.MemoryLayout
+import java.lang.foreign.ValueLayout.ADDRESS
 import java.lang.foreign.ValueLayout.JAVA_BYTE
 import java.lang.foreign.ValueLayout.JAVA_DOUBLE
 import java.lang.foreign.ValueLayout.JAVA_FLOAT
@@ -22,7 +23,8 @@ internal enum class ScalarFfiType {
     SIGNED_WORD,
     UNSIGNED_WORD,
     SIGNED_C_LONG,
-    UNSIGNED_C_LONG;
+    UNSIGNED_C_LONG,
+    ADDRESS;
 
     val handling: FfiHandling get() = when (this) {
         I8 -> FfiHandling.I8AsByte
@@ -51,6 +53,8 @@ internal enum class ScalarFfiType {
             IntOrLong.INT -> FfiHandling.I32AsUnsignedLong
             IntOrLong.LONG -> FfiHandling.I64AsLong
         }
+
+        ADDRESS -> FfiHandling.Address
     }
 }
 
@@ -138,6 +142,16 @@ internal sealed interface FfiHandling {
             return Long::class.java
         }
     }
+
+    object Address : FfiHandling {
+        override val memoryLayout: MemoryLayout get() {
+            return ADDRESS
+        }
+
+        override val jvmType: Class<*> get() {
+            return MemoryAddress::class.java
+        }
+    }
 }
 
 internal fun ffiHandlingFor(kType: KType): FfiHandling {
@@ -166,7 +180,7 @@ internal fun ffiHandlingFor(kType: KType): FfiHandling {
         Long::class, ULong::class -> FfiHandling.I64AsLong
         Float::class -> FfiHandling.F32AsFloat
         Double::class -> FfiHandling.F64AsDouble
-        NativeAddress::class -> ScalarFfiType.UNSIGNED_WORD.handling
+        MemoryAddress::class -> FfiHandling.Address
         else -> throw IllegalArgumentException("Type '$kType' is not FFI-compatible")
     }
 }

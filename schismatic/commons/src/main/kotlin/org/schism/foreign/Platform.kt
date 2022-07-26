@@ -1,4 +1,4 @@
-package org.schism.ffi
+package org.schism.foreign
 
 import java.lang.System.getProperty
 import java.lang.foreign.ValueLayout.ADDRESS

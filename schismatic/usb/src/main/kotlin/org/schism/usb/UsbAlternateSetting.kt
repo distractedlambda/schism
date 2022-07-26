@@ -1,6 +1,6 @@
 package org.schism.usb
 
-import org.schism.ffi.wrapArray
+import org.schism.foreign.wrapArray
 import org.schism.usb.Libusb.EndpointDescriptor
 import org.schism.usb.Libusb.InterfaceDescriptor
 import org.schism.util.contextual

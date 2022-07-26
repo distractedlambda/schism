@@ -1,7 +1,8 @@
-package org.schism.ffi
+package org.schism.foreign
 
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.ClassWriter.COMPUTE_FRAMES
+import org.objectweb.asm.ConstantDynamic
 import org.objectweb.asm.Handle
 import org.objectweb.asm.Opcodes.ACC_FINAL
 import org.objectweb.asm.Opcodes.ACC_PRIVATE
@@ -25,18 +26,16 @@ import org.objectweb.asm.Opcodes.LLOAD
 import org.objectweb.asm.Opcodes.LRETURN
 import org.objectweb.asm.Opcodes.RETURN
 import org.objectweb.asm.Opcodes.V19
-import org.objectweb.asm.Type.getDescriptor
-import org.objectweb.asm.Type.getInternalName
 import org.schism.invoke.HiddenClassDefiner
 import org.schism.math.alignForwardsTo
-import org.schism.memory.Memory
-import org.schism.memory.NativeAddress
-import org.schism.memory.allocateNativeMemory
-import org.schism.memory.nativeMemory
-import org.schism.memory.requireAlignedTo
-import org.schism.memory.withNativeMemory
+import org.schism.math.requireAlignedTo
 import org.schism.reflect.descriptorString
 import org.schism.reflect.internalName
+import java.lang.foreign.GroupLayout
+import java.lang.foreign.MemoryAddress
+import java.lang.foreign.MemorySegment
+import java.lang.foreign.MemorySession
+import java.lang.foreign.SegmentAllocator
 import java.lang.invoke.CallSite
 import java.lang.invoke.ConstantCallSite
 import java.lang.invoke.MethodHandle
@@ -45,9 +44,6 @@ import java.lang.invoke.MethodHandles.classData
 import java.lang.invoke.MethodType
 import java.lang.invoke.MethodType.methodType
 import java.util.TreeMap
-import kotlin.contracts.ExperimentalContracts
-import kotlin.contracts.InvocationKind
-import kotlin.contracts.contract
 import kotlin.reflect.KClass
 import kotlin.reflect.KMutableProperty1
 import kotlin.reflect.KProperty1
@@ -58,7 +54,9 @@ import kotlin.reflect.jvm.javaMethod
 import kotlin.reflect.jvm.javaSetter
 
 public interface Struct {
-    public fun memory(): Memory
+    public fun type(): StructType<*>
+
+    public fun segment(): MemorySegment
 }
 
 @Target(AnnotationTarget.PROPERTY)
@@ -66,50 +64,25 @@ public interface Struct {
 public annotation class StructField(val index: Int)
 
 public interface StructType<out S : Struct> {
-    public val size: Long
+    public val layout: GroupLayout
 
-    public val alignment: Long
-
-    public fun wrap(memory: Memory): S
+    public fun wrap(segment: MemorySegment): S
 }
 
-public fun Struct.isNative(): Boolean {
-    return memory().isNative
+public fun Struct.address(): MemoryAddress {
+    return segment().address()
 }
 
-public fun Struct.size(): Long {
-    return memory().size
+public fun <S : Struct> MemorySegment.asStruct(type: StructType<S>): S {
+    return type.wrap(this)
 }
 
-public fun Struct.isReadable(): Boolean {
-    return memory().isReadable
+public fun <S : Struct> MemoryAddress.asStruct(type: StructType<S>, session: MemorySession): S {
+    return asMemorySegment(type.layout.byteSize(), session).asStruct(type)
 }
 
-public fun Struct.isWritable(): Boolean {
-    return memory().isWritable
-}
-
-public fun Struct.address(): NativeAddress {
-    return memory().startAddress
-}
-
-public fun <S : Struct> StructType<S>.wrap(address: NativeAddress): S {
-    return wrap(nativeMemory(address, size))
-}
-
-public fun <S : Struct> allocateNativeStruct(type: StructType<S>): S {
-    return type.wrap(allocateNativeMemory(type.size))
-}
-
-@OptIn(ExperimentalContracts::class)
-public inline fun <S : Struct, R> withNativeStruct(type: StructType<S>, block: (S) -> R): R {
-    contract {
-        callsInPlace(block, InvocationKind.EXACTLY_ONCE)
-    }
-
-    return withNativeMemory(type.size) {
-        block(type.wrap(it))
-    }
+public fun <S : Struct> SegmentAllocator.allocate(type: StructType<S>): S {
+    return type.wrap(allocate(type.layout))
 }
 
 public inline fun <reified S : Struct> StructType(): StructType<S> {
@@ -183,48 +156,48 @@ internal fun <S : Struct> StructType(klass: KClass<S>, definer: HiddenClassDefin
         implWriter.visitMethod(ACC_PUBLIC, getter.name, getter.descriptorString, null, null).apply {
             visitCode()
             visitVarInsn(ALOAD, 0)
-            visitFieldInsn(GETFIELD, AbstractStructImpl.INTERNAL_NAME, "memory", MEMORY_DESCRIPTOR)
+            visitFieldInsn(GETFIELD, AbstractStructImpl.INTERNAL_NAME, "memory", MEMORY_SEGMENT_DESCRIPTOR)
             visitLdcInsn(offset)
 
             when (handling) {
                 FfiHandling.I8AsByte -> {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getByte", "(J)B", true)
+                    visitMethodInsn(INVOKEINTERFACE, MEMORY_SEGMENT_INTERNAL_NAME, "getByte", "(J)B", true)
                     visitInsn(IRETURN)
                 }
 
                 FfiHandling.I16AsShort -> {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getShort", "(J)S", true)
+                    visitMethodInsn(INVOKEINTERFACE, MEMORY_SEGMENT_INTERNAL_NAME, "getShort", "(J)S", true)
                     visitInsn(IRETURN)
                 }
 
                 FfiHandling.I32AsInt -> {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getInt", "(J)I", true)
+                    visitMethodInsn(INVOKEINTERFACE, MEMORY_SEGMENT_INTERNAL_NAME, "getInt", "(J)I", true)
                     visitInsn(IRETURN)
                 }
 
                 FfiHandling.I64AsLong -> {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getLong", "(J)J", true)
+                    visitMethodInsn(INVOKEINTERFACE, MEMORY_SEGMENT_INTERNAL_NAME, "getLong", "(J)J", true)
                     visitInsn(LRETURN)
                 }
 
                 FfiHandling.F32AsFloat -> {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getFloat", "(J)F", true)
+                    visitMethodInsn(INVOKEINTERFACE, MEMORY_SEGMENT_INTERNAL_NAME, "getFloat", "(J)F", true)
                     visitInsn(FRETURN)
                 }
 
                 FfiHandling.F64AsDouble -> {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getDouble", "(J)D", true)
+                    visitMethodInsn(INVOKEINTERFACE, MEMORY_SEGMENT_INTERNAL_NAME, "getDouble", "(J)D", true)
                     visitInsn(DRETURN)
                 }
 
                 FfiHandling.I32AsSignedLong -> {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getInt", "(J)I", true)
+                    visitMethodInsn(INVOKEINTERFACE, MEMORY_SEGMENT_INTERNAL_NAME, "getInt", "(J)I", true)
                     visitInsn(I2L)
                     visitInsn(LRETURN)
                 }
 
                 FfiHandling.I32AsUnsignedLong -> {
-                    visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "getInt", "(J)I", true)
+                    visitMethodInsn(INVOKEINTERFACE, MEMORY_SEGMENT_INTERNAL_NAME, "getInt", "(J)I", true)
                     visitInsn(I2L)
                     visitLdcInsn(0xFFFF_FFFFL)
                     visitInsn(LAND)
@@ -240,7 +213,7 @@ internal fun <S : Struct> StructType(klass: KClass<S>, definer: HiddenClassDefin
             implWriter.visitMethod(ACC_PUBLIC, setter.name, setter.descriptorString, null, null).apply {
                 visitCode()
                 visitVarInsn(ALOAD, 0)
-                visitFieldInsn(GETFIELD, AbstractStructImpl.INTERNAL_NAME, "memory", MEMORY_DESCRIPTOR)
+                visitFieldInsn(GETFIELD, AbstractStructImpl.INTERNAL_NAME, "memory", MEMORY_SEGMENT_DESCRIPTOR)
 
                 when (handling) {
                     FfiHandling.I8AsByte, FfiHandling.I16AsShort, FfiHandling.I32AsInt -> {
@@ -269,27 +242,27 @@ internal fun <S : Struct> StructType(klass: KClass<S>, definer: HiddenClassDefin
 
                 when (handling) {
                     FfiHandling.I8AsByte -> {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setByte", "(BJ)V", true)
+                        visitMethodInsn(INVOKEINTERFACE, MEMORY_SEGMENT_INTERNAL_NAME, "setByte", "(BJ)V", true)
                     }
 
                     FfiHandling.I16AsShort -> {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setShort", "(SJ)V", true)
+                        visitMethodInsn(INVOKEINTERFACE, MEMORY_SEGMENT_INTERNAL_NAME, "setShort", "(SJ)V", true)
                     }
 
                     FfiHandling.I32AsInt, FfiHandling.I32AsSignedLong, FfiHandling.I32AsUnsignedLong -> {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setInt", "(IJ)V", true)
+                        visitMethodInsn(INVOKEINTERFACE, MEMORY_SEGMENT_INTERNAL_NAME, "setInt", "(IJ)V", true)
                     }
 
                     FfiHandling.I64AsLong -> {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setLong", "(JJ)V", true)
+                        visitMethodInsn(INVOKEINTERFACE, MEMORY_SEGMENT_INTERNAL_NAME, "setLong", "(JJ)V", true)
                     }
 
                     FfiHandling.F32AsFloat -> {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setFloat", "(FJ)V", true)
+                        visitMethodInsn(INVOKEINTERFACE, MEMORY_SEGMENT_INTERNAL_NAME, "setFloat", "(FJ)V", true)
                     }
 
                     FfiHandling.F64AsDouble -> {
-                        visitMethodInsn(INVOKEINTERFACE, MEMORY_INTERNAL_NAME, "setDouble", "(DJ)V", true)
+                        visitMethodInsn(INVOKEINTERFACE, MEMORY_SEGMENT_INTERNAL_NAME, "setDouble", "(DJ)V", true)
                     }
                 }
 
@@ -307,8 +280,8 @@ internal fun <S : Struct> StructType(klass: KClass<S>, definer: HiddenClassDefin
     val implLookup = definer.define(implWriter.toByteArray())
 
     val implConstructor = implLookup
-        .findConstructor(implLookup.lookupClass(), methodType(Void.TYPE, Memory::class.java))
-        .asType(methodType(Struct::class.java, Memory::class.java))
+        .findConstructor(implLookup.lookupClass(), methodType(Void.TYPE, MemorySegment::class.java))
+        .asType(methodType(Struct::class.java, MemorySegment::class.java))
 
     val typeImplName = "${definer.internalNamePrefix}${klass.simpleName}TypeImpl"
     val typeImplWriter = ClassWriter(COMPUTE_FRAMES)
@@ -319,8 +292,7 @@ internal fun <S : Struct> StructType(klass: KClass<S>, definer: HiddenClassDefin
         visitCode()
 
         visitVarInsn(ALOAD, 0)
-        visitLdcInsn(size)
-        visitLdcInsn(alignment)
+        visitLdcInsn(STRUCT_LAYOUT_CONSTANT)
         visitMethodInsn(
             INVOKESPECIAL,
             AbstractStructTypeImpl.INTERNAL_NAME,
@@ -343,25 +315,34 @@ internal fun <S : Struct> StructType(klass: KClass<S>, definer: HiddenClassDefin
     ).apply {
         visitCode()
         visitVarInsn(ALOAD, 1)
-        visitInvokeDynamicInsn("_", AbstractStructTypeImpl.WRAP_SAFE_DESCRIPTOR, STRUCT_FACTORY_BOOTSTRAP_HANDLE)
+        visitInvokeDynamicInsn("_", AbstractStructTypeImpl.WRAP_SAFE_DESCRIPTOR, STRUCT_WRAP_BOOTSTRAP)
         visitInsn(ARETURN)
         visitMaxs(0, 0)
         visitEnd()
     }
 
+    val structClassData = StructClassData()
+
     typeImplWriter.visitEnd()
 
-    val typeImplLookup = definer.define(typeImplWriter.toByteArray(), classData = implConstructor)
+    val typeImplLookup = definer.define(
+        typeImplWriter.toByteArray(),
+        classData = StructTypeClassData(implConstructor, layout),
+    )
 
     @Suppress("UNCHECKED_CAST")
-    return typeImplLookup
+    val type =  typeImplLookup
         .findConstructor(typeImplLookup.lookupClass(), methodType(Void.TYPE))
         .invoke() as StructType<S>
+
+    return type.also {
+        structClassData.type = it
+    }
 }
 
-internal abstract class AbstractStructImpl(@JvmField protected val memory: Memory) : Struct {
-    final override fun memory(): Memory {
-        return memory
+internal abstract class AbstractStructImpl(@JvmField protected val segment: MemorySegment) : Struct {
+    final override fun segment(): MemorySegment {
+        return segment
     }
 
     companion object {
@@ -371,16 +352,16 @@ internal abstract class AbstractStructImpl(@JvmField protected val memory: Memor
     }
 }
 
-internal abstract class AbstractStructTypeImpl<S : Struct>(
-    final override val size: Long,
-    final override val alignment: Long,
-) : StructType<S> {
-    final override fun wrap(memory: Memory): S {
-        memory.requireAlignedTo(alignment)
-        return wrapSafe(memory.slice(size = size))
+internal abstract class AbstractStructTypeImpl<S : Struct>(final override val layout: GroupLayout) : StructType<S> {
+    final override fun wrap(segment: MemorySegment): S {
+        if (segment.isNative) {
+            segment.address().toRawLongValue().requireAlignedTo(layout.byteAlignment())
+        }
+
+        return wrapSafe(segment.asSlice(0, layout.byteSize()))
     }
 
-    protected abstract fun wrapSafe(memory: Memory): S
+    protected abstract fun wrapSafe(segment: MemorySegment): S
 
     companion object {
         val INTERNAL_NAME = AbstractStructTypeImpl::class.java.internalName
@@ -393,12 +374,25 @@ internal abstract class AbstractStructTypeImpl<S : Struct>(
     }
 }
 
-internal fun structFactoryBootstrap(lookup: Lookup, name: String, type: MethodType): CallSite {
-    val constructorHandle = classData(lookup, "_", MethodHandle::class.java)
-    return ConstantCallSite(constructorHandle)
+internal fun structTypeBootstrap(lookup: Lookup, name: String, type: Class<StructType<*>>): StructType<*> {
+    return classData(lookup, "_", StructClassData::class.java).type
 }
 
-private val STRUCT_FACTORY_BOOTSTRAP_HANDLE = ::structFactoryBootstrap.javaMethod!!.let { javaMethod ->
+internal fun structTypeWrapBootstrap(lookup: Lookup, name: String, type: MethodType): CallSite {
+    return ConstantCallSite(classData(lookup, "_", StructTypeClassData::class.java).instanceConstructor)
+}
+
+internal fun structTypeLayoutBootstrap(lookup: Lookup, name: String, type: Class<GroupLayout>): GroupLayout {
+    return classData(lookup, "_", StructTypeClassData::class.java).layout
+}
+
+private class StructClassData {
+    @Volatile lateinit var type: StructType<*>
+}
+
+private data class StructTypeClassData(val instanceConstructor: MethodHandle, val layout: GroupLayout)
+
+private val STRUCT_WRAP_BOOTSTRAP = ::structTypeWrapBootstrap.javaMethod!!.let { javaMethod ->
     Handle(
         H_INVOKESTATIC,
         javaMethod.declaringClass.internalName,
@@ -408,6 +402,34 @@ private val STRUCT_FACTORY_BOOTSTRAP_HANDLE = ::structFactoryBootstrap.javaMetho
     )
 }
 
-private val MEMORY_INTERNAL_NAME = getInternalName(Memory::class.java)
+private val STRUCT_LAYOUT_CONSTANT = ::structTypeLayoutBootstrap.javaMethod!!.let { javaMethod ->
+    ConstantDynamic(
+        "_",
+        GroupLayout::class.java.descriptorString(),
+        Handle(
+            H_INVOKESTATIC,
+            javaMethod.declaringClass.internalName,
+            javaMethod.name,
+            javaMethod.descriptorString,
+            false,
+        ),
+    )
+}
 
-private val MEMORY_DESCRIPTOR = getDescriptor(Memory::class.java)
+private val STRUCT_TYPE_CONSTANT = ::structTypeBootstrap.javaMethod!!.let { javaMethod ->
+    ConstantDynamic(
+        "_",
+        StructType::class.java.descriptorString(),
+        Handle(
+            H_INVOKESTATIC,
+            javaMethod.declaringClass.internalName,
+            javaMethod.name,
+            javaMethod.descriptorString,
+            false,
+        ),
+    )
+}
+
+private val MEMORY_SEGMENT_INTERNAL_NAME = MemorySegment::class.java.internalName
+
+private val MEMORY_SEGMENT_DESCRIPTOR = MemorySegment::class.java.descriptorString()

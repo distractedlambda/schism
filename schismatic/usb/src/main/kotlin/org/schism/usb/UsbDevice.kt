@@ -12,9 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.schism.coroutines.SharedLifetime
 import org.schism.coroutines.updateMutating
-import org.schism.ffi.address
-import org.schism.ffi.withNativeStruct
-import org.schism.ffi.wrap
+import org.schism.foreign.address
+import org.schism.foreign.withNativeStruct
 import org.schism.memory.NativeAddress
 import org.schism.memory.nativePointers
 import org.schism.memory.withNativePointer

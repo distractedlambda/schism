@@ -1,4 +1,4 @@
-package org.schism.ffi
+package org.schism.foreign
 
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.ClassWriter.COMPUTE_FRAMES
@@ -8,6 +8,7 @@ import org.objectweb.asm.Opcodes.ACC_FINAL
 import org.objectweb.asm.Opcodes.ACC_PRIVATE
 import org.objectweb.asm.Opcodes.ACC_PUBLIC
 import org.objectweb.asm.Opcodes.ALOAD
+import org.objectweb.asm.Opcodes.ARETURN
 import org.objectweb.asm.Opcodes.DLOAD
 import org.objectweb.asm.Opcodes.DRETURN
 import org.objectweb.asm.Opcodes.FLOAD
@@ -140,6 +141,11 @@ internal fun linkNativeLibrary(klass: KClass<*>, definer: HiddenClassDefiner, sy
                     methodWriter.visitInsn(L2I) // TODO: add range check?
                     nextArgumentLocal += 2
                 }
+
+                FfiHandling.Address -> {
+                    methodWriter.visitVarInsn(ALOAD, nextArgumentLocal)
+                    nextArgumentLocal += 1
+                }
             }
         }
 
@@ -186,6 +192,10 @@ internal fun linkNativeLibrary(klass: KClass<*>, definer: HiddenClassDefiner, sy
                         visitInsn(LAND)
                         visitInsn(LRETURN)
                     }
+                }
+
+                FfiHandling.Address -> {
+                    { visitInsn(ARETURN) }
                 }
             }
 

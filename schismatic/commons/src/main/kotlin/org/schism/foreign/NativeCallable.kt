@@ -1,10 +1,10 @@
-package org.schism.ffi
+package org.schism.foreign
 
-import org.schism.memory.NativeAddress
-import org.schism.memory.toNativeAddress
+import org.schism.util.contextual
 import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.Linker
 import java.lang.foreign.MemoryLayout
+import java.lang.foreign.MemorySegment
 import java.lang.foreign.MemorySession
 import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodHandles.Lookup
@@ -16,16 +16,12 @@ import kotlin.reflect.KFunction
 import kotlin.reflect.full.valueParameters
 import kotlin.reflect.jvm.javaMethod
 
-public interface NativeCallable {
-    public val address: NativeAddress
-}
-
 @Suppress("NOTHING_TO_INLINE")
-public inline fun nativeCallable(function: KFunction<*>): NativeCallable {
+public inline fun MemorySession.nativeCallable(function: KFunction<*>): MemorySegment {
     return nativeCallable(MethodHandles.lookup(), function)
 }
 
-public fun nativeCallable(lookup: Lookup, function: KFunction<*>): NativeCallable {
+public fun MemorySession.nativeCallable(lookup: Lookup, function: KFunction<*>): MemorySegment {
     val javaMethod = function.javaMethod
 
     require(javaMethod != null && Modifier.isStatic(javaMethod.modifiers)) {
@@ -73,20 +69,8 @@ public fun nativeCallable(lookup: Lookup, function: KFunction<*>): NativeCallabl
         FunctionDescriptor.of(handling.memoryLayout, *argumentLayouts.toTypedArray())
     }
 
-    val memorySession = MemorySession.openImplicit()
-
-    val address = NATIVE_LINKER
-        .upcallStub(target, functionDescriptor, memorySession)
-        .address()
-        .toNativeAddress()
-
-    return NativeCallableImpl(address, memorySession)
+    return NATIVE_LINKER.upcallStub(target, functionDescriptor, contextual())
 }
-
-private class NativeCallableImpl(
-    override val address: NativeAddress,
-    private val session: MemorySession,
-) : NativeCallable
 
 private val NATIVE_LINKER = Linker.nativeLinker()
 
