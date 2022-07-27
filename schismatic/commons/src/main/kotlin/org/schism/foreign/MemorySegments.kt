@@ -3,6 +3,7 @@
 package org.schism.foreign
 
 import java.lang.foreign.MemoryAddress
+import java.lang.foreign.MemoryLayout
 import java.lang.foreign.MemorySegment
 import java.lang.foreign.MemorySession
 import java.lang.foreign.ValueLayout.JAVA_BYTE
@@ -57,6 +58,21 @@ public fun FloatArray.asMemorySegment(): MemorySegment {
 
 public fun DoubleArray.asMemorySegment(): MemorySegment {
     return MemorySegment.ofArray(this)
+}
+
+public fun MemorySegment.requireAlignedTo(alignment: Long) {
+    if (isNative) {
+        address().requireAlignedTo(alignment)
+    }
+}
+
+public fun MemorySegment.requireAlignedFor(layout: MemoryLayout) {
+    requireAlignedTo(layout.byteAlignment())
+}
+
+public fun MemorySegment.requireSizedAndAlignedFor(layout: MemoryLayout) {
+    require(byteSize() == layout.byteSize())
+    requireAlignedFor(layout)
 }
 
 public inline fun MemorySegment.getByte(offset: Long): Byte {

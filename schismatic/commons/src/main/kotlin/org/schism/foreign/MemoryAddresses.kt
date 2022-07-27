@@ -2,7 +2,10 @@
 
 package org.schism.foreign
 
+import org.schism.math.requireAlignedTo
 import java.lang.foreign.MemoryAddress
+import java.lang.foreign.MemoryLayout
+import java.lang.foreign.MemorySegment
 import java.lang.foreign.ValueLayout
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
@@ -26,6 +29,26 @@ public inline fun MemoryAddress.nonNULLOrElse(block: () -> MemoryAddress): Memor
         isNULL() -> block()
         else -> this
     }
+}
+
+public operator fun MemoryAddress.plus(offset: Int): MemoryAddress {
+    return (toRawLongValue() + offset).toMemoryAddress()
+}
+
+public operator fun MemoryAddress.plus(offset: Long): MemoryAddress {
+    return (toRawLongValue() + offset).toMemoryAddress()
+}
+
+public operator fun MemoryAddress.minus(other: MemoryAddress): Long {
+    return toRawLongValue() - other.toRawLongValue()
+}
+
+public fun MemoryAddress.requireAlignedTo(alignment: Long) {
+    toRawLongValue().requireAlignedTo(alignment)
+}
+
+public fun MemoryAddress.requireAlignedFor(layout: MemoryLayout) {
+    requireAlignedTo(layout.byteAlignment())
 }
 
 public inline fun MemoryAddress.getByte(offset: Long): Byte {
