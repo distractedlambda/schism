@@ -1,20 +1,20 @@
 package org.schism.usb
 
-import org.schism.memory.Memory
-import org.schism.memory.NativeAddress
-import org.schism.memory.allocateHeapMemory
-import org.schism.memory.nativeMemory
-import org.schism.memory.nextUByte
+import org.schism.foreign.allocateHeapSegment
+import org.schism.foreign.asMemorySegment
+import org.schism.foreign.decoder
+import java.lang.foreign.MemoryAddress
+import java.lang.foreign.MemorySegment
 
-public data class UsbDescriptor(val descriptorType: UByte, val contents: Memory)
+public data class UsbDescriptor(val descriptorType: UByte, val contents: MemorySegment)
 
-internal fun parseExtraDescriptors(extra: NativeAddress, extraLength: Int): List<UsbDescriptor> {
+internal fun parseExtraDescriptors(extra: MemoryAddress, extraLength: Int): List<UsbDescriptor> {
     return buildList {
-        nativeMemory(extra, extraLength.toLong()).decoder().run {
-            while (hasRemaining()) {
+        extra.asMemorySegment(extraLength.toLong()).decoder().run {
+            while (hasRemaining) {
                 val length = nextUByte() - 2u
                 val descriptorType = nextUByte()
-                val contents = allocateHeapMemory(length.toInt()).also(::nextBytes).asReadOnly()
+                val contents = nextBytes(allocateHeapSegment(length.toLong())).asReadOnly()
                 add(UsbDescriptor(descriptorType, contents))
             }
         }

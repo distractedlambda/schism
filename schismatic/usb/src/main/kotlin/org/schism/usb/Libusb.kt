@@ -8,85 +8,87 @@ import org.schism.foreign.NativeFunction
 import org.schism.foreign.Struct
 import org.schism.foreign.StructField
 import org.schism.foreign.StructType
+import org.schism.foreign.getPointer
 import org.schism.foreign.linkNativeLibrary
-import org.schism.memory.NativeAddress
-import org.schism.memory.readUtf8CString
-import org.schism.memory.withNativePointer
+import org.schism.foreign.withConfinedMemorySession
+import java.lang.foreign.Addressable
+import java.lang.foreign.MemoryAddress
 import java.lang.foreign.MemorySession
 import java.lang.foreign.SymbolLookup.libraryLookup
+import java.lang.foreign.ValueLayout.ADDRESS
 import java.nio.file.Path
 import kotlin.concurrent.thread
 
 internal interface Libusb {
     @NativeFunction("libusb_alloc_transfer")
-    fun alloc_transfer(iso_packets: @CInt Int): NativeAddress
+    fun alloc_transfer(iso_packets: @CInt Int): MemoryAddress
 
     @NativeFunction("libusb_cancel_transfer")
-    fun cancel_transfer(transfer: NativeAddress): @CInt Int
+    fun cancel_transfer(transfer: Addressable): @CInt Int
 
     @NativeFunction("libusb_claim_interface")
-    fun claim_interface(dev_handle: NativeAddress, interface_number: @CInt Int): @CInt Int
+    fun claim_interface(dev_handle: Addressable, interface_number: @CInt Int): @CInt Int
 
     @NativeFunction("libusb_clear_halt")
-    fun clear_halt(dev_handle: NativeAddress, endpoint: @CUnsignedChar UByte): @CInt Int
+    fun clear_halt(dev_handle: Addressable, endpoint: @CUnsignedChar UByte): @CInt Int
 
     @NativeFunction("libusb_close")
-    fun close(dev_handle: NativeAddress)
+    fun close(dev_handle: Addressable)
 
     @NativeFunction("libusb_free_config_descriptor")
-    fun free_config_descriptor(config: NativeAddress)
+    fun free_config_descriptor(config: Addressable)
 
     @NativeFunction("libusb_free_device_list")
-    fun free_device_list(list: NativeAddress, unref_devices: @CInt Int)
+    fun free_device_list(list: Addressable, unref_devices: @CInt Int)
 
     @NativeFunction("libusb_get_config_descriptor")
-    fun get_config_descriptor(dev: NativeAddress, config_index: UByte, config: NativeAddress): @CInt Int
+    fun get_config_descriptor(dev: Addressable, config_index: UByte, config: Addressable): @CInt Int
 
     @NativeFunction("libusb_get_configuration")
-    fun get_configuration(dev_handle: NativeAddress, config: NativeAddress): @CInt Int
+    fun get_configuration(dev_handle: Addressable, config: Addressable): @CInt Int
 
     @NativeFunction("libusb_get_device_descriptor")
-    fun get_device_descriptor(dev: NativeAddress, desc: NativeAddress): @CInt Int
+    fun get_device_descriptor(dev: Addressable, desc: Addressable): @CInt Int
 
     @NativeFunction("libusb_get_device_list")
-    fun get_device_list(ctx: NativeAddress, list: NativeAddress): @CSSizeT Long
+    fun get_device_list(ctx: Addressable, list: Addressable): @CSSizeT Long
 
     @NativeFunction("libusb_get_port_numbers")
-    fun get_port_numbers(dev: NativeAddress, port_numbers: NativeAddress, port_numbers_len: @CInt Int): @CInt Int
+    fun get_port_numbers(dev: Addressable, port_numbers: Addressable, port_numbers_len: @CInt Int): @CInt Int
 
     @NativeFunction("libusb_handle_events")
-    fun handle_events(ctx: NativeAddress): @CInt Int
+    fun handle_events(ctx: Addressable): @CInt Int
 
     @NativeFunction("libusb_init")
-    fun init(ctx: NativeAddress): @CInt Int
+    fun init(ctx: Addressable): @CInt Int
 
     @NativeFunction("libusb_open")
-    fun open(dev: NativeAddress, dev_handle: NativeAddress): @CInt Int
+    fun open(dev: Addressable, dev_handle: Addressable): @CInt Int
 
     @NativeFunction("libusb_ref_device")
-    fun ref_device(dev: NativeAddress): NativeAddress
+    fun ref_device(dev: Addressable): MemoryAddress
 
     @NativeFunction("libusb_release_interface")
-    fun release_interface(dev_handle: NativeAddress, interface_number: @CInt Int): @CInt Int
+    fun release_interface(dev_handle: Addressable, interface_number: @CInt Int): @CInt Int
 
     @NativeFunction("libusb_reset_device")
-    fun reset_device(dev_handle: NativeAddress): @CInt Int
+    fun reset_device(dev_handle: Addressable): @CInt Int
 
     @NativeFunction("libusb_set_interface_alt_setting")
     fun set_interface_alt_setting(
-        dev_handle: NativeAddress,
+        dev_handle: Addressable,
         interface_number: @CInt Int,
         alternate_setting: @CInt Int,
     ): @CInt Int
 
     @NativeFunction("libusb_strerror")
-    fun strerror(errcode: @CInt Int): NativeAddress
+    fun strerror(errcode: @CInt Int): MemoryAddress
 
     @NativeFunction("libusb_submit_transfer")
-    fun submit_transfer(transfer: NativeAddress): @CInt Int
+    fun submit_transfer(transfer: Addressable): @CInt Int
 
     @NativeFunction("libusb_unref_device")
-    fun unref_device(dev: NativeAddress)
+    fun unref_device(dev: Addressable)
 
     interface ConfigDescriptor : Struct {
         @StructField(0) val bLength: UByte
@@ -97,8 +99,8 @@ internal interface Libusb {
         @StructField(5) val iConfiguration: UByte
         @StructField(6) val bmAttributes: UByte
         @StructField(7) val MaxPower: UByte
-        @StructField(8) val iface: NativeAddress
-        @StructField(9) val extra: NativeAddress
+        @StructField(8) val iface: MemoryAddress
+        @StructField(9) val extra: MemoryAddress
         @StructField(10) val extra_length: @CInt Int
 
         companion object {
@@ -136,7 +138,7 @@ internal interface Libusb {
         @StructField(5) val bInterval: UByte
         @StructField(6) val bRefresh: UByte
         @StructField(7) val bSynchAddress: UByte
-        @StructField(8) val extra: NativeAddress
+        @StructField(8) val extra: MemoryAddress
         @StructField(9) val extra_length: @CInt Int
 
         companion object {
@@ -145,7 +147,7 @@ internal interface Libusb {
     }
 
     interface Interface : Struct {
-        @StructField(0) val altsetting: NativeAddress
+        @StructField(0) val altsetting: MemoryAddress
         @StructField(1) val num_altsetting: @CInt Int
 
         companion object {
@@ -163,8 +165,8 @@ internal interface Libusb {
         @StructField(6) val bInterfaceSubClass: UByte
         @StructField(7) val bInterfaceProtocol: UByte
         @StructField(8) val iInterface: UByte
-        @StructField(9) val endpoint: NativeAddress
-        @StructField(10) val extra: NativeAddress
+        @StructField(9) val endpoint: MemoryAddress
+        @StructField(10) val extra: MemoryAddress
         @StructField(11) val extra_length: @CInt Int
 
         companion object {
@@ -173,7 +175,7 @@ internal interface Libusb {
     }
 
     interface Transfer : Struct {
-        @StructField(0) var dev_handle: NativeAddress
+        @StructField(0) var dev_handle: MemoryAddress
         @StructField(1) var flags: UByte
         @StructField(2) var endpoint: @CUnsignedChar UByte
         @StructField(3) var type: @CUnsignedChar UByte
@@ -181,9 +183,9 @@ internal interface Libusb {
         @StructField(5) var status: @CInt Int
         @StructField(6) var length: @CInt Int
         @StructField(7) var actual_length: @CInt Int
-        @StructField(8) var callback: NativeAddress
-        @StructField(9) var user_data: NativeAddress
-        @StructField(10) var buffer: NativeAddress
+        @StructField(8) var callback: MemoryAddress
+        @StructField(9) var user_data: MemoryAddress
+        @StructField(10) var buffer: MemoryAddress
         @StructField(11) var num_iso_packets: @CInt Int
 
         companion object {
@@ -225,7 +227,7 @@ internal val libusb = linkNativeLibrary<Libusb>(
 )
 
 internal fun libusbErrorMessage(code: Int): String {
-    return libusb.strerror(code).readUtf8CString()
+    return libusb.strerror(code).getUtf8String(0)
 }
 
 internal fun checkLibusbReturn(code: Int) {
@@ -250,9 +252,10 @@ internal fun checkLibusbSizeReturn(value: Long): Long {
     return value
 }
 
-internal val libusbContext = withNativePointer {
-    checkLibusbReturn(libusb.init(it.memory.startAddress))
-    it.value
+internal val libusbContext = withConfinedMemorySession {
+    val buffer = allocate(ADDRESS)
+    checkLibusbReturn(libusb.init(buffer))
+    buffer.getPointer()
 }
 
 internal val libusbEventHandlerThread = thread(isDaemon = true, name = "libusb event handler") {

@@ -1,6 +1,6 @@
 package org.schism.usb
 
-import org.schism.foreign.wrapArray
+import org.schism.foreign.asStructArray
 import org.schism.usb.Libusb.ConfigDescriptor
 import org.schism.usb.Libusb.Interface
 
@@ -8,7 +8,7 @@ public class UsbConfiguration internal constructor(public val device: UsbDevice,
     internal val value = descriptor.bConfigurationValue
 
     public val interfaces: List<UsbInterface> = kotlin.run {
-        val interfaceStructs = Interface.Type.wrapArray(descriptor.iface, descriptor.bNumInterfaces.toLong())
+        val interfaceStructs = descriptor.iface.asStructArray(Interface.Type, descriptor.bNumInterfaces.toLong())
         List(descriptor.bNumInterfaces.toInt()) {
             UsbInterface(this, interfaceStructs[it.toLong()])
         }

@@ -15,6 +15,22 @@ public fun MemoryAddress.asMemorySegment(
     return MemorySegment.ofAddress(this, bytesSize, session)
 }
 
+public fun MemorySegment.drop(count: Long): MemorySegment {
+    return asSlice(count)
+}
+
+public fun MemorySegment.dropLast(count: Long): MemorySegment {
+    return asSlice(0, byteSize() - count)
+}
+
+public fun MemorySegment.take(count: Long): MemorySegment {
+    return asSlice(0, count)
+}
+
+public fun MemorySegment.takeLast(count: Long): MemorySegment {
+    return asSlice(byteSize() - count, count)
+}
+
 public fun allocateHeapSegment(size: Long): MemorySegment {
     require(size in 0 .. Int.MAX_VALUE)
     return ByteArray(size.toInt()).asMemorySegment()

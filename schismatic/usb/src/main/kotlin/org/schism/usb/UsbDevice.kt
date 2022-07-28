@@ -13,19 +13,21 @@ import kotlinx.coroutines.launch
 import org.schism.coroutines.SharedLifetime
 import org.schism.coroutines.updateMutating
 import org.schism.foreign.address
-import org.schism.foreign.withNativeStruct
-import org.schism.memory.NativeAddress
-import org.schism.memory.nativePointers
-import org.schism.memory.withNativePointer
-import org.schism.memory.withNativeUBytes
+import org.schism.foreign.allocate
+import org.schism.foreign.asStruct
+import org.schism.foreign.getPointer
+import org.schism.foreign.getUByte
+import org.schism.foreign.withConfinedMemorySession
 import org.schism.ref.registerCleanup
 import org.schism.usb.Libusb.ConfigDescriptor
 import org.schism.usb.Libusb.DeviceDescriptor
+import java.lang.foreign.MemoryAddress
+import java.lang.foreign.ValueLayout.ADDRESS
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 
-public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
+public class UsbDevice internal constructor(nativeHandle: MemoryAddress) {
     init {
         libusb.ref_device(nativeHandle)
         registerCleanup { libusb.unref_device(nativeHandle) }
@@ -50,7 +52,8 @@ public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
     init {
         val numConfigurations: UByte
 
-        withNativeStruct(DeviceDescriptor.Type) { deviceDescriptor ->
+        withConfinedMemorySession {
+            val deviceDescriptor = allocate(DeviceDescriptor.Type)
             checkLibusbReturn(libusb.get_device_descriptor(nativeHandle, deviceDescriptor.address()))
             iManufacturer = deviceDescriptor.iManufacturer
             iProduct = deviceDescriptor.iProduct
@@ -65,35 +68,39 @@ public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
             numConfigurations = deviceDescriptor.bNumConfigurations
         }
 
-        withNativeUBytes(MAX_PORT_NUMBERS.toLong()) { nativePortNumbers ->
+        withConfinedMemorySession {
+            val nativePortNumbers = allocate(MAX_PORT_NUMBERS.toLong())
+
             val portNumbersSize = checkLibusbSizeReturn(
                 libusb.get_port_numbers(
                     nativeHandle,
-                    nativePortNumbers.startAddress,
+                    nativePortNumbers,
                     MAX_PORT_NUMBERS,
                 )
             )
 
             portNumbers = List(portNumbersSize) {
-                nativePortNumbers[it.toLong()]
+                nativePortNumbers.getUByte(it.toLong())
             }
         }
 
         configurations = List(numConfigurations.toInt()) { configIndex ->
-            val configDescriptorAddress = withNativePointer { configDescriptorPointer ->
+            val configDescriptorAddress = withConfinedMemorySession {
+                val buffer = allocate(ADDRESS)
+
                 checkLibusbReturn(
                     libusb.get_config_descriptor(
                         nativeHandle,
                         configIndex.toUByte(),
-                        configDescriptorPointer.address,
+                        buffer,
                     )
                 )
 
-                configDescriptorPointer.value
+                buffer.getPointer()
             }
 
             try {
-                UsbConfiguration(this, ConfigDescriptor.Type.wrap(configDescriptorAddress))
+                UsbConfiguration(this, configDescriptorAddress.asStruct(ConfigDescriptor.Type))
             } finally {
                 libusb.free_config_descriptor(configDescriptorAddress)
             }
@@ -108,9 +115,10 @@ public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
 
         val lifetime = SharedLifetime()
 
-        val nativeConnectionHandle = withNativePointer {
-            checkLibusbReturn(libusb.open(nativeHandle, it.address))
-            it.value
+        val nativeConnectionHandle = withConfinedMemorySession {
+            val buffer = allocate(ADDRESS)
+            checkLibusbReturn(libusb.open(nativeHandle, buffer))
+            buffer.getPointer()
         }
 
         try {
@@ -132,24 +140,28 @@ public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
             @OptIn(DelicateCoroutinesApi::class)
             GlobalScope.launch(CoroutineName("UsbDevice enumerator")) {
                 var lastDevices = emptySet<UsbDevice>()
-                var lastDevicesByHandle = emptyMap<NativeAddress, Result<UsbDevice>>()
+                var lastDevicesByHandle = emptyMap<MemoryAddress, Result<UsbDevice>>()
 
-                withNativePointer { deviceListPointer ->
+                withConfinedMemorySession {
+                    val deviceListPointer = allocate(ADDRESS)
+
                     while (true) {
-                        val newDevicesByHandle: MutableMap<NativeAddress, Result<UsbDevice>>
+                        val newDevicesByHandle: MutableMap<MemoryAddress, Result<UsbDevice>>
 
                         val listSize = checkLibusbSizeReturn(
                             libusb.get_device_list(
                                 libusbContext,
-                                deviceListPointer.address,
+                                deviceListPointer,
                             )
                         )
 
+                        val deviceList = deviceListPointer.getPointer()
+
                         try {
-                            val deviceList = nativePointers(deviceListPointer.value, listSize.toLong())
                             newDevicesByHandle = hashMapOf()
 
-                            for (handle in deviceList) {
+                            for (handleIndex in 0 until listSize) {
+                                val handle = deviceList.getPointer(handleIndex * ADDRESS.byteSize())
                                 newDevicesByHandle[handle] = lastDevicesByHandle[handle]
                                     ?: try {
                                         Result.success(UsbDevice(handle))
@@ -158,7 +170,7 @@ public class UsbDevice internal constructor(nativeHandle: NativeAddress) {
                                     }
                             }
                         } finally {
-                            libusb.free_device_list(deviceListPointer.value, unref_devices = 1)
+                            libusb.free_device_list(deviceList, unref_devices = 1)
                         }
 
                         val newDevices = buildSet {

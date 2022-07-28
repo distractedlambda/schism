@@ -2,6 +2,7 @@
 
 package org.schism.foreign
 
+import java.lang.foreign.MemoryAddress
 import java.lang.foreign.MemorySegment
 
 public class MemoryDecoder(public val segment: MemorySegment, public var offset: Long = 0) {
@@ -87,6 +88,45 @@ public class MemoryDecoder(public val segment: MemorySegment, public var offset:
         return segment.getBeChar(offset).also {
             advance(2)
         }
+    }
+
+    public fun nextChars(
+        destination: CharArray,
+        destinationStartIndex: Int = 0,
+        count: Int = destination.size - destinationStartIndex,
+    ): CharArray {
+        MemorySegment.copy(segment, CHAR_LAYOUT, offset, destination, destinationStartIndex, count)
+        return destination.also { advance(count * 2L) }
+    }
+
+    public fun nextLeChars(
+        destination: CharArray,
+        destinationStartIndex: Int = 0,
+        count: Int = destination.size - destinationStartIndex,
+    ): CharArray {
+        MemorySegment.copy(segment, LE_CHAR_LAYOUT, offset, destination, destinationStartIndex, count)
+        return destination.also { advance(count * 2L) }
+    }
+
+    public fun nextBeChars(
+        destination: CharArray,
+        destinationStartIndex: Int = 0,
+        count: Int = destination.size - destinationStartIndex,
+    ): CharArray {
+        MemorySegment.copy(segment, BE_CHAR_LAYOUT, offset, destination, destinationStartIndex, count)
+        return destination.also { advance(count * 2L) }
+    }
+
+    public fun nextUtf16(count: Int): String {
+        return String(nextChars(CharArray(count)))
+    }
+
+    public fun nextLeUtf16(count: Int): String {
+        return String(nextLeChars(CharArray(count)))
+    }
+
+    public fun nextBeUtf16(count: Int): String {
+        return String(nextBeChars(CharArray(count)))
     }
 
     public inline fun nextInt(): Int {

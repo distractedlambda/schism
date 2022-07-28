@@ -7,22 +7,25 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.schism.coroutines.SharedLifetime
-import org.schism.foreign.NativeCallable
+import org.schism.foreign.asMemorySegment
+import org.schism.foreign.asStruct
+import org.schism.foreign.decoder
+import org.schism.foreign.encoder
+import org.schism.foreign.free
+import org.schism.foreign.getInt
+import org.schism.foreign.getUByte
+import org.schism.foreign.implicitMemorySession
+import org.schism.foreign.isNULL
+import org.schism.foreign.malloc
 import org.schism.foreign.nativeCallable
-import org.schism.memory.Memory
-import org.schism.memory.NativeAddress
-import org.schism.memory.free
-import org.schism.memory.isNULL
-import org.schism.memory.malloc
-import org.schism.memory.nativeMemory
-import org.schism.memory.nextLeUtf16
-import org.schism.memory.plus
-import org.schism.memory.putLeUShort
-import org.schism.memory.putUByte
-import org.schism.memory.readUByte
-import org.schism.memory.withNativeInt
+import org.schism.foreign.withConfinedMemorySession
+import org.schism.foreign.withSharedMemorySession
 import org.schism.usb.Libusb.TransferStatus
 import org.schism.usb.Libusb.TransferType
+import java.lang.foreign.MemoryAddress
+import java.lang.foreign.MemoryAddress.NULL
+import java.lang.foreign.MemorySegment
+import java.lang.foreign.ValueLayout.JAVA_INT
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.Result.Companion.failure
@@ -34,15 +37,15 @@ import kotlin.coroutines.resumeWithException
 
 public class UsbDeviceConnection internal constructor(
     public val device: UsbDevice,
-    private val nativeHandle: NativeAddress,
+    private val nativeHandle: MemoryAddress,
     private val lifetime: SharedLifetime,
 ) {
     private fun transfer(
         continuation: CancellableContinuation<Int>,
-        callback: NativeCallable,
+        callback: MemoryAddress,
         endpointAddress: UByte,
         type: UByte,
-        buffer: NativeAddress,
+        buffer: MemoryAddress,
         bufferLength: Int,
     ) {
         var submitted = false
@@ -64,7 +67,7 @@ public class UsbDeviceConnection internal constructor(
                 try {
                     transfer.native.let {
                         it.dev_handle = nativeHandle
-                        it.callback = callback.address
+                        it.callback = callback
                         it.endpoint = endpointAddress
                         it.type = type
                         it.buffer = buffer
@@ -110,7 +113,7 @@ public class UsbDeviceConnection internal constructor(
                 throw exception
             }
         } finally {
-            if (!submitted && !buffer.isNULL()) {
+            if (!submitted) {
                 free(buffer)
             }
         }
@@ -118,9 +121,9 @@ public class UsbDeviceConnection internal constructor(
 
     private suspend inline fun transfer(
         endpointAddress: UByte,
-        callback: NativeCallable,
+        callback: MemoryAddress,
         type: UByte,
-        buffer: NativeAddress,
+        buffer: MemoryAddress,
         bufferLength: Int,
     ): Int {
         return suspendCancellableCoroutine { continuation ->
@@ -136,7 +139,7 @@ public class UsbDeviceConnection internal constructor(
         val bufferLength = 8 + 255
         val buffer = malloc(bufferLength.toLong())
 
-        nativeMemory(buffer, 8).encoder().run {
+        buffer.asMemorySegment(8).encoder().run {
             putUByte(0x80u)
             putUByte(0x06u)
             putUByte(index)
@@ -145,13 +148,13 @@ public class UsbDeviceConnection internal constructor(
             putLeUShort(255u)
         }
 
-        transfer(0x00u, nativeInTransferCallback, TransferType.CONTROL, buffer, bufferLength)
+        transfer(0x00u, nativeInTransferCallback.address(), TransferType.CONTROL, buffer, bufferLength)
 
         try {
-            val descriptorLength = (buffer + 8).readUByte().toInt()
-            return nativeMemory(buffer, bufferLength.toLong())
-                .slice(offset = 10)
-                .decoder()
+            val descriptorLength = buffer.getUByte(8).toInt()
+            return buffer
+                .asMemorySegment(bufferLength.toLong())
+                .decoder(offset = 10)
                 .nextLeUtf16((descriptorLength - 2) / 2)
         } finally {
             free(buffer)
@@ -178,9 +181,10 @@ public class UsbDeviceConnection internal constructor(
     public suspend fun getActiveConfiguration(): UsbConfiguration? {
         val activeValue = withContext(Dispatchers.IO) {
             lifetime.withRetained {
-                withNativeInt { configurationValue ->
-                    checkLibusbReturn(libusb.get_configuration(nativeHandle, configurationValue.address))
-                    configurationValue.value
+                withConfinedMemorySession {
+                    val buffer = allocate(JAVA_INT) // FIXME: C Int?
+                    checkLibusbReturn(libusb.get_configuration(nativeHandle, buffer))
+                    buffer.getInt()
                 }
             }
         }
@@ -256,7 +260,7 @@ public class UsbDeviceConnection internal constructor(
     }
 
     @OptIn(ExperimentalContracts::class)
-    public suspend fun sendPacket(endpoint: UsbBulkTransferOutEndpoint, fill: suspend (Memory) -> Long) {
+    public suspend fun sendPacket(endpoint: UsbBulkTransferOutEndpoint, fill: suspend (MemorySegment) -> Long) {
         contract {
             callsInPlace(fill, InvocationKind.EXACTLY_ONCE)
         }
@@ -266,7 +270,9 @@ public class UsbDeviceConnection internal constructor(
         val buffer = malloc(endpoint.maxPacketSize.toLong())
 
         val length = try {
-            fill(nativeMemory(buffer, endpoint.maxPacketSize.toLong()))
+            withSharedMemorySession {
+                fill(buffer.asMemorySegment(endpoint.maxPacketSize.toLong(), session = asNonCloseable()))
+            }
         } catch (exception: Throwable) {
             free(buffer)
             throw exception
@@ -274,7 +280,7 @@ public class UsbDeviceConnection internal constructor(
 
         val sentLength = transfer(
             endpoint.address,
-            nativeOutTransferCallback,
+            nativeOutTransferCallback.address(),
             TransferType.BULK,
             buffer,
             length.toInt(),
@@ -287,11 +293,14 @@ public class UsbDeviceConnection internal constructor(
 
     public suspend fun sendZeroLengthPacket(endpoint: UsbBulkTransferOutEndpoint) {
         require(endpoint.device === device)
-        transfer(endpoint.address, nativeZeroLengthTransferCallback, TransferType.BULK, NativeAddress.NULL, 0)
+        transfer(endpoint.address, nativeZeroLengthTransferCallback.address(), TransferType.BULK, NULL, 0)
     }
 
     @OptIn(ExperimentalContracts::class)
-    public suspend fun <R> receivePacket(endpoint: UsbBulkTransferInEndpoint, process: suspend (Memory) -> R): R {
+    public suspend fun <R> receivePacket(
+        endpoint: UsbBulkTransferInEndpoint,
+        process: suspend (MemorySegment) -> R,
+    ): R {
         contract {
             callsInPlace(process, InvocationKind.EXACTLY_ONCE)
         }
@@ -302,14 +311,16 @@ public class UsbDeviceConnection internal constructor(
 
         val receivedLength = transfer(
             endpoint.address,
-            nativeInTransferCallback,
+            nativeInTransferCallback.address(),
             TransferType.BULK,
             buffer,
             endpoint.maxPacketSize.toInt(),
         )
 
         try {
-            return process(nativeMemory(buffer, receivedLength.toLong()).asReadOnly())
+            withSharedMemorySession {
+                return process(buffer.asMemorySegment(receivedLength.toLong(), asNonCloseable()).asReadOnly())
+            }
         } finally {
             free(buffer)
         }
@@ -317,16 +328,16 @@ public class UsbDeviceConnection internal constructor(
 
     public suspend fun receiveZeroLengthPacket(endpoint: UsbBulkTransferInEndpoint) {
         require(endpoint.device === device)
-        transfer(endpoint.address, nativeZeroLengthTransferCallback, TransferType.BULK, NativeAddress.NULL, 0)
+        transfer(endpoint.address, nativeZeroLengthTransferCallback.address(), TransferType.BULK, NULL, 0)
     }
 }
 
-private class Transfer(val nativeAddress: NativeAddress) {
+private class Transfer(val nativeAddress: MemoryAddress) {
     var continuation: CancellableContinuation<Int>? = null
     var deviceConnectionLifetime: SharedLifetime? = null
 
     val native: Libusb.Transfer get() {
-        return Libusb.Transfer.Type.wrap(nativeAddress)
+        return nativeAddress.asStruct(Libusb.Transfer.Type)
     }
 
     fun claimFromCallback(): CancellableContinuation<Int> {
@@ -341,11 +352,13 @@ private class Transfer(val nativeAddress: NativeAddress) {
     }
 }
 
-private val transfersByAddress = ConcurrentHashMap<NativeAddress, Transfer>()
+private val transfersByAddress = ConcurrentHashMap<MemoryAddress, Transfer>()
 private val freeTransfers = ConcurrentLinkedQueue<Transfer>()
-private val nativeInTransferCallback = nativeCallable(::inTransferCallback)
-private val nativeOutTransferCallback = nativeCallable(::outTransferCallback)
-private val nativeZeroLengthTransferCallback = nativeCallable(::zeroLengthTransferCallback)
+
+private val callbacksSession = implicitMemorySession()
+private val nativeInTransferCallback = callbacksSession.nativeCallable(::inTransferCallback)
+private val nativeOutTransferCallback = callbacksSession.nativeCallable(::outTransferCallback)
+private val nativeZeroLengthTransferCallback = callbacksSession.nativeCallable(::zeroLengthTransferCallback)
 
 private fun transferError(status: Int): UsbException {
     return UsbException(when (status) {
@@ -359,11 +372,11 @@ private fun transferError(status: Int): UsbException {
     })
 }
 
-private fun inTransferCallback(transferAddress: NativeAddress) {
+private fun inTransferCallback(transferAddress: MemoryAddress) {
     val transfer = transfersByAddress[transferAddress]!!
     val continuation = transfer.claimFromCallback()
 
-    val buffer: NativeAddress
+    val buffer: MemoryAddress
     val status: Int
     val actualLength: Int
 
@@ -371,7 +384,7 @@ private fun inTransferCallback(transferAddress: NativeAddress) {
         buffer = it.buffer
         status = it.status
         actualLength = it.actual_length
-        it.buffer = NativeAddress.NULL
+        it.buffer = NULL
     }
 
     freeTransfers.add(transfer)
@@ -387,11 +400,11 @@ private fun inTransferCallback(transferAddress: NativeAddress) {
     }
 }
 
-private fun outTransferCallback(transferAddress: NativeAddress) {
+private fun outTransferCallback(transferAddress: MemoryAddress) {
     val transfer = transfersByAddress[transferAddress]!!
     val continuation = transfer.claimFromCallback()
 
-    val buffer: NativeAddress
+    val buffer: MemoryAddress
     val status: Int
     val actualLength: Int
 
@@ -399,7 +412,7 @@ private fun outTransferCallback(transferAddress: NativeAddress) {
         buffer = it.buffer
         status = it.status
         actualLength = it.actual_length
-        it.buffer = NativeAddress.NULL
+        it.buffer = NULL
     }
 
     freeTransfers.add(transfer)
@@ -414,7 +427,7 @@ private fun outTransferCallback(transferAddress: NativeAddress) {
     )
 }
 
-private fun zeroLengthTransferCallback(transferAddress: NativeAddress) {
+private fun zeroLengthTransferCallback(transferAddress: MemoryAddress) {
     val transfer = transfersByAddress[transferAddress]!!
     val continuation = transfer.claimFromCallback()
 

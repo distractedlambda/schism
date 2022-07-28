@@ -1,6 +1,6 @@
 package org.schism.usb
 
-import org.schism.foreign.wrapArray
+import org.schism.foreign.asStructArray
 import org.schism.usb.Libusb.Interface
 import org.schism.usb.Libusb.InterfaceDescriptor
 
@@ -14,8 +14,13 @@ public class UsbInterface internal constructor(public val configuration: UsbConf
     }
 
     init {
-        val interfaceDescriptors = InterfaceDescriptor.Type.wrapArray(native.altsetting, native.num_altsetting.toLong())
+        val interfaceDescriptors = native.altsetting.asStructArray(
+            InterfaceDescriptor.Type,
+            native.num_altsetting.toLong(),
+        )
+
         number = interfaceDescriptors[0].bInterfaceNumber
+
         alternateSettings = List(native.num_altsetting) {
             UsbAlternateSetting(this, interfaceDescriptors[it.toLong()])
         }

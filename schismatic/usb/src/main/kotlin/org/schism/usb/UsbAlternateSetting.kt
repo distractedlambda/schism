@@ -1,6 +1,7 @@
 package org.schism.usb
 
-import org.schism.foreign.wrapArray
+import org.schism.foreign.asStructArray
+import org.schism.foreign.globalMemorySession
 import org.schism.usb.Libusb.EndpointDescriptor
 import org.schism.usb.Libusb.InterfaceDescriptor
 import org.schism.util.contextual
@@ -25,8 +26,8 @@ public class UsbAlternateSetting internal constructor(
     }
 
     public val endpoints: List<UsbEndpoint> = kotlin.run {
-        val endpointDescriptors = EndpointDescriptor.Type.wrapArray(
-            descriptor.endpoint,
+        val endpointDescriptors = descriptor.endpoint.asStructArray(
+            EndpointDescriptor.Type,
             descriptor.bNumEndpoints.toLong(),
         )
 
