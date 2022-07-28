@@ -36,6 +36,18 @@ public fun allocateHeapSegment(size: Long): MemorySegment {
     return ByteArray(size.toInt()).asMemorySegment()
 }
 
+public fun emptyHeapSegment(): MemorySegment {
+    return EMPTY_HEAP_SEGMENT
+}
+
+private val EMPTY_HEAP_SEGMENT = allocateHeapSegment(0)
+
+public fun heapCopyOf(segment: MemorySegment): MemorySegment {
+    return allocateHeapSegment(segment.byteSize()).apply {
+        copyFrom(segment)
+    }
+}
+
 public fun ByteArray.asMemorySegment(): MemorySegment {
     return MemorySegment.ofArray(this)
 }

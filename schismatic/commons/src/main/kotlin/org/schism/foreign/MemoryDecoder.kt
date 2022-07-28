@@ -2,7 +2,6 @@
 
 package org.schism.foreign
 
-import java.lang.foreign.MemoryAddress
 import java.lang.foreign.MemorySegment
 
 public class MemoryDecoder(public val segment: MemorySegment, public var offset: Long = 0) {

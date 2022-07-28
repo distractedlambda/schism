@@ -12,20 +12,18 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.launch
-import org.schism.math.foldHashCode
+import org.schism.foreign.allocateHeapSegment
+import org.schism.foreign.emptyHeapSegment
+import org.schism.foreign.heapCopyOf
 import org.schism.math.plusExact
 import org.schism.math.toIntExact
-import org.schism.memory.Memory
-import org.schism.memory.allocateHeapMemory
-import org.schism.memory.emptyHeapMemory
-import org.schism.memory.heapCopyOf
-import org.schism.memory.memcpy
 import org.schism.util.Token
 import org.schism.util.loop
+import java.lang.foreign.MemorySegment
 import java.util.BitSet
 import java.util.Objects.checkFromIndexSize
 
-public interface MemoryFlow : Flow<Memory> {
+public interface MemoryFlow : Flow<MemorySegment> {
     public val size: Long
 
     public fun invalidate(offset: Long = 0, size: Long = this.size - offset) {
@@ -55,14 +53,14 @@ public interface MemoryFlow : Flow<Memory> {
     }
 }
 
-public fun MemoryFlow(size: Long, load: suspend () -> Memory): MemoryFlow {
+public fun MemoryFlow(size: Long, load: suspend () -> MemorySegment): MemoryFlow {
     return when (size) {
         0L -> EmptyMemoryFlow
         else -> DeferredMemoryFlow(size, load)
     }
 }
 
-public fun MemoryFlow(size: Long, pageSize: Long, loadPage: suspend (pageIndex: Long) -> Memory): MemoryFlow {
+public fun MemoryFlow(size: Long, pageSize: Long, loadPage: suspend (pageIndex: Long) -> MemorySegment): MemoryFlow {
     return when (size) {
         0L -> EmptyMemoryFlow
         pageSize -> DeferredMemoryFlow(size) { loadPage(0) }
@@ -74,8 +72,8 @@ public fun emptyMemoryFlow(): MemoryFlow {
     return EmptyMemoryFlow
 }
 
-public fun memoryFlowOf(memory: Memory): MemoryFlow {
-    return ImmediateMemoryFlow(memory)
+public fun memoryFlowOf(segment: MemorySegment): MemoryFlow {
+    return ImmediateMemoryFlow(segment.asReadOnly())
 }
 
 public fun concatenate(vararg flows: MemoryFlow): MemoryFlow {
@@ -114,14 +112,14 @@ private fun concatenateComponents(components: List<MemoryFlow>, size: Long): Mem
     return when (components.size) {
         0 -> EmptyMemoryFlow
         1 -> components.single()
-        else -> ConcatenatedMemoryFlow(components.toTypedArray(), size)
+        else -> ConcatenatedMemoryFlow(components, size)
     }
 }
 
 private class PageDeferredMemoryFlow(
     override val size: Long,
     private val pageSize: Long,
-    private val loadPage: suspend (pageIndex: Long) -> Memory,
+    private val loadPage: suspend (pageIndex: Long) -> MemorySegment,
 ) : MemoryFlow {
     init {
         require(size > 0)
@@ -179,7 +177,7 @@ private class PageDeferredMemoryFlow(
                     }
 
                     else -> {
-                        val components = Array(lastPageIndex - firstPageIndex + 1) {
+                        val components = MutableList(lastPageIndex - firstPageIndex + 1) {
                             getOrCreatePage(firstPageIndex + it)
                         }
 
@@ -205,7 +203,7 @@ private class PageDeferredMemoryFlow(
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    override suspend fun collect(collector: FlowCollector<Memory>) {
+    override suspend fun collect(collector: FlowCollector<MemorySegment>) {
         coroutineScope {
             val nextVersion = produce(capacity = Channel.CONFLATED) {
                 val pageUpdates = produce {
@@ -220,14 +218,14 @@ private class PageDeferredMemoryFlow(
                 }
 
                 pageUpdates.consume {
-                    val mutableVersion = allocateHeapMemory(size.toIntExact()) // FIXME: support larger memories
+                    val mutableVersion = allocateHeapSegment(size)
                     val initFlags = BitSet(pages.size)
                     var uninitializedCount = pages.size
 
                     while (uninitializedCount != 0) {
                         val (pageIndex, data) = receive()
 
-                        memcpy(mutableVersion.slice(pageIndex * pageSize, pageSize), data)
+                        mutableVersion.asSlice(pageIndex * pageSize, pageSize).copyFrom(data)
 
                         if (!initFlags[pageIndex]) {
                             initFlags.set(pageIndex)
@@ -239,7 +237,7 @@ private class PageDeferredMemoryFlow(
 
                     loop {
                         val (pageIndex, data) = receive()
-                        memcpy(mutableVersion.slice(pageIndex * pageSize, pageSize), data)
+                        mutableVersion.asSlice(pageIndex * pageSize, pageSize).copyFrom(data)
                         send(heapCopyOf(mutableVersion).asReadOnly())
                     }
                 }
@@ -249,10 +247,10 @@ private class PageDeferredMemoryFlow(
         }
     }
 
-    private data class PageUpdate(val pageIndex: Int, val data: Memory)
+    private data class PageUpdate(val pageIndex: Int, val data: MemorySegment)
 }
 
-private class DeferredMemoryFlow(override val size: Long, private val load: suspend () -> Memory) : MemoryFlow {
+private class DeferredMemoryFlow(override val size: Long, private val load: suspend () -> MemorySegment) : MemoryFlow {
     init {
         require(size > 0)
     }
@@ -264,14 +262,14 @@ private class DeferredMemoryFlow(override val size: Long, private val load: susp
         if (size != 0L) state.value = EMPTY
     }
 
-    override suspend fun collect(collector: FlowCollector<Memory>) {
+    override suspend fun collect(collector: FlowCollector<MemorySegment>) {
         state.collect { lastState ->
             when {
                 lastState === EMPTY -> {
                     if (state.compareAndSet(EMPTY, LOADING)) {
                         try {
                             val loaded = load()
-                            check(loaded.size == size)
+                            check(loaded.byteSize() == size)
                             state.value = loaded.asReadOnly()
                         } catch (exception: Throwable) {
                             state.value = EMPTY
@@ -280,7 +278,7 @@ private class DeferredMemoryFlow(override val size: Long, private val load: susp
                     }
                 }
 
-                lastState is Memory -> {
+                lastState is MemorySegment -> {
                     collector.emit(lastState)
                 }
             }
@@ -293,8 +291,8 @@ private class DeferredMemoryFlow(override val size: Long, private val load: susp
     }
 }
 
-private class ConcatenatedMemoryFlow(
-    private val components: Array<out MemoryFlow>,
+private data class ConcatenatedMemoryFlow(
+    private val components: List<MemoryFlow>,
     override val size: Long,
 ) : MemoryFlow {
     init {
@@ -353,7 +351,7 @@ private class ConcatenatedMemoryFlow(
 
                 when (newComponents.size) {
                     1 -> newComponents.single()
-                    else -> ConcatenatedMemoryFlow(newComponents.toTypedArray(), size)
+                    else -> ConcatenatedMemoryFlow(newComponents, size)
                 }
             }
         }
@@ -364,7 +362,7 @@ private class ConcatenatedMemoryFlow(
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    override suspend fun collect(collector: FlowCollector<Memory>) {
+    override suspend fun collect(collector: FlowCollector<MemorySegment>) {
         coroutineScope {
             val nextVersion = produce(capacity = Channel.CONFLATED) {
                 val componentUpdates = produce {
@@ -384,14 +382,14 @@ private class ConcatenatedMemoryFlow(
                 }
 
                 componentUpdates.consume {
-                    val mutableVersion = allocateHeapMemory(size.toIntExact()) // FIXME: support larger memories
+                    val mutableVersion = allocateHeapSegment(size)
                     val initFlags = BitSet(components.size)
                     var uninitializedCount = components.size
 
                     while (uninitializedCount != 0) {
                         val (componentIndex, byteOffset, data) = receive()
 
-                        memcpy(mutableVersion.slice(byteOffset, data.size), data)
+                        mutableVersion.asSlice(byteOffset, data.byteSize()).copyFrom(data)
 
                         if (!initFlags[componentIndex]) {
                             initFlags.set(componentIndex)
@@ -403,7 +401,7 @@ private class ConcatenatedMemoryFlow(
 
                     loop {
                         val (_, byteOffset, data) = receive()
-                        memcpy(mutableVersion.slice(byteOffset, data.size), data)
+                        mutableVersion.asSlice(byteOffset, data.byteSize()).copyFrom(data)
                         send(heapCopyOf(mutableVersion).asReadOnly())
                     }
                 }
@@ -413,18 +411,10 @@ private class ConcatenatedMemoryFlow(
         }
     }
 
-    override fun equals(other: Any?): Boolean {
-        return other is ConcatenatedMemoryFlow && components.contentEquals(other.components)
-    }
-
-    override fun hashCode(): Int {
-        return components.contentHashCode()
-    }
-
-    private data class ComponentUpdate(val componentIndex: Int, val byteOffset: Long, val data: Memory)
+    private data class ComponentUpdate(val componentIndex: Int, val byteOffset: Long, val data: MemorySegment)
 }
 
-private class SlicedMemoryFlow(
+private data class SlicedMemoryFlow(
     private val source: MemoryFlow,
     private val sourceOffset: Long,
     override val size: Long,
@@ -447,54 +437,35 @@ private class SlicedMemoryFlow(
         }
     }
 
-    override suspend fun collect(collector: FlowCollector<Memory>) {
+    override suspend fun collect(collector: FlowCollector<MemorySegment>) {
         source.collect {
-            collector.emit(it.slice(sourceOffset, size))
+            collector.emit(it.asSlice(sourceOffset, size))
         }
-    }
-
-    override fun equals(other: Any?): Boolean {
-        return other is SlicedMemoryFlow
-            && source == other.source
-            && sourceOffset == other.sourceOffset
-            && size == other.size
-    }
-
-    override fun hashCode(): Int {
-        return source.hashCode() foldHashCode sourceOffset.hashCode() foldHashCode size.hashCode()
     }
 }
 
-private class ImmediateMemoryFlow(private val memory: Memory) : MemoryFlow {
+private data class ImmediateMemoryFlow(private val memory: MemorySegment) : MemoryFlow {
     override val size: Long get() {
-        return memory.size
+        return memory.byteSize()
     }
 
     override fun slice(offset: Long, size: Long): MemoryFlow {
-        checkFromIndexSize(offset, size, memory.size)
+        checkFromIndexSize(offset, size, memory.byteSize())
         return when (size) {
-            memory.size -> this
-            else -> ImmediateMemoryFlow(memory.slice(offset, size))
+            memory.byteSize() -> this
+            else -> ImmediateMemoryFlow(memory.asSlice(offset, size))
         }
     }
 
     override fun unpackComponents(to: MutableList<MemoryFlow>) {
-        if (memory.size != 0L) {
+        if (memory.byteSize() != 0L) {
             to.add(this)
         }
     }
 
-    override suspend fun collect(collector: FlowCollector<Memory>) {
+    override suspend fun collect(collector: FlowCollector<MemorySegment>) {
         collector.emit(memory)
         awaitCancellation()
-    }
-
-    override fun equals(other: Any?): Boolean {
-        return other is ImmediateMemoryFlow && memory == other.memory
-    }
-
-    override fun hashCode(): Int {
-        return memory.hashCode()
     }
 }
 
@@ -516,8 +487,8 @@ private object EmptyMemoryFlow : MemoryFlow {
         return other
     }
 
-    override suspend fun collect(collector: FlowCollector<Memory>) {
-        collector.emit(emptyHeapMemory())
+    override suspend fun collect(collector: FlowCollector<MemorySegment>) {
+        collector.emit(emptyHeapSegment())
         awaitCancellation()
     }
 }

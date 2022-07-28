@@ -9,8 +9,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import org.schism.coroutines.MemoryFlow
+import org.schism.foreign.getUByte
 import org.schism.math.toIntExact
-import org.schism.memory.getUByte
 
 @Composable
 fun MemoryHexView(source: MemoryFlow, bytesPerRow: Int = 8) {
@@ -29,7 +29,7 @@ fun MemoryHexView(source: MemoryFlow, bytesPerRow: Int = 8) {
 private fun ByteValues(bytes: MemoryFlow) {
     val currentBytes = bytes.collectAsState(initial = null).value
     for (byteIndex in 0 until bytes.size) {
-        val text = currentBytes?.getUByte(byteIndex.toLong())?.toString(16)?.padStart(2, '0') ?: "--"
+        val text = currentBytes?.getUByte(byteIndex)?.toString(16)?.padStart(2, '0') ?: "--"
         Text(text, fontFamily = FontFamily.Monospace)
     }
 }

@@ -3,17 +3,15 @@ package org.schism.schismatic
 import kotlinx.coroutines.coroutineScope
 import org.schism.coroutines.Actor
 import org.schism.coroutines.MemoryFlow
-import org.schism.math.toIntExact
-import org.schism.memory.Memory
-import org.schism.memory.MemoryEncoder
-import org.schism.memory.allocateHeapMemory
-import org.schism.memory.positionalDifference
-import org.schism.memory.putLeUInt
-import org.schism.memory.putUByte
+import org.schism.foreign.MemoryEncoder
+import org.schism.foreign.allocateHeapSegment
+import org.schism.foreign.encoder
+import org.schism.foreign.take
 import org.schism.usb.UsbBulkTransferInEndpoint
 import org.schism.usb.UsbBulkTransferOutEndpoint
 import org.schism.usb.UsbDevice
 import org.schism.usb.UsbDeviceConnection
+import java.lang.foreign.MemorySegment
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
@@ -31,10 +29,10 @@ class PicobootConnection private constructor(
     val sram: MemoryFlow = memoryFlow(address = 0x20000000u, size = 0x42000u)
 
     private fun memoryFlow(address: UInt, size: UInt): MemoryFlow {
-        return MemoryFlow(size.toLong(), 256) { pageIndex ->
-            allocateHeapMemory(PAGE_SIZE.toIntExact()).apply {
+        return MemoryFlow(size.toLong(), PAGE_SIZE) { pageIndex ->
+            allocateHeapSegment(PAGE_SIZE).apply {
                 encoder().apply {
-                    readMemory(address + pageIndex.toUInt() * 256u, 256u) {
+                    readMemory(address + pageIndex.toUInt() * PAGE_SIZE.toUInt(), PAGE_SIZE.toUInt()) {
                         putBytes(it)
                     }
                 }
@@ -49,11 +47,9 @@ class PicobootConnection private constructor(
         }
 
         deviceConnection.sendPacket(outEndpoint) { packet ->
-            val commandSize = packet.slice(offset = 16, size = 16).encoder().positionalDifference {
-                fillArgs()
-            }
+            val commandSize = packet.asSlice(16, 16).encoder().apply(fillArgs).offset
 
-            packet.slice(size = 16).encoder().run {
+            packet.take(16).encoder().run {
                 putLeUInt(0x431fd10bu)
                 putInt(0)
                 putUByte(id)
@@ -106,7 +102,7 @@ class PicobootConnection private constructor(
     }
 
     @OptIn(ExperimentalContracts::class)
-    private suspend fun readMemory(deviceAddress: UInt, size: UInt, onEachPart: suspend (Memory) -> Unit) {
+    private suspend fun readMemory(deviceAddress: UInt, size: UInt, onEachPart: suspend (MemorySegment) -> Unit) {
         contract {
             callsInPlace(onEachPart, InvocationKind.AT_LEAST_ONCE)
         }
@@ -123,7 +119,7 @@ class PicobootConnection private constructor(
 
             while (countReceived < size.toLong()) {
                 deviceConnection.receivePacket(inEndpoint) {
-                    countReceived += it.size
+                    countReceived += it.byteSize()
                     onEachPart(it)
                 }
             }
@@ -133,7 +129,7 @@ class PicobootConnection private constructor(
     }
 
     @OptIn(ExperimentalContracts::class)
-    private suspend fun writeMemory(deviceAddress: UInt, size: UInt, writePart: suspend (Memory) -> Unit) {
+    private suspend fun writeMemory(deviceAddress: UInt, size: UInt, writePart: suspend (MemorySegment) -> Unit) {
         contract {
             callsInPlace(writePart, InvocationKind.AT_LEAST_ONCE)
         }
@@ -150,9 +146,9 @@ class PicobootConnection private constructor(
 
             while (countRemaining > 0) {
                 deviceConnection.sendPacket(outEndpoint) { memory ->
-                    minOf(memory.size, countRemaining).also { packetSize ->
+                    minOf(memory.byteSize(), countRemaining).also { packetSize ->
                         countRemaining -= packetSize
-                        writePart(memory.slice(size = packetSize))
+                        writePart(memory.take(packetSize))
                     }
                 }
             }

@@ -4,9 +4,9 @@ import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consume
+import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.channels.onFailure
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.contracts.ExperimentalContracts
@@ -31,11 +31,9 @@ public class Actor(scope: CoroutineScope) {
 
     init {
         scope.launch {
-            workItems.consume {
-                while (true) {
-                    // FIXME: will [coroutineScope] poll cancellation early?
-                    coroutineScope(workItems.receive())
-                }
+            workItems.consumeEach {
+                // FIXME: Is there a risk that [coroutineScope] will poll cancellation early?
+                coroutineScope(it)
             }
         }
     }
