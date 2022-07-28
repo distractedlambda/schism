@@ -3,7 +3,6 @@ package org.schism.coroutines
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.consume
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.channels.onFailure
 import kotlinx.coroutines.coroutineScope
