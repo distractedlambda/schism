@@ -5,6 +5,14 @@ package org.schism.foreign
 import java.lang.foreign.MemorySegment
 
 public class MemoryDecoder(public val segment: MemorySegment, public var offset: Long = 0) {
+    public val remaining: Long get() {
+        return segment.byteSize() - offset
+    }
+
+    public val hasRemaining: Boolean get() {
+        return remaining != 0L
+    }
+
     public fun advance(count: Long) {
         offset += count
     }
@@ -13,6 +21,12 @@ public class MemoryDecoder(public val segment: MemorySegment, public var offset:
         return segment.getByte(offset).also {
             advance(1)
         }
+    }
+
+    public fun nextBytes(destination: MemorySegment): MemorySegment {
+        destination.copyFrom(segment.asSlice(offset, destination.byteSize()))
+        advance(destination.byteSize())
+        return destination
     }
 
     public inline fun nextUByte(): UByte {

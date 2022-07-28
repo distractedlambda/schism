@@ -5,6 +5,14 @@ package org.schism.foreign
 import java.lang.foreign.MemorySegment
 
 public class MemoryEncoder(public val segment: MemorySegment, public var offset: Long = 0) {
+    public val remaining: Long get() {
+        return segment.byteSize() - offset
+    }
+
+    public val hasRemaining: Boolean get() {
+        return remaining != 0L
+    }
+
     public fun advance(count: Long) {
         offset += count
     }

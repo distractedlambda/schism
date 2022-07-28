@@ -51,7 +51,7 @@ public fun <S : Struct> MemorySegment.asStructArray(elementType: StructType<S>):
 public fun <S : Struct> MemoryAddress.asStructArray(
     elementType: StructType<S>,
     count: Long,
-    session: MemorySession,
+    session: MemorySession = globalMemorySession(),
 ): StructArray<S> {
     return asMemorySegment(elementType.layout.byteSize() timesExact count, session).asStructArray(elementType)
 }

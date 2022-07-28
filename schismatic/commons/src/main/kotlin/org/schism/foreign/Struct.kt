@@ -32,7 +32,6 @@ import org.schism.invoke.HiddenClassDefiner
 import org.schism.math.alignForwardsTo
 import org.schism.math.forwardsAlignmentOffsetTo
 import org.schism.math.plusExact
-import org.schism.math.requireAlignedTo
 import org.schism.math.timesExact
 import org.schism.reflect.descriptorString
 import org.schism.reflect.internalName
@@ -86,7 +85,7 @@ public fun <S : Struct> MemorySegment.asStruct(type: StructType<S>): S {
     return type.wrap(this)
 }
 
-public fun <S : Struct> MemoryAddress.asStruct(type: StructType<S>, session: MemorySession): S {
+public fun <S : Struct> MemoryAddress.asStruct(type: StructType<S>, session: MemorySession = globalMemorySession()): S {
     return asMemorySegment(type.layout.byteSize(), session).asStruct(type)
 }
 
