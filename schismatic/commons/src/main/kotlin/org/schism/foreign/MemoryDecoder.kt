@@ -94,7 +94,7 @@ public class MemoryDecoder(public val segment: MemorySegment, public var offset:
         destinationStartIndex: Int = 0,
         count: Int = destination.size - destinationStartIndex,
     ): CharArray {
-        MemorySegment.copy(segment, CHAR_LAYOUT, offset, destination, destinationStartIndex, count)
+        MemorySegment.copy(segment, UNALIGNED_CHAR, offset, destination, destinationStartIndex, count)
         return destination.also { advance(count * 2L) }
     }
 
@@ -103,7 +103,7 @@ public class MemoryDecoder(public val segment: MemorySegment, public var offset:
         destinationStartIndex: Int = 0,
         count: Int = destination.size - destinationStartIndex,
     ): CharArray {
-        MemorySegment.copy(segment, LE_CHAR_LAYOUT, offset, destination, destinationStartIndex, count)
+        MemorySegment.copy(segment, UNALIGNED_LE_CHAR, offset, destination, destinationStartIndex, count)
         return destination.also { advance(count * 2L) }
     }
 
@@ -112,7 +112,7 @@ public class MemoryDecoder(public val segment: MemorySegment, public var offset:
         destinationStartIndex: Int = 0,
         count: Int = destination.size - destinationStartIndex,
     ): CharArray {
-        MemorySegment.copy(segment, BE_CHAR_LAYOUT, offset, destination, destinationStartIndex, count)
+        MemorySegment.copy(segment, UNALIGNED_BE_CHAR, offset, destination, destinationStartIndex, count)
         return destination.also { advance(count * 2L) }
     }
 

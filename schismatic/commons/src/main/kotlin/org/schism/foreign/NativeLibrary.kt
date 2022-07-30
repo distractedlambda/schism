@@ -16,6 +16,7 @@ import org.objectweb.asm.Opcodes.FRETURN
 import org.objectweb.asm.Opcodes.H_INVOKESTATIC
 import org.objectweb.asm.Opcodes.I2L
 import org.objectweb.asm.Opcodes.ILOAD
+import org.objectweb.asm.Opcodes.INVOKEINTERFACE
 import org.objectweb.asm.Opcodes.INVOKESPECIAL
 import org.objectweb.asm.Opcodes.IRETURN
 import org.objectweb.asm.Opcodes.L2I
@@ -24,7 +25,7 @@ import org.objectweb.asm.Opcodes.LLOAD
 import org.objectweb.asm.Opcodes.LRETURN
 import org.objectweb.asm.Opcodes.RETURN
 import org.objectweb.asm.Opcodes.V19
-import org.schism.invoke.HiddenClassDefiner
+import org.schism.invoke.internalNamePrefix
 import org.schism.reflect.descriptorString
 import org.schism.reflect.internalName
 import java.lang.foreign.FunctionDescriptor
@@ -34,8 +35,7 @@ import java.lang.foreign.MemoryLayout
 import java.lang.foreign.SymbolLookup
 import java.lang.invoke.CallSite
 import java.lang.invoke.ConstantCallSite
-import java.lang.invoke.MethodHandles.Lookup
-import java.lang.invoke.MethodHandles.classData
+import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
 import java.lang.invoke.MethodType.methodType
 import kotlin.jvm.optionals.getOrElse
@@ -46,24 +46,25 @@ import kotlin.reflect.KMutableProperty
 import kotlin.reflect.KProperty
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.jvm.javaMethod
+import kotlin.reflect.typeOf
 
 @Target(AnnotationTarget.PROPERTY_GETTER, AnnotationTarget.PROPERTY_SETTER, AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
 public annotation class NativeFunction(val name: String)
 
 public inline fun <reified T> linkNativeLibrary(symbolLookup: SymbolLookup): T {
-    return linkNativeLibrary(T::class, HiddenClassDefiner(), symbolLookup) as T
+    return linkNativeLibrary(T::class, MethodHandles.lookup(), symbolLookup) as T
 }
 
 @PublishedApi
-internal fun linkNativeLibrary(klass: KClass<*>, definer: HiddenClassDefiner, symbolLookup: SymbolLookup): Any {
+internal fun linkNativeLibrary(klass: KClass<*>, lookup: MethodHandles.Lookup, symbolLookup: SymbolLookup): Any {
     require(klass.java.isInterface) {
         "$klass is not an interface"
     }
 
     val downcallSpecs = mutableListOf<DowncallSpec>()
 
-    val implName = "${definer.internalNamePrefix}${klass.simpleName}Impl"
+    val implName = "${lookup.internalNamePrefix()}${klass.simpleName}Impl"
 
     val implWriter = ClassWriter(COMPUTE_FRAMES)
 
@@ -108,104 +109,138 @@ internal fun linkNativeLibrary(klass: KClass<*>, definer: HiddenClassDefiner, sy
         val argumentLayouts = mutableListOf<MemoryLayout>()
         var nextArgumentLocal = 1
 
-        for ((kParam, jType) in member.parameters.drop(1).zip(javaMethod.parameterTypes)) {
-            val handling = ffiHandlingFor(kParam.type)
+        for ((kParam, jvmType) in member.parameters.drop(1).zip(javaMethod.parameterTypes)) {
+            val type = kParam.type
 
-            argumentLayouts.add(handling.memoryLayout)
+            val abiClass = AbiClass.fromType(type, lookup)
 
-            require(handling.jvmType == jType)
+            if (abiClass.jvmType != jvmType) {
+                throw UnsupportedOperationException("Unexpected JVM type for $kParam: expected ${abiClass.jvmType}, " +
+                    "found $jvmType")
+            }
 
-            when (handling) {
-                FfiHandling.I8AsByte, FfiHandling.I16AsShort, FfiHandling.I32AsInt -> {
+            argumentLayouts.add(abiClass.layout)
+
+            when (abiClass) {
+                AbiClass.JvmByteNativeI8, AbiClass.JvmShortNativeI16, AbiClass.JvmIntNativeI32 -> {
                     methodWriter.visitVarInsn(ILOAD, nextArgumentLocal)
                     nextArgumentLocal += 1
                 }
 
-                FfiHandling.I64AsLong -> {
+                AbiClass.JvmLongNativeI64 -> {
                     methodWriter.visitVarInsn(LLOAD, nextArgumentLocal)
                     nextArgumentLocal += 2
                 }
 
-                FfiHandling.F32AsFloat -> {
+                AbiClass.JvmFloatNativeF32 -> {
                     methodWriter.visitVarInsn(FLOAD, nextArgumentLocal)
                     nextArgumentLocal += 1
                 }
 
-                FfiHandling.F64AsDouble -> {
+                AbiClass.JvmDoubleNativeF64 -> {
                     methodWriter.visitVarInsn(DLOAD, nextArgumentLocal)
                     nextArgumentLocal += 2
                 }
 
-                FfiHandling.I32AsSignedLong, FfiHandling.I32AsUnsignedLong -> {
+                AbiClass.JvmLongNativeI32Sext, AbiClass.JvmLongNativeI32Zext -> {
                     methodWriter.visitVarInsn(LLOAD, nextArgumentLocal)
-                    methodWriter.visitInsn(L2I) // TODO: add range check?
+                    methodWriter.visitInsn(L2I)
                     nextArgumentLocal += 2
                 }
 
-                FfiHandling.Address -> {
+                AbiClass.JvmAddressableNativeAddress, AbiClass.JvmMemoryAddressNativeAddress -> {
                     methodWriter.visitVarInsn(ALOAD, nextArgumentLocal)
+                    nextArgumentLocal += 1
+                }
+
+                is AbiClass.StructByValue -> {
+                    methodWriter.visitVarInsn(ALOAD, nextArgumentLocal)
+
+                    methodWriter.visitMethodInsn(
+                        INVOKEINTERFACE,
+                        Struct.INTERNAL_NAME,
+                        Struct.SEGMENT_METHOD_NAME,
+                        Struct.SEGMENT_METHOD_DESCRIPTOR,
+                        true,
+                    )
+
                     nextArgumentLocal += 1
                 }
             }
         }
 
-        val visitReturn: MethodVisitor.() -> Unit
         val returnLayout: MemoryLayout?
+        val visitReturn: MethodVisitor.() -> Unit
 
-        if (member.returnType.classifier == Unit::class) {
-            require(javaMethod.returnType == Void.TYPE)
-            visitReturn = { visitInsn(RETURN) }
-            returnLayout = null
-        } else {
-            val returnHandling = ffiHandlingFor(member.returnType)
-
-            require(returnHandling.jvmType == javaMethod.returnType)
-
-            visitReturn = when (returnHandling) {
-                FfiHandling.I8AsByte, FfiHandling.I16AsShort, FfiHandling.I32AsInt -> {
-                    { visitInsn(IRETURN) }
+        when (val returnType = member.returnType) {
+            typeOf<Unit>() -> {
+                if (javaMethod.returnType != Void.TYPE) {
+                    throw UnsupportedOperationException("Unexpected JVM return type for $member: expected " +
+                        "${Void.TYPE}, found $returnType")
                 }
 
-                FfiHandling.I64AsLong -> {
-                    { visitInsn(LRETURN) }
-                }
-
-                FfiHandling.F32AsFloat -> {
-                    { visitInsn(FRETURN) }
-                }
-
-                FfiHandling.F64AsDouble -> {
-                    { visitInsn(DRETURN) }
-                }
-
-                FfiHandling.I32AsSignedLong -> {
-                    {
-                        visitInsn(I2L)
-                        visitInsn(LRETURN)
-                    }
-                }
-
-                FfiHandling.I32AsUnsignedLong -> {
-                    {
-                        visitInsn(I2L)
-                        visitLdcInsn(0xFFFF_FFFFL)
-                        visitInsn(LAND)
-                        visitInsn(LRETURN)
-                    }
-                }
-
-                FfiHandling.Address -> {
-                    { visitInsn(ARETURN) }
-                }
+                returnLayout = null
+                visitReturn = { visitInsn(RETURN) }
             }
 
-            returnLayout = returnHandling.memoryLayout
+            else -> {
+                val returnAbiClass = AbiClass.fromType(returnType, lookup)
+
+                if (javaMethod.returnType != returnAbiClass.jvmType) {
+                    throw UnsupportedOperationException("Unexpected JVM return type for $member: expected " +
+                        "${returnAbiClass.jvmType}, found $returnType"
+                    )
+                }
+
+                returnLayout = returnAbiClass.layout
+
+                visitReturn = when (returnAbiClass) {
+                    AbiClass.JvmByteNativeI8, AbiClass.JvmShortNativeI16, AbiClass.JvmIntNativeI32 -> {
+                        { visitInsn(IRETURN) }
+                    }
+
+                    AbiClass.JvmLongNativeI64 -> {
+                        { visitInsn(LRETURN) }
+                    }
+
+                    AbiClass.JvmFloatNativeF32 -> {
+                        { visitInsn(FRETURN) }
+                    }
+
+                    AbiClass.JvmDoubleNativeF64 -> {
+                        { visitInsn(DRETURN) }
+                    }
+
+                    AbiClass.JvmLongNativeI32Sext -> {
+                        {
+                            visitInsn(I2L)
+                            visitInsn(LRETURN)
+                        }
+                    }
+
+                    AbiClass.JvmLongNativeI32Zext -> {
+                        {
+                            visitInsn(I2L)
+                            visitLdcInsn(0xFFFF_FFFFL)
+                            visitInsn(LAND)
+                            visitInsn(LRETURN)
+                        }
+                    }
+
+                    AbiClass.JvmAddressableNativeAddress, AbiClass.JvmMemoryAddressNativeAddress -> {
+                        { visitInsn(ARETURN) }
+                    }
+
+                    is AbiClass.StructByValue -> {
+                        TODO("Implement struct return types in downcalls")
+                    }
+                }
+            }
         }
 
-        val functionDescriptor = if (returnLayout != null) {
-            FunctionDescriptor.of(returnLayout, *argumentLayouts.toTypedArray())
-        } else {
-            FunctionDescriptor.ofVoid(*argumentLayouts.toTypedArray())
+        val functionDescriptor = when (returnLayout) {
+            null -> FunctionDescriptor.ofVoid(*argumentLayouts.toTypedArray())
+            else -> FunctionDescriptor.of(returnLayout, *argumentLayouts.toTypedArray())
         }
 
         downcallSpecs.add(DowncallSpec(symbolName, functionDescriptor))
@@ -226,7 +261,12 @@ internal fun linkNativeLibrary(klass: KClass<*>, definer: HiddenClassDefiner, sy
 
     implWriter.visitEnd()
 
-    val implLookup = definer.define(implWriter.toByteArray(), ClassData(symbolLookup, downcallSpecs.toList()))
+    val implLookup = lookup.defineHiddenClassWithClassData(
+        implWriter.toByteArray(),
+        ClassData(symbolLookup, downcallSpecs),
+        false,
+    )
+
     return implLookup.findConstructor(implLookup.lookupClass(), methodType(Void.TYPE)).invoke()
 }
 
@@ -235,8 +275,8 @@ private data class DowncallSpec(val symbolName: String, val descriptor: Function
 private data class ClassData(val symbolLookup: SymbolLookup, val downcallSpecs: List<DowncallSpec>)
 
 @OptIn(ExperimentalStdlibApi::class)
-internal fun downcallBootstrap(lookup: Lookup, name: String, type: MethodType, index: Int): CallSite {
-    val (symbolLookup, downcallSpecs) = classData(lookup, "_", ClassData::class.java)
+internal fun downcallBootstrap(lookup: MethodHandles.Lookup, name: String, type: MethodType, index: Int): CallSite {
+    val (symbolLookup, downcallSpecs) = MethodHandles.classData(lookup, "_", ClassData::class.java)
     val (symbolName, descriptor) = downcallSpecs[index]
 
     val symbol = symbolLookup.lookup(symbolName).getOrElse {

@@ -63,17 +63,17 @@ public class MemoryEncoder(public val segment: MemorySegment, public var offset:
     }
 
     public fun putShorts(source: ShortArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, SHORT_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_SHORT, offset, count)
         advance(count * 2L)
     }
 
     public fun putLeShorts(source: ShortArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, LE_SHORT_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_LE_SHORT, offset, count)
         advance(count * 2L)
     }
 
     public fun putBeShorts(source: ShortArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, BE_SHORT_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_BE_SHORT, offset, count)
         advance(count * 2L)
     }
 
@@ -123,17 +123,17 @@ public class MemoryEncoder(public val segment: MemorySegment, public var offset:
     }
 
     public fun putChars(source: CharArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, CHAR_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_CHAR, offset, count)
         advance(count * 2L)
     }
 
     public fun putLeChars(source: CharArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, LE_CHAR_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_LE_CHAR, offset, count)
         advance(count * 2L)
     }
 
     public fun putBeChars(source: CharArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, BE_CHAR_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_BE_CHAR, offset, count)
         advance(count * 2L)
     }
 
@@ -165,17 +165,17 @@ public class MemoryEncoder(public val segment: MemorySegment, public var offset:
     }
 
     public fun putInts(source: IntArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, INT_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_INT, offset, count)
         advance(count * 4L)
     }
 
     public fun putLeInts(source: IntArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, LE_INT_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_LE_INT, offset, count)
         advance(count * 4L)
     }
 
     public fun putBeInts(source: IntArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, BE_INT_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_BE_INT, offset, count)
         advance(count * 4L)
     }
 
@@ -225,17 +225,17 @@ public class MemoryEncoder(public val segment: MemorySegment, public var offset:
     }
 
     public fun putLongs(source: LongArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, LONG_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_LONG, offset, count)
         advance(count * 8L)
     }
 
     public fun putLeLongs(source: LongArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, LE_LONG_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_LE_LONG, offset, count)
         advance(count * 8L)
     }
 
     public fun putBeLongs(source: LongArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, BE_LONG_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_BE_LONG, offset, count)
         advance(count * 8L)
     }
 
@@ -285,17 +285,17 @@ public class MemoryEncoder(public val segment: MemorySegment, public var offset:
     }
 
     public fun putFloats(source: FloatArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, FLOAT_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_FLOAT, offset, count)
         advance(count * 4L)
     }
 
     public fun putLeFloats(source: FloatArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, LE_FLOAT_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_LE_FLOAT, offset, count)
         advance(count * 4L)
     }
 
     public fun putBeFloats(source: FloatArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, BE_FLOAT_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_BE_FLOAT, offset, count)
         advance(count * 4L)
     }
 
@@ -315,17 +315,17 @@ public class MemoryEncoder(public val segment: MemorySegment, public var offset:
     }
 
     public fun putDoubles(source: DoubleArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, DOUBLE_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_DOUBLE, offset, count)
         advance(count * 8L)
     }
 
     public fun putLeDoubles(source: DoubleArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, LE_DOUBLE_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_LE_DOUBLE, offset, count)
         advance(count * 8L)
     }
 
     public fun putBeDoubles(source: DoubleArray, sourceIndex: Int = 0, count: Int = source.size - sourceIndex) {
-        MemorySegment.copy(source, sourceIndex, segment, BE_DOUBLE_LAYOUT, offset, count)
+        MemorySegment.copy(source, sourceIndex, segment, UNALIGNED_BE_DOUBLE, offset, count)
         advance(count * 8L)
     }
 }

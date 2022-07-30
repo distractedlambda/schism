@@ -120,15 +120,15 @@ public inline fun MemorySegment.getUByte(offset: Long = 0): UByte {
 }
 
 public inline fun MemorySegment.getShort(offset: Long = 0): Short {
-    return get(SHORT_LAYOUT, offset)
+    return get(UNALIGNED_SHORT, offset)
 }
 
 public inline fun MemorySegment.getLeShort(offset: Long = 0): Short {
-    return get(LE_SHORT_LAYOUT, offset)
+    return get(UNALIGNED_LE_SHORT, offset)
 }
 
 public inline fun MemorySegment.getBeShort(offset: Long = 0): Short {
-    return get(BE_SHORT_LAYOUT, offset)
+    return get(UNALIGNED_BE_SHORT, offset)
 }
 
 public inline fun MemorySegment.getUShort(offset: Long = 0): UShort {
@@ -144,27 +144,27 @@ public inline fun MemorySegment.getBeUShort(offset: Long = 0): UShort {
 }
 
 public inline fun MemorySegment.getChar(offset: Long = 0): Char {
-    return get(CHAR_LAYOUT, offset)
+    return get(UNALIGNED_CHAR, offset)
 }
 
 public inline fun MemorySegment.getLeChar(offset: Long = 0): Char {
-    return get(LE_CHAR_LAYOUT, offset)
+    return get(UNALIGNED_LE_CHAR, offset)
 }
 
 public inline fun MemorySegment.getBeChar(offset: Long = 0): Char {
-    return get(BE_CHAR_LAYOUT, offset)
+    return get(UNALIGNED_BE_CHAR, offset)
 }
 
 public inline fun MemorySegment.getInt(offset: Long = 0): Int {
-    return get(INT_LAYOUT, offset)
+    return get(UNALIGNED_INT, offset)
 }
 
 public inline fun MemorySegment.getLeInt(offset: Long = 0): Int {
-    return get(LE_INT_LAYOUT, offset)
+    return get(UNALIGNED_LE_INT, offset)
 }
 
 public inline fun MemorySegment.getBeInt(offset: Long = 0): Int {
-    return get(BE_INT_LAYOUT, offset)
+    return get(UNALIGNED_BE_INT, offset)
 }
 
 public inline fun MemorySegment.getUInt(offset: Long = 0): UInt {
@@ -180,15 +180,15 @@ public inline fun MemorySegment.getBeUInt(offset: Long = 0): UInt {
 }
 
 public inline fun MemorySegment.getLong(offset: Long = 0): Long {
-    return get(LONG_LAYOUT, offset)
+    return get(UNALIGNED_LONG, offset)
 }
 
 public inline fun MemorySegment.getLeLong(offset: Long = 0): Long {
-    return get(LE_LONG_LAYOUT, offset)
+    return get(UNALIGNED_LE_LONG, offset)
 }
 
 public inline fun MemorySegment.getBeLong(offset: Long = 0): Long {
-    return get(BE_LONG_LAYOUT, offset)
+    return get(UNALIGNED_BE_LONG, offset)
 }
 
 public inline fun MemorySegment.getULong(offset: Long = 0): ULong {
@@ -204,31 +204,31 @@ public inline fun MemorySegment.getBeULong(offset: Long = 0): ULong {
 }
 
 public inline fun MemorySegment.getFloat(offset: Long = 0): Float {
-    return get(FLOAT_LAYOUT, offset)
+    return get(UNALIGNED_FLOAT, offset)
 }
 
 public inline fun MemorySegment.getLeFloat(offset: Long = 0): Float {
-    return get(LE_FLOAT_LAYOUT, offset)
+    return get(UNALIGNED_LE_FLOAT, offset)
 }
 
 public inline fun MemorySegment.getBeFloat(offset: Long = 0): Float {
-    return get(BE_FLOAT_LAYOUT, offset)
+    return get(UNALIGNED_BE_FLOAT, offset)
 }
 
 public inline fun MemorySegment.getDouble(offset: Long = 0): Double {
-    return get(DOUBLE_LAYOUT, offset)
+    return get(UNALIGNED_DOUBLE, offset)
 }
 
 public inline fun MemorySegment.getLeDouble(offset: Long = 0): Double {
-    return get(LE_DOUBLE_LAYOUT, offset)
+    return get(UNALIGNED_LE_DOUBLE, offset)
 }
 
 public inline fun MemorySegment.getBeDouble(offset: Long = 0): Double {
-    return get(BE_DOUBLE_LAYOUT, offset)
+    return get(UNALIGNED_BE_DOUBLE, offset)
 }
 
 public inline fun MemorySegment.getPointer(offset: Long = 0): MemoryAddress {
-    return get(ADDRESS_LAYOUT, offset)
+    return get(UNALIGNED_ADDRESS, offset)
 }
 
 public inline fun MemorySegment.setByte(offset: Long = 0, value: Byte) {
@@ -240,15 +240,15 @@ public inline fun MemorySegment.setUByte(offset: Long = 0, value: UByte) {
 }
 
 public inline fun MemorySegment.setShort(offset: Long = 0, value: Short) {
-    set(SHORT_LAYOUT, offset, value)
+    set(UNALIGNED_SHORT, offset, value)
 }
 
 public inline fun MemorySegment.setLeShort(offset: Long = 0, value: Short) {
-    set(LE_SHORT_LAYOUT, offset, value)
+    set(UNALIGNED_LE_SHORT, offset, value)
 }
 
 public inline fun MemorySegment.setBeShort(offset: Long = 0, value: Short) {
-    set(BE_SHORT_LAYOUT, offset, value)
+    set(UNALIGNED_BE_SHORT, offset, value)
 }
 
 public inline fun MemorySegment.setUShort(offset: Long = 0, value: UShort) {
@@ -264,27 +264,27 @@ public inline fun MemorySegment.setBeUShort(offset: Long = 0, value: UShort) {
 }
 
 public inline fun MemorySegment.setChar(offset: Long = 0, value: Char) {
-    set(CHAR_LAYOUT, offset, value)
+    set(UNALIGNED_CHAR, offset, value)
 }
 
 public inline fun MemorySegment.setLeChar(offset: Long = 0, value: Char) {
-    set(LE_CHAR_LAYOUT, offset, value)
+    set(UNALIGNED_LE_CHAR, offset, value)
 }
 
 public inline fun MemorySegment.setBeChar(offset: Long = 0, value: Char) {
-    set(BE_CHAR_LAYOUT, offset, value)
+    set(UNALIGNED_BE_CHAR, offset, value)
 }
 
 public inline fun MemorySegment.setInt(offset: Long = 0, value: Int) {
-    set(INT_LAYOUT, offset, value)
+    set(UNALIGNED_INT, offset, value)
 }
 
 public inline fun MemorySegment.setLeInt(offset: Long = 0, value: Int) {
-    set(LE_INT_LAYOUT, offset, value)
+    set(UNALIGNED_LE_INT, offset, value)
 }
 
 public inline fun MemorySegment.setBeInt(offset: Long = 0, value: Int) {
-    set(BE_INT_LAYOUT, offset, value)
+    set(UNALIGNED_BE_INT, offset, value)
 }
 
 public inline fun MemorySegment.setUInt(offset: Long = 0, value: UInt) {
@@ -300,15 +300,15 @@ public inline fun MemorySegment.setBeUInt(offset: Long = 0, value: UInt) {
 }
 
 public inline fun MemorySegment.setLong(offset: Long = 0, value: Long) {
-    set(LONG_LAYOUT, offset, value)
+    set(UNALIGNED_LONG, offset, value)
 }
 
 public inline fun MemorySegment.setLeLong(offset: Long = 0, value: Long) {
-    set(LE_LONG_LAYOUT, offset, value)
+    set(UNALIGNED_LE_LONG, offset, value)
 }
 
 public inline fun MemorySegment.setBeLong(offset: Long = 0, value: Long) {
-    set(BE_LONG_LAYOUT, offset, value)
+    set(UNALIGNED_BE_LONG, offset, value)
 }
 
 public inline fun MemorySegment.setULong(offset: Long = 0, value: ULong) {
@@ -324,29 +324,29 @@ public inline fun MemorySegment.setBeULong(offset: Long = 0, value: ULong) {
 }
 
 public inline fun MemorySegment.setFloat(offset: Long = 0, value: Float) {
-    set(FLOAT_LAYOUT, offset, value)
+    set(UNALIGNED_FLOAT, offset, value)
 }
 
 public inline fun MemorySegment.setLeFloat(offset: Long = 0, value: Float) {
-    set(LE_FLOAT_LAYOUT, offset, value)
+    set(UNALIGNED_LE_FLOAT, offset, value)
 }
 
 public inline fun MemorySegment.setBeFloat(offset: Long = 0, value: Float) {
-    set(BE_FLOAT_LAYOUT, offset, value)
+    set(UNALIGNED_BE_FLOAT, offset, value)
 }
 
 public inline fun MemorySegment.setDouble(offset: Long = 0, value: Double) {
-    set(DOUBLE_LAYOUT, offset, value)
+    set(UNALIGNED_DOUBLE, offset, value)
 }
 
 public inline fun MemorySegment.setLeDouble(offset: Long = 0, value: Double) {
-    set(LE_DOUBLE_LAYOUT, offset, value)
+    set(UNALIGNED_LE_DOUBLE, offset, value)
 }
 
 public inline fun MemorySegment.setBeDouble(offset: Long = 0, value: Double) {
-    set(BE_DOUBLE_LAYOUT, offset, value)
+    set(UNALIGNED_BE_DOUBLE, offset, value)
 }
 
 public inline fun MemorySegment.setPointer(offset: Long = 0, value: MemoryAddress) {
-    set(ADDRESS_LAYOUT, offset, value)
+    set(UNALIGNED_ADDRESS, offset, value)
 }

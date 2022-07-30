@@ -1,10 +1,10 @@
 package org.schism.foreign
 
+import kotlinx.atomicfu.locks.withLock
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.ClassWriter.COMPUTE_FRAMES
 import org.objectweb.asm.ConstantDynamic
 import org.objectweb.asm.Handle
-import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes.ACC_FINAL
 import org.objectweb.asm.Opcodes.ACC_PRIVATE
 import org.objectweb.asm.Opcodes.ACC_PUBLIC
@@ -15,12 +15,12 @@ import org.objectweb.asm.Opcodes.DRETURN
 import org.objectweb.asm.Opcodes.FLOAD
 import org.objectweb.asm.Opcodes.FRETURN
 import org.objectweb.asm.Opcodes.GETFIELD
-import org.objectweb.asm.Opcodes.GETSTATIC
 import org.objectweb.asm.Opcodes.H_INVOKESTATIC
 import org.objectweb.asm.Opcodes.I2L
 import org.objectweb.asm.Opcodes.ILOAD
 import org.objectweb.asm.Opcodes.INVOKEINTERFACE
 import org.objectweb.asm.Opcodes.INVOKESPECIAL
+import org.objectweb.asm.Opcodes.INVOKEVIRTUAL
 import org.objectweb.asm.Opcodes.IRETURN
 import org.objectweb.asm.Opcodes.L2I
 import org.objectweb.asm.Opcodes.LAND
@@ -28,16 +28,19 @@ import org.objectweb.asm.Opcodes.LLOAD
 import org.objectweb.asm.Opcodes.LRETURN
 import org.objectweb.asm.Opcodes.RETURN
 import org.objectweb.asm.Opcodes.V19
-import org.schism.invoke.HiddenClassDefiner
+import org.schism.invoke.internalNamePrefix
 import org.schism.math.alignForwardsTo
 import org.schism.math.forwardsAlignmentOffsetTo
 import org.schism.math.plusExact
 import org.schism.math.timesExact
 import org.schism.reflect.descriptorString
 import org.schism.reflect.internalName
+import org.schism.util.asUnchecked
+import org.schism.util.coerceAs
 import java.lang.foreign.GroupLayout
 import java.lang.foreign.MemoryAddress
 import java.lang.foreign.MemoryLayout
+import java.lang.foreign.MemoryLayout.PathElement.groupElement
 import java.lang.foreign.MemoryLayout.paddingLayout
 import java.lang.foreign.MemoryLayout.structLayout
 import java.lang.foreign.MemorySegment
@@ -47,16 +50,21 @@ import java.lang.foreign.ValueLayout
 import java.lang.invoke.CallSite
 import java.lang.invoke.ConstantCallSite
 import java.lang.invoke.MethodHandle
-import java.lang.invoke.MethodHandles.Lookup
-import java.lang.invoke.MethodHandles.classData
+import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
 import java.lang.invoke.MethodType.methodType
+import java.lang.invoke.VarHandle
+import java.lang.reflect.Method
 import java.util.TreeMap
+import java.util.WeakHashMap
+import java.util.concurrent.locks.ReentrantLock
 import kotlin.reflect.KClass
 import kotlin.reflect.KMutableProperty1
+import kotlin.reflect.KProperty
 import kotlin.reflect.KProperty1
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.isSubclassOf
+import kotlin.reflect.jvm.javaField
 import kotlin.reflect.jvm.javaGetter
 import kotlin.reflect.jvm.javaMethod
 import kotlin.reflect.jvm.javaSetter
@@ -65,6 +73,20 @@ public interface Struct {
     public fun type(): StructType<*>
 
     public fun segment(): MemorySegment
+
+    public companion object {
+        internal val INTERNAL_NAME = Struct::class.java.internalName
+
+        internal val DESCRIPTOR = Struct::class.java.descriptorString()
+
+        internal val TYPE_METHOD_NAME = Struct::type.javaMethod!!.name
+
+        internal val TYPE_METHOD_DESCRIPTOR = Struct::type.javaMethod!!.descriptorString
+
+        internal val SEGMENT_METHOD_NAME = Struct::segment.javaMethod!!.name
+
+        internal val SEGMENT_METHOD_DESCRIPTOR = Struct::segment.javaMethod!!.descriptorString
+    }
 }
 
 @Target(AnnotationTarget.PROPERTY)
@@ -75,6 +97,12 @@ public interface StructType<out S : Struct> {
     public val layout: GroupLayout
 
     public fun wrap(segment: MemorySegment): S
+
+    public companion object {
+        internal val INTERNAL_NAME = StructType::class.java.internalName
+
+        internal val DESCRIPTOR = StructType::class.java.descriptorString()
+    }
 }
 
 public fun Struct.address(): MemoryAddress {
@@ -94,438 +122,435 @@ public fun <S : Struct> SegmentAllocator.allocate(type: StructType<S>): S {
 }
 
 public inline fun <reified S : Struct> StructType(): StructType<S> {
-    return StructType(S::class, HiddenClassDefiner())
+    return StructType(S::class, MethodHandles.lookup())
 }
 
 @PublishedApi
-internal fun <S : Struct> StructType(klass: KClass<S>, definer: HiddenClassDefiner): StructType<S> {
-    require(klass.java.isInterface) {
-        "$klass is not an interface"
-    }
-
-    require(klass.isSubclassOf(Struct::class)) {
-        "$klass does not extend ${Struct::class.simpleName}"
-    }
-
-    var size = 0L
-    var alignment = 1L
-
-    val fields = TreeMap<Int, KProperty1<*, *>>()
-
-    klass.members.forEach { member ->
-        val field = (member.findAnnotation<StructField>() ?: return@forEach).index
-
-        require(member is KProperty1<*, *>) {
-            "$member is not a non-extension property"
+internal fun <S : Struct> StructType(klass: KClass<S>, lookup: MethodHandles.Lookup): StructType<S> {
+    structTypeResolvingLock.withLock {
+        resolvedStructTypes[klass.java]?.let {
+            return it.asUnchecked()
         }
 
-        fields.put(field, member)?.let { otherMember ->
-            throw IllegalArgumentException("Field index $field is used by both $member and $otherMember")
+        require(klass.java.isInterface) {
+            "$klass is not an interface"
         }
-    }
 
-    val implName = "${definer.internalNamePrefix}${klass.simpleName}Impl"
-    val implWriter = ClassWriter(COMPUTE_FRAMES)
-    val memberLayouts = mutableListOf<MemoryLayout>()
+        require(klass.isSubclassOf(Struct::class)) {
+            "$klass does not extend ${Struct::class.simpleName}"
+        }
 
-    implWriter.visit(V19, ACC_FINAL, implName, null, AbstractStructImpl.INTERNAL_NAME, arrayOf(klass.java.internalName))
+        var size = 0L
+        var alignment = 1L
 
-    implWriter.visitMethod(ACC_PRIVATE, "<init>", AbstractStructImpl.CONSTRUCTOR_DESCRIPTOR, null, null).apply {
-        visitCode()
+        val fields = TreeMap<Int, KProperty1<*, *>>()
 
-        visitVarInsn(ALOAD, 0)
-        visitVarInsn(ALOAD, 1)
-        visitMethodInsn(
-            INVOKESPECIAL,
+        klass.members.forEach { member ->
+            val field = (member.findAnnotation<StructField>() ?: return@forEach).index
+
+            require(member is KProperty1<*, *>) {
+                "$member is not a non-extension property"
+            }
+
+            fields.put(field, member)?.let { otherMember ->
+                throw IllegalArgumentException("Field index $field is used by both $member and $otherMember")
+            }
+        }
+
+        val implName = "${lookup.internalNamePrefix()}${klass.simpleName}Impl"
+        val implWriter = ClassWriter(COMPUTE_FRAMES)
+        val memberLayouts = mutableListOf<MemoryLayout>()
+
+        implWriter.visit(
+            V19,
+            ACC_FINAL,
+            implName,
+            null,
             AbstractStructImpl.INTERNAL_NAME,
-            "<init>",
-            AbstractStructImpl.CONSTRUCTOR_DESCRIPTOR,
-            false,
+            arrayOf(klass.java.internalName),
         )
 
-        visitInsn(RETURN)
-        visitMaxs(0, 0)
-        visitEnd()
-    }
-
-    implWriter.visitMethod(
-        ACC_PUBLIC,
-        AbstractStructImpl.TYPE_NAME,
-        AbstractStructImpl.TYPE_DESCRIPTOR,
-        null,
-        null,
-    ).apply {
-        visitCode()
-        visitLdcInsn(TYPE_CONSTANT)
-        visitInsn(ARETURN)
-        visitMaxs(0, 0)
-        visitEnd()
-    }
-
-    fields.values.forEach { property ->
-        val getter = property.javaGetter
-        val setter = (property as? KMutableProperty1)?.javaSetter
-
-        requireNotNull(getter) {
-            "$property has no getter"
-        }
-
-        val handling = ffiHandlingFor(property.returnType)
-        val offset = size.alignForwardsTo(handling.memoryLayout.byteAlignment())
-
-        if (offset != size) {
-            memberLayouts.add(paddingLayout((offset - size) timesExact 8))
-        }
-
-        memberLayouts.add(handling.memoryLayout.withName(property.name))
-        size = offset plusExact handling.memoryLayout.byteSize()
-        alignment = maxOf(alignment, handling.memoryLayout.byteAlignment())
-
-        implWriter.visitMethod(ACC_PUBLIC, getter.name, getter.descriptorString, null, null).apply {
+        implWriter.visitMethod(ACC_PRIVATE, "<init>", AbstractStructImpl.CONSTRUCTOR_DESCRIPTOR, null, null).apply {
             visitCode()
 
             visitVarInsn(ALOAD, 0)
-            visitFieldInsn(
-                GETFIELD,
+            visitVarInsn(ALOAD, 1)
+            visitMethodInsn(
+                INVOKESPECIAL,
                 AbstractStructImpl.INTERNAL_NAME,
-                AbstractStructImpl.SEGMENT_FIELD_NAME,
-                MEMORY_SEGMENT_DESCRIPTOR,
+                "<init>",
+                AbstractStructImpl.CONSTRUCTOR_DESCRIPTOR,
+                false,
             )
 
-            visitLoadValueLayout(handling)
-
-            visitLdcInsn(offset)
-
-            when (handling) {
-                FfiHandling.I8AsByte -> visitMethodInsn(
-                    INVOKEINTERFACE,
-                    MEMORY_SEGMENT_INTERNAL_NAME,
-                    "get",
-                    "(${VALUE_LAYOUT_OF_BYTE_DESCRIPTOR}J)B",
-                    true,
-                )
-
-                FfiHandling.I16AsShort -> visitMethodInsn(
-                    INVOKEINTERFACE,
-                    MEMORY_SEGMENT_INTERNAL_NAME,
-                    "get",
-                    "(${VALUE_LAYOUT_OF_SHORT_DESCRIPTOR}J)S",
-                    true,
-                )
-
-                FfiHandling.I32AsInt, FfiHandling.I32AsSignedLong, FfiHandling.I32AsUnsignedLong -> visitMethodInsn(
-                    INVOKEINTERFACE,
-                    MEMORY_SEGMENT_INTERNAL_NAME,
-                    "get",
-                    "(${VALUE_LAYOUT_OF_INT_DESCRIPTOR}J)I",
-                    true,
-                )
-
-                FfiHandling.I64AsLong -> visitMethodInsn(
-                    INVOKEINTERFACE,
-                    MEMORY_SEGMENT_INTERNAL_NAME,
-                    "get",
-                    "(${VALUE_LAYOUT_OF_LONG_DESCRIPTOR}J)L",
-                    true,
-                )
-
-                FfiHandling.F32AsFloat -> visitMethodInsn(
-                    INVOKEINTERFACE,
-                    MEMORY_SEGMENT_INTERNAL_NAME,
-                    "get",
-                    "(${VALUE_LAYOUT_OF_FLOAT_DESCRIPTOR}J)F",
-                    true,
-                )
-
-                FfiHandling.F64AsDouble -> visitMethodInsn(
-                    INVOKEINTERFACE,
-                    MEMORY_SEGMENT_INTERNAL_NAME,
-                    "get",
-                    "(${VALUE_LAYOUT_OF_DOUBLE_DESCRIPTOR}J)D",
-                    true,
-                )
-
-                FfiHandling.Address -> visitMethodInsn(
-                    INVOKEINTERFACE,
-                    MEMORY_SEGMENT_INTERNAL_NAME,
-                    "get",
-                    "(${VALUE_LAYOUT_OF_ADDRESS_DESCRIPTOR}J)$MEMORY_ADDRESS_DESCRIPTOR",
-                    true,
-                )
-            }
-
-            when (handling) {
-                FfiHandling.I8AsByte, FfiHandling.I16AsShort, FfiHandling.I32AsInt -> {
-                    visitInsn(IRETURN)
-                }
-
-                FfiHandling.I64AsLong -> {
-                    visitInsn(LRETURN)
-                }
-
-                FfiHandling.F32AsFloat -> {
-                    visitInsn(FRETURN)
-                }
-
-                FfiHandling.F64AsDouble -> {
-                    visitInsn(DRETURN)
-                }
-
-                FfiHandling.I32AsSignedLong -> {
-                    visitInsn(I2L)
-                    visitInsn(LRETURN)
-                }
-
-                FfiHandling.I32AsUnsignedLong -> {
-                    visitInsn(I2L)
-                    visitLdcInsn(0xFFFF_FFFFL)
-                    visitInsn(LAND)
-                    visitInsn(LRETURN)
-                }
-
-                FfiHandling.Address -> {
-                    visitInsn(ARETURN)
-                }
-            }
-
+            visitInsn(RETURN)
             visitMaxs(0, 0)
             visitEnd()
         }
 
-        if (setter != null) {
-            implWriter.visitMethod(ACC_PUBLIC, setter.name, setter.descriptorString, null, null).apply {
+        implWriter.visitMethod(ACC_PUBLIC, Struct.TYPE_METHOD_NAME, Struct.TYPE_METHOD_DESCRIPTOR, null, null).apply {
+            visitCode()
+            visitLdcInsn(TYPE_CONSTANT)
+            visitInsn(ARETURN)
+            visitMaxs(0, 0)
+            visitEnd()
+        }
+
+        fields.values.forEach { property ->
+            val getter = property.javaGetter
+            val setter = (property as? KMutableProperty1)?.javaSetter
+
+            requireNotNull(getter) {
+                "$property has no getter"
+            }
+
+            val type = property.returnType
+
+            val abiClass = AbiClass.fromType(property.returnType, lookup)
+
+            if (abiClass !is AbiClass.StructMemberAllowable) {
+                throw UnsupportedOperationException("$type is not allowed for struct members")
+            }
+
+            if (abiClass is AbiClass.StructByValue) {
+                TODO("Implement struct members")
+            }
+
+            val offset = size.alignForwardsTo(abiClass.layout.byteAlignment())
+
+            if (offset != size) {
+                memberLayouts.add(paddingLayout((offset - size) timesExact 8))
+            }
+
+            memberLayouts.add(abiClass.layout.withName(property.name))
+            size = offset plusExact abiClass.layout.byteSize()
+            alignment = maxOf(alignment, abiClass.layout.byteAlignment())
+
+            val nativeVarHandleConstant = ConstantDynamic(
+                property.name,
+                VarHandle::class.java.descriptorString(),
+                NATIVE_MEMBER_BOOTSTRAP,
+            )
+
+            implWriter.visitMethod(ACC_PUBLIC, getter.name, getter.descriptorString, null, null).apply {
                 visitCode()
 
+                visitLdcInsn(nativeVarHandleConstant)
+
                 visitVarInsn(ALOAD, 0)
+
                 visitFieldInsn(
                     GETFIELD,
                     AbstractStructImpl.INTERNAL_NAME,
-                    MEMORY_SEGMENT_INTERNAL_NAME,
-                    MEMORY_SEGMENT_DESCRIPTOR,
+                    AbstractStructImpl.SEGMENT_FIELD_NAME,
+                    AbstractStructImpl.SEGMENT_FIELD_DESCRIPTOR,
                 )
 
-                visitLoadValueLayout(handling)
-
-                visitLdcInsn(offset)
-
-                when (handling) {
-                    FfiHandling.I8AsByte, FfiHandling.I16AsShort, FfiHandling.I32AsInt -> {
-                        visitVarInsn(ILOAD, 1)
-                    }
-
-                    FfiHandling.I64AsLong -> {
-                        visitVarInsn(LLOAD, 1)
-                    }
-
-                    FfiHandling.F32AsFloat -> {
-                        visitVarInsn(FLOAD, 1)
-                    }
-
-                    FfiHandling.F64AsDouble -> {
-                        visitVarInsn(DLOAD, 1)
-                    }
-
-                    FfiHandling.I32AsSignedLong, FfiHandling.I32AsUnsignedLong -> {
-                        visitVarInsn(LLOAD, 1)
-                        visitInsn(L2I)
-                    }
-
-                    FfiHandling.Address -> {
-                        visitVarInsn(ALOAD, 1)
-                    }
-                }
-
-                when (handling) {
-                    FfiHandling.I8AsByte -> visitMethodInsn(
-                        INVOKEINTERFACE,
-                        MEMORY_SEGMENT_INTERNAL_NAME,
-                        "set",
-                        "(${VALUE_LAYOUT_OF_BYTE_DESCRIPTOR}JB)V",
+                when (abiClass) {
+                    AbiClass.JvmByteNativeI8 -> visitMethodInsn(
+                        INVOKEVIRTUAL,
+                        MemorySegment::class.java.internalName,
+                        "get",
+                        "(${ValueLayout.OfByte::class.java.descriptorString()}J)B",
                         true,
                     )
 
-                    FfiHandling.I16AsShort -> visitMethodInsn(
+                    AbiClass.JvmShortNativeI16 -> visitMethodInsn(
                         INVOKEINTERFACE,
-                        MEMORY_SEGMENT_INTERNAL_NAME,
-                        "set",
-                        "(${VALUE_LAYOUT_OF_SHORT_DESCRIPTOR}JS)V",
+                        MemorySegment::class.java.internalName,
+                        "get",
+                        "(${ValueLayout.OfShort::class.java.descriptorString()}J)S",
                         true,
                     )
 
-                    FfiHandling.I32AsInt, FfiHandling.I32AsSignedLong, FfiHandling.I32AsUnsignedLong -> visitMethodInsn(
+                    AbiClass.JvmIntNativeI32,
+                    AbiClass.JvmLongNativeI32Sext,
+                    AbiClass.JvmLongNativeI32Zext -> visitMethodInsn(
                         INVOKEINTERFACE,
-                        MEMORY_SEGMENT_INTERNAL_NAME,
-                        "set",
-                        "(${VALUE_LAYOUT_OF_INT_DESCRIPTOR}JI)V",
+                        MemorySegment::class.java.internalName,
+                        "get",
+                        "(${ValueLayout.OfInt::class.java.descriptorString()}J)I",
                         true,
                     )
 
-                    FfiHandling.I64AsLong -> visitMethodInsn(
+                    AbiClass.JvmLongNativeI64 -> visitMethodInsn(
                         INVOKEINTERFACE,
-                        MEMORY_SEGMENT_INTERNAL_NAME,
-                        "set",
-                        "(${VALUE_LAYOUT_OF_LONG_DESCRIPTOR}JJ)V",
+                        MemorySegment::class.java.internalName,
+                        "get",
+                        "(${ValueLayout.OfLong::class.java.descriptorString()}J)L",
                         true,
                     )
 
-                    FfiHandling.F32AsFloat -> visitMethodInsn(
+                    AbiClass.JvmFloatNativeF32 -> visitMethodInsn(
                         INVOKEINTERFACE,
-                        MEMORY_SEGMENT_INTERNAL_NAME,
-                        "set",
-                        "(${VALUE_LAYOUT_OF_FLOAT_DESCRIPTOR}JF)V",
+                        MemorySegment::class.java.internalName,
+                        "get",
+                        "(${ValueLayout.OfFloat::class.java.descriptorString()}J)F",
                         true,
                     )
 
-                    FfiHandling.F64AsDouble -> visitMethodInsn(
+                    AbiClass.JvmDoubleNativeF64 -> visitMethodInsn(
                         INVOKEINTERFACE,
-                        MEMORY_SEGMENT_INTERNAL_NAME,
-                        "set",
-                        "(${VALUE_LAYOUT_OF_DOUBLE_DESCRIPTOR}JD)V",
+                        MemorySegment::class.java.internalName,
+                        "get",
+                        "(${ValueLayout.OfDouble::class.java.descriptorString()}J)D",
                         true,
                     )
 
-                    FfiHandling.Address -> visitMethodInsn(
+                    AbiClass.JvmMemoryAddressNativeAddress -> visitMethodInsn(
                         INVOKEINTERFACE,
-                        MEMORY_SEGMENT_INTERNAL_NAME,
-                        "set",
-                        "(${VALUE_LAYOUT_OF_ADDRESS_DESCRIPTOR}J${MEMORY_ADDRESS_DESCRIPTOR})V",
+                        MemorySegment::class.java.internalName,
+                        "get",
+                        "(${ValueLayout.OfAddress::class.java.descriptorString()}J)" +
+                            MemorySegment::class.java.descriptorString(),
                         true,
                     )
                 }
 
-                visitInsn(RETURN)
+                when (abiClass) {
+                    AbiClass.JvmByteNativeI8, AbiClass.JvmShortNativeI16, AbiClass.JvmIntNativeI32 -> {
+                        visitInsn(IRETURN)
+                    }
+
+                    AbiClass.JvmLongNativeI64 -> {
+                        visitInsn(LRETURN)
+                    }
+
+                    AbiClass.JvmFloatNativeF32 -> {
+                        visitInsn(FRETURN)
+                    }
+
+                    AbiClass.JvmDoubleNativeF64 -> {
+                        visitInsn(DRETURN)
+                    }
+
+                    AbiClass.JvmLongNativeI32Sext -> {
+                        visitInsn(I2L)
+                        visitInsn(LRETURN)
+                    }
+
+                    AbiClass.JvmLongNativeI32Zext -> {
+                        visitInsn(I2L)
+                        visitLdcInsn(0xFFFF_FFFFL)
+                        visitInsn(LAND)
+                        visitInsn(LRETURN)
+                    }
+
+                    AbiClass.JvmMemoryAddressNativeAddress -> {
+                        visitInsn(ARETURN)
+                    }
+
+                    AbiClass.JvmAddressableNativeAddress, is AbiClass.StructByValue -> {
+                        throw AssertionError()
+                    }
+                }
+
                 visitMaxs(0, 0)
                 visitEnd()
             }
+
+            if (setter != null) {
+                implWriter.visitMethod(ACC_PUBLIC, setter.name, setter.descriptorString, null, null).apply {
+                    visitCode()
+
+                    visitVarInsn(ALOAD, 0)
+                    visitFieldInsn(
+                        GETFIELD,
+                        AbstractStructImpl::class.java.internalName,
+                        coerceAs<KProperty<*>>(AbstractStructImpl::segment).javaField!!.name,
+                        MemorySegment::class.java.descriptorString(),
+                    )
+
+                    visitLoadValueLayout(abiClass)
+
+                    visitLdcInsn(offset)
+
+                    when (abiClass) {
+                        AbiClass.JvmByteNativeI8, AbiClass.JvmShortNativeI16, AbiClass.JvmIntNativeI32 -> {
+                            visitVarInsn(ILOAD, 1)
+                        }
+
+                        AbiClass.JvmLongNativeI64 -> {
+                            visitVarInsn(LLOAD, 1)
+                        }
+
+                        AbiClass.JvmFloatNativeF32 -> {
+                            visitVarInsn(FLOAD, 1)
+                        }
+
+                        AbiClass.JvmDoubleNativeF64 -> {
+                            visitVarInsn(DLOAD, 1)
+                        }
+
+                        AbiClass.JvmLongNativeI32Sext, AbiClass.JvmLongNativeI32Zext -> {
+                            visitVarInsn(LLOAD, 1)
+                            visitInsn(L2I)
+                        }
+
+                        AbiClass.JvmMemoryAddressNativeAddress -> {
+                            visitVarInsn(ALOAD, 1)
+                        }
+
+                        AbiClass.JvmAddressableNativeAddress, is AbiClass.StructByValue -> {
+                            throw AssertionError()
+                        }
+                    }
+
+                    when (abiClass) {
+                        AbiClass.JvmByteNativeI8 -> visitMethodInsn(
+                            INVOKEINTERFACE,
+                            MemorySegment::class.java.internalName,
+                            "set",
+                            "(${ValueLayout.OfByte::class.java.descriptorString()}JB)V",
+                            true,
+                        )
+
+                        AbiClass.JvmShortNativeI16 -> visitMethodInsn(
+                            INVOKEINTERFACE,
+                            MemorySegment::class.java.internalName,
+                            "set",
+                            "(${ValueLayout.OfShort::class.java.descriptorString()}JS)V",
+                            true,
+                        )
+
+                        AbiClass.JvmIntNativeI32,
+                        AbiClass.JvmLongNativeI32Sext,
+                        AbiClass.JvmLongNativeI32Zext -> visitMethodInsn(
+                            INVOKEINTERFACE,
+                            MemorySegment::class.java.internalName,
+                            "set",
+                            "(${ValueLayout.OfInt::class.java.descriptorString()}JI)V",
+                            true,
+                        )
+
+                        AbiClass.JvmLongNativeI64 -> visitMethodInsn(
+                            INVOKEINTERFACE,
+                            MemorySegment::class.java.internalName,
+                            "set",
+                            "(${ValueLayout.OfLong::class.java.descriptorString()}JJ)V",
+                            true,
+                        )
+
+                        AbiClass.JvmFloatNativeF32 -> visitMethodInsn(
+                            INVOKEINTERFACE,
+                            MemorySegment::class.java.internalName,
+                            "set",
+                            "(${ValueLayout.OfFloat::class.java.descriptorString()}JF)V",
+                            true,
+                        )
+
+                        AbiClass.JvmDoubleNativeF64 -> visitMethodInsn(
+                            INVOKEINTERFACE,
+                            MemorySegment::class.java.internalName,
+                            "set",
+                            "(${ValueLayout.OfDouble::class.java.descriptorString()}JD)V",
+                            true,
+                        )
+
+                        AbiClass.JvmMemoryAddressNativeAddress -> visitMethodInsn(
+                            INVOKEINTERFACE,
+                            MemorySegment::class.java.internalName,
+                            "set",
+                            "(${ValueLayout.OfAddress::class.java.descriptorString()}J" +
+                                "${MemoryAddress::class.java.internalName})V",
+                            true,
+                        )
+
+                        AbiClass.JvmAddressableNativeAddress, is AbiClass.StructByValue -> {
+                            throw AssertionError()
+                        }
+                    }
+
+                    visitInsn(RETURN)
+                    visitMaxs(0, 0)
+                    visitEnd()
+                }
+            }
+        }
+
+        val finalPadding = size.forwardsAlignmentOffsetTo(alignment)
+
+        if (finalPadding != 0L) {
+            memberLayouts.add(paddingLayout(finalPadding timesExact 8))
+            size += finalPadding
+        }
+
+        implWriter.visitEnd()
+
+        val layout = structLayout(*memberLayouts.toTypedArray())
+
+        val implClassData = StructClassData()
+
+        val implLookup = lookup.defineHiddenClassWithClassData(implWriter.toByteArray(), implClassData, false)
+
+        val implConstructor = implLookup
+            .findConstructor(implLookup.lookupClass(), methodType(Void.TYPE, MemorySegment::class.java))
+            .asType(methodType(Struct::class.java, MemorySegment::class.java))
+
+        val typeImplName = "${lookup.internalNamePrefix()}${klass.simpleName}TypeImpl"
+        val typeImplWriter = ClassWriter(COMPUTE_FRAMES)
+
+        typeImplWriter.visit(V19, ACC_FINAL, typeImplName, null, AbstractStructTypeImpl::class.java.internalName, null)
+
+        typeImplWriter.visitMethod(
+            ACC_PRIVATE,
+            "<init>",
+            AbstractStructImpl::class.java.constructors.single().descriptorString,
+            null,
+            null,
+        ).apply {
+            visitCode()
+
+            visitVarInsn(ALOAD, 0)
+            visitLdcInsn(LAYOUT_CONSTANT)
+            visitMethodInsn(
+                INVOKESPECIAL,
+                AbstractStructTypeImpl::class.java.internalName,
+                "<init>",
+                AbstractStructTypeImpl::class.java.constructors.single().descriptorString,
+                false,
+            )
+
+            visitInsn(RETURN)
+            visitMaxs(0, 0)
+            visitEnd()
+        }
+
+        typeImplWriter.visitMethod(
+            ACC_PUBLIC,
+            AbstractStructTypeImpl::wrap
+            AbstractStructTypeImpl.WRAP_SAFE_DESCRIPTOR,
+            null,
+            null,
+        ).apply {
+            visitCode()
+            visitVarInsn(ALOAD, 1)
+            visitInvokeDynamicInsn("_", AbstractStructTypeImpl.WRAP_SAFE_DESCRIPTOR, WRAP_BOOTSTRAP)
+            visitInsn(ARETURN)
+            visitMaxs(0, 0)
+            visitEnd()
+        }
+
+        typeImplWriter.visitEnd()
+
+        val typeImplLookup = definer.define(
+            typeImplWriter.toByteArray(),
+            classData = StructTypeClassData(implConstructor, layout),
+        )
+
+        val type = typeImplLookup
+            .findConstructor(typeImplLookup.lookupClass(), methodType(Void.TYPE))
+            .invoke() as StructType<S>
+
+        return type.also {
+            implClassData.type = it
         }
     }
-
-    val finalPadding = size.forwardsAlignmentOffsetTo(alignment)
-
-    if (finalPadding != 0L) {
-        memberLayouts.add(paddingLayout(finalPadding timesExact 8))
-        size += finalPadding
-    }
-
-    implWriter.visitEnd()
-
-    val layout = structLayout(*memberLayouts.toTypedArray())
-
-    val implClassData = StructClassData()
-
-    val implLookup = definer.define(implWriter.toByteArray(), classData = implClassData)
-
-    val implConstructor = implLookup
-        .findConstructor(implLookup.lookupClass(), methodType(Void.TYPE, MemorySegment::class.java))
-        .asType(methodType(Struct::class.java, MemorySegment::class.java))
-
-    val typeImplName = "${definer.internalNamePrefix}${klass.simpleName}TypeImpl"
-    val typeImplWriter = ClassWriter(COMPUTE_FRAMES)
-
-    typeImplWriter.visit(V19, ACC_FINAL, typeImplName, null, AbstractStructTypeImpl.INTERNAL_NAME, null)
-
-    typeImplWriter.visitMethod(ACC_PRIVATE, "<init>", "()V", null, null).apply {
-        visitCode()
-
-        visitVarInsn(ALOAD, 0)
-        visitLdcInsn(LAYOUT_CONSTANT)
-        visitMethodInsn(
-            INVOKESPECIAL,
-            AbstractStructTypeImpl.INTERNAL_NAME,
-            "<init>",
-            AbstractStructTypeImpl.CONSTRUCTOR_DESCRIPTOR,
-            false,
-        )
-
-        visitInsn(RETURN)
-        visitMaxs(0, 0)
-        visitEnd()
-    }
-
-    typeImplWriter.visitMethod(
-        ACC_PUBLIC,
-        AbstractStructTypeImpl.WRAP_SAFE_NAME,
-        AbstractStructTypeImpl.WRAP_SAFE_DESCRIPTOR,
-        null,
-        null,
-    ).apply {
-        visitCode()
-        visitVarInsn(ALOAD, 1)
-        visitInvokeDynamicInsn("_", AbstractStructTypeImpl.WRAP_SAFE_DESCRIPTOR, WRAP_BOOTSTRAP)
-        visitInsn(ARETURN)
-        visitMaxs(0, 0)
-        visitEnd()
-    }
-
-    typeImplWriter.visitEnd()
-
-    val typeImplLookup = definer.define(
-        typeImplWriter.toByteArray(),
-        classData = StructTypeClassData(implConstructor, layout),
-    )
-
-    @Suppress("UNCHECKED_CAST")
-    val type = typeImplLookup
-        .findConstructor(typeImplLookup.lookupClass(), methodType(Void.TYPE))
-        .invoke() as StructType<S>
-
-    return type.also {
-        implClassData.type = it
-    }
 }
 
-private fun MethodVisitor.visitLoadValueLayout(handling: FfiHandling) {
-    when (handling) {
-        FfiHandling.I8AsByte -> visitFieldInsn(
-            GETSTATIC,
-            VALUE_LAYOUT_INTERNAL_NAME,
-            "JAVA_BYTE",
-            VALUE_LAYOUT_OF_BYTE_DESCRIPTOR,
-        )
+private val structTypeResolvingLock = ReentrantLock()
 
-        FfiHandling.I16AsShort -> visitFieldInsn(
-            GETSTATIC,
-            VALUE_LAYOUT_INTERNAL_NAME,
-            "JAVA_SHORT",
-            VALUE_LAYOUT_OF_SHORT_DESCRIPTOR,
-        )
-
-        FfiHandling.I32AsInt, FfiHandling.I32AsSignedLong, FfiHandling.I32AsUnsignedLong -> visitFieldInsn(
-            GETSTATIC,
-            VALUE_LAYOUT_INTERNAL_NAME,
-            "JAVA_INT",
-            VALUE_LAYOUT_OF_INT_DESCRIPTOR,
-        )
-
-        FfiHandling.I64AsLong -> visitFieldInsn(
-            GETSTATIC,
-            VALUE_LAYOUT_INTERNAL_NAME,
-            "JAVA_LONG",
-            VALUE_LAYOUT_OF_LONG_DESCRIPTOR,
-        )
-
-        FfiHandling.F32AsFloat -> visitFieldInsn(
-            GETSTATIC,
-            VALUE_LAYOUT_INTERNAL_NAME,
-            "JAVA_FLOAT",
-            VALUE_LAYOUT_OF_FLOAT_DESCRIPTOR,
-        )
-
-        FfiHandling.F64AsDouble -> visitFieldInsn(
-            GETSTATIC,
-            VALUE_LAYOUT_INTERNAL_NAME,
-            "JAVA_DOUBLE",
-            VALUE_LAYOUT_OF_DOUBLE_DESCRIPTOR,
-        )
-
-        FfiHandling.Address -> visitFieldInsn(
-            GETSTATIC,
-            VALUE_LAYOUT_INTERNAL_NAME,
-            "ADDRESS",
-            VALUE_LAYOUT_OF_ADDRESS_DESCRIPTOR,
-        )
-    }
-}
+private val resolvedStructTypes = WeakHashMap<Class<out Struct>, StructType<*>>()
 
 internal abstract class AbstractStructImpl(@JvmField protected val segment: MemorySegment) : Struct {
     final override fun segment(): MemorySegment {
@@ -535,13 +560,11 @@ internal abstract class AbstractStructImpl(@JvmField protected val segment: Memo
     companion object {
         val INTERNAL_NAME = AbstractStructImpl::class.java.internalName
 
-        const val SEGMENT_FIELD_NAME = "segment"
+        val CONSTRUCTOR_DESCRIPTOR = AbstractStructImpl::class.java.constructors.single().descriptorString
 
-        val CONSTRUCTOR_DESCRIPTOR = AbstractStructImpl::class.java.declaredConstructors.single().descriptorString
+        val SEGMENT_FIELD_NAME = coerceAs<KProperty<*>>(AbstractStructImpl::segment).javaField!!.name
 
-        val TYPE_NAME = Struct::type.javaMethod!!.name
-
-        val TYPE_DESCRIPTOR = Struct::type.javaMethod!!.descriptorString
+        val SEGMENT_FIELD_DESCRIPTOR = MemorySegment::class.java.descriptorString()
     }
 }
 
@@ -556,24 +579,27 @@ internal abstract class AbstractStructTypeImpl<S : Struct>(final override val la
     companion object {
         val INTERNAL_NAME = AbstractStructTypeImpl::class.java.internalName
 
-        val CONSTRUCTOR_DESCRIPTOR = AbstractStructTypeImpl::class.java.declaredConstructors.single().descriptorString
-
-        val WRAP_SAFE_NAME = AbstractStructTypeImpl<*>::wrapSafe.javaMethod!!.name
-
-        val WRAP_SAFE_DESCRIPTOR = AbstractStructTypeImpl<*>::wrapSafe.javaMethod!!.descriptorString
+        val CONSTRUCTOR_DESCRIPTOR = AbstractStructTypeImpl::class.java.constructors.single().descriptorString
     }
 }
 
-internal fun wrapBootstrap(lookup: Lookup, name: String, type: MethodType): CallSite {
-    return ConstantCallSite(classData(lookup, "_", StructTypeClassData::class.java).instanceConstructor)
+internal fun nativeMemberBootstrap(lookup: MethodHandles.Lookup, name: String, type: Class<VarHandle>): VarHandle {
+    return MethodHandles.classData(lookup, "_", StructClassData::class.java)
+        .type
+        .layout
+        .varHandle(groupElement(name))
 }
 
-internal fun layoutBootstrap(lookup: Lookup, name: String, type: Class<GroupLayout>): GroupLayout {
-    return classData(lookup, "_", StructTypeClassData::class.java).layout
+internal fun wrapBootstrap(lookup: MethodHandles.Lookup, name: String, type: MethodType): CallSite {
+    return ConstantCallSite(MethodHandles.classData(lookup, "_", StructTypeClassData::class.java).instanceConstructor)
 }
 
-internal fun typeBootstrap(lookup: Lookup, name: String, type: Class<StructType<*>>): StructType<*> {
-    return classData(lookup, "_", StructClassData::class.java).type
+internal fun layoutBootstrap(lookup: MethodHandles.Lookup, name: String, type: Class<GroupLayout>): GroupLayout {
+    return MethodHandles.classData(lookup, "_", StructTypeClassData::class.java).layout
+}
+
+internal fun typeBootstrap(lookup: MethodHandles.Lookup, name: String, type: Class<StructType<*>>): StructType<*> {
+    return MethodHandles.classData(lookup, "_", StructClassData::class.java).type
 }
 
 private class StructClassData {
@@ -582,62 +608,24 @@ private class StructClassData {
 
 private data class StructTypeClassData(val instanceConstructor: MethodHandle, val layout: GroupLayout)
 
-private val WRAP_BOOTSTRAP = ::wrapBootstrap.javaMethod!!.let { javaMethod ->
-    Handle(
+private fun Method.asBootstrapHandle(): Handle {
+    return Handle(
         H_INVOKESTATIC,
-        javaMethod.declaringClass.internalName,
-        javaMethod.name,
-        javaMethod.descriptorString,
+        declaringClass.internalName,
+        name,
+        descriptorString,
         false,
     )
 }
 
-private val LAYOUT_CONSTANT = ::layoutBootstrap.javaMethod!!.let { javaMethod ->
-    ConstantDynamic(
-        "_",
-        GroupLayout::class.java.descriptorString(),
-        Handle(
-            H_INVOKESTATIC,
-            javaMethod.declaringClass.internalName,
-            javaMethod.name,
-            javaMethod.descriptorString,
-            false,
-        ),
-    )
-}
+private val NATIVE_MEMBER_BOOTSTRAP = ::nativeMemberBootstrap.javaMethod!!.asBootstrapHandle()
 
-private val TYPE_CONSTANT = ::typeBootstrap.javaMethod!!.let { javaMethod ->
-    ConstantDynamic(
-        "_",
-        StructType::class.java.descriptorString(),
-        Handle(
-            H_INVOKESTATIC,
-            javaMethod.declaringClass.internalName,
-            javaMethod.name,
-            javaMethod.descriptorString,
-            false,
-        ),
-    )
-}
+private val WRAP_BOOTSTRAP = ::wrapBootstrap.javaMethod!!.asBootstrapHandle()
 
-private val MEMORY_ADDRESS_DESCRIPTOR = MemoryAddress::class.java.descriptorString()
+private val LAYOUT_CONSTANT = ::layoutBootstrap.javaMethod!!.asBootstrapHandle()
 
-private val MEMORY_SEGMENT_INTERNAL_NAME = MemorySegment::class.java.internalName
-
-private val MEMORY_SEGMENT_DESCRIPTOR = MemorySegment::class.java.descriptorString()
-
-private val VALUE_LAYOUT_INTERNAL_NAME = ValueLayout::class.java.internalName
-
-private val VALUE_LAYOUT_OF_BYTE_DESCRIPTOR = ValueLayout.OfByte::class.java.descriptorString()
-
-private val VALUE_LAYOUT_OF_SHORT_DESCRIPTOR = ValueLayout.OfShort::class.java.descriptorString()
-
-private val VALUE_LAYOUT_OF_INT_DESCRIPTOR = ValueLayout.OfInt::class.java.descriptorString()
-
-private val VALUE_LAYOUT_OF_LONG_DESCRIPTOR = ValueLayout.OfLong::class.java.descriptorString()
-
-private val VALUE_LAYOUT_OF_FLOAT_DESCRIPTOR = ValueLayout.OfFloat::class.java.descriptorString()
-
-private val VALUE_LAYOUT_OF_DOUBLE_DESCRIPTOR = ValueLayout.OfDouble::class.java.descriptorString()
-
-private val VALUE_LAYOUT_OF_ADDRESS_DESCRIPTOR = ValueLayout.OfAddress::class.java.descriptorString()
+private val TYPE_CONSTANT = ConstantDynamic(
+    "_",
+    StructType.DESCRIPTOR,
+    ::typeBootstrap.javaMethod!!.asBootstrapHandle(),
+)
