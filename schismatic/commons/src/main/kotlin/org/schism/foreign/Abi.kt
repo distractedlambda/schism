@@ -18,62 +18,29 @@ internal enum class IntOrLong {
 }
 
 internal sealed class AbiClass(val layout: MemoryLayout, val jvmType: Class<*>) {
-    object JvmByteNativeI8 :
-        AbiClass(ValueLayout.JAVA_BYTE, Byte::class.java),
-        Scalar,
-        StructMemberAllowable
+    object JvmByteNativeI8 : AbiClass(ValueLayout.JAVA_BYTE, Byte::class.java), Scalar
 
-    object JvmShortNativeI16 :
-        AbiClass(ValueLayout.JAVA_SHORT, Short::class.java),
-        Scalar,
-        StructMemberAllowable
+    object JvmShortNativeI16 : AbiClass(ValueLayout.JAVA_SHORT, Short::class.java), Scalar
 
-    object JvmIntNativeI32 :
-        AbiClass(ValueLayout.JAVA_INT, Int::class.java),
-        Scalar,
-        StructMemberAllowable
+    object JvmIntNativeI32 : AbiClass(ValueLayout.JAVA_INT, Int::class.java), Scalar
 
-    object JvmLongNativeI64 :
-        AbiClass(ValueLayout.JAVA_LONG, Long::class.java),
-        Scalar,
-        StructMemberAllowable
+    object JvmLongNativeI64 : AbiClass(ValueLayout.JAVA_LONG, Long::class.java), Scalar
 
-    object JvmLongNativeI32Sext :
-        AbiClass(ValueLayout.JAVA_INT, Long::class.java),
-        Scalar,
-        StructMemberAllowable
+    object JvmLongNativeI32Sext : AbiClass(ValueLayout.JAVA_INT, Long::class.java), Scalar
 
-    object JvmLongNativeI32Zext :
-        AbiClass(ValueLayout.JAVA_INT, Long::class.java),
-        Scalar,
-        StructMemberAllowable
+    object JvmLongNativeI32Zext : AbiClass(ValueLayout.JAVA_INT, Long::class.java), Scalar
 
-    object JvmFloatNativeF32 :
-        AbiClass(ValueLayout.JAVA_FLOAT, Float::class.java),
-        Scalar,
-        StructMemberAllowable
+    object JvmFloatNativeF32 : AbiClass(ValueLayout.JAVA_FLOAT, Float::class.java), Scalar
 
-    object JvmDoubleNativeF64 :
-        AbiClass(ValueLayout.JAVA_DOUBLE, Double::class.java),
-        Scalar,
-        StructMemberAllowable
+    object JvmDoubleNativeF64 : AbiClass(ValueLayout.JAVA_DOUBLE, Double::class.java), Scalar
 
-    object JvmAddressableNativeAddress :
-        AbiClass(ValueLayout.ADDRESS, Addressable::class.java),
-        Scalar
+    object JvmAddressableNativeAddress : AbiClass(ValueLayout.ADDRESS, Addressable::class.java), Scalar
 
-    object JvmMemoryAddressNativeAddress :
-        AbiClass(ValueLayout.ADDRESS, MemoryAddress::class.java),
-        Scalar,
-        StructMemberAllowable
+    object JvmMemoryAddressNativeAddress : AbiClass(ValueLayout.ADDRESS, MemoryAddress::class.java), Scalar
 
-    data class StructByValue(val clazz: Class<*>, val type: StructType<*>) :
-        AbiClass(type.layout, clazz),
-        StructMemberAllowable
+    data class StructByValue(val clazz: Class<*>, val type: StructType<*>) : AbiClass(type.layout, clazz)
 
     sealed interface Scalar
-
-    sealed interface StructMemberAllowable
 
     companion object {
         fun fromType(type: KType, lookup: MethodHandles.Lookup): AbiClass = when {

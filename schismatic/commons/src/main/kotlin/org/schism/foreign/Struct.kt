@@ -37,6 +37,7 @@ import org.schism.reflect.descriptorString
 import org.schism.reflect.internalName
 import org.schism.util.asUnchecked
 import org.schism.util.coerceAs
+import java.lang.foreign.Addressable
 import java.lang.foreign.GroupLayout
 import java.lang.foreign.MemoryAddress
 import java.lang.foreign.MemoryLayout
@@ -204,15 +205,9 @@ internal fun <S : Struct> StructType(klass: KClass<S>, lookup: MethodHandles.Loo
                 "$property has no getter"
             }
 
-            val type = property.returnType
-
             val abiClass = AbiClass.fromType(property.returnType, lookup)
 
-            if (abiClass !is AbiClass.StructMemberAllowable) {
-                throw UnsupportedOperationException("$type is not allowed for struct members")
-            }
-
-            if (abiClass is AbiClass.StructByValue) {
+            if (abiClass !is AbiClass.Scalar) {
                 TODO("Implement struct members")
             }
 
@@ -228,7 +223,7 @@ internal fun <S : Struct> StructType(klass: KClass<S>, lookup: MethodHandles.Loo
 
             val nativeVarHandleConstant = ConstantDynamic(
                 property.name,
-                VarHandle::class.java.descriptorString(),
+                VAR_HANDLE_INTERNAL_NAME,
                 NATIVE_MEMBER_BOOTSTRAP,
             )
 
@@ -246,69 +241,45 @@ internal fun <S : Struct> StructType(klass: KClass<S>, lookup: MethodHandles.Loo
                     AbstractStructImpl.SEGMENT_FIELD_DESCRIPTOR,
                 )
 
-                when (abiClass) {
-                    AbiClass.JvmByteNativeI8 -> visitMethodInsn(
-                        INVOKEVIRTUAL,
-                        MemorySegment::class.java.internalName,
-                        "get",
-                        "(${ValueLayout.OfByte::class.java.descriptorString()}J)B",
-                        true,
-                    )
+                val nativeGetDescriptor = when (abiClass) {
+                    AbiClass.JvmByteNativeI8 -> {
+                        GET_BYTE_DESCRIPTOR
+                    }
 
-                    AbiClass.JvmShortNativeI16 -> visitMethodInsn(
-                        INVOKEINTERFACE,
-                        MemorySegment::class.java.internalName,
-                        "get",
-                        "(${ValueLayout.OfShort::class.java.descriptorString()}J)S",
-                        true,
-                    )
+                    AbiClass.JvmShortNativeI16 -> {
+                        GET_SHORT_DESCRIPTOR
+                    }
 
                     AbiClass.JvmIntNativeI32,
                     AbiClass.JvmLongNativeI32Sext,
-                    AbiClass.JvmLongNativeI32Zext -> visitMethodInsn(
-                        INVOKEINTERFACE,
-                        MemorySegment::class.java.internalName,
-                        "get",
-                        "(${ValueLayout.OfInt::class.java.descriptorString()}J)I",
-                        true,
-                    )
+                    AbiClass.JvmLongNativeI32Zext -> {
+                        GET_INT_DESCRIPTOR
+                    }
 
-                    AbiClass.JvmLongNativeI64 -> visitMethodInsn(
-                        INVOKEINTERFACE,
-                        MemorySegment::class.java.internalName,
-                        "get",
-                        "(${ValueLayout.OfLong::class.java.descriptorString()}J)L",
-                        true,
-                    )
+                    AbiClass.JvmLongNativeI64 -> {
+                        GET_LONG_DESCRIPTOR
+                    }
 
-                    AbiClass.JvmFloatNativeF32 -> visitMethodInsn(
-                        INVOKEINTERFACE,
-                        MemorySegment::class.java.internalName,
-                        "get",
-                        "(${ValueLayout.OfFloat::class.java.descriptorString()}J)F",
-                        true,
-                    )
+                    AbiClass.JvmFloatNativeF32 -> {
+                        GET_FLOAT_DESCRIPTOR
+                    }
 
-                    AbiClass.JvmDoubleNativeF64 -> visitMethodInsn(
-                        INVOKEINTERFACE,
-                        MemorySegment::class.java.internalName,
-                        "get",
-                        "(${ValueLayout.OfDouble::class.java.descriptorString()}J)D",
-                        true,
-                    )
+                    AbiClass.JvmDoubleNativeF64 -> {
+                        GET_DOUBLE_DESCRIPTOR
+                    }
 
-                    AbiClass.JvmMemoryAddressNativeAddress -> visitMethodInsn(
-                        INVOKEINTERFACE,
-                        MemorySegment::class.java.internalName,
-                        "get",
-                        "(${ValueLayout.OfAddress::class.java.descriptorString()}J)" +
-                            MemorySegment::class.java.descriptorString(),
-                        true,
-                    )
+                    AbiClass.JvmAddressableNativeAddress,
+                    AbiClass.JvmMemoryAddressNativeAddress -> {
+                        GET_ADDRESS_DESCRIPTOR
+                    }
                 }
 
+                visitMethodInsn(INVOKEVIRTUAL, VAR_HANDLE_INTERNAL_NAME, "get", nativeGetDescriptor, false)
+
                 when (abiClass) {
-                    AbiClass.JvmByteNativeI8, AbiClass.JvmShortNativeI16, AbiClass.JvmIntNativeI32 -> {
+                    AbiClass.JvmByteNativeI8,
+                    AbiClass.JvmShortNativeI16,
+                    AbiClass.JvmIntNativeI32 -> {
                         visitInsn(IRETURN)
                     }
 
@@ -336,12 +307,9 @@ internal fun <S : Struct> StructType(klass: KClass<S>, lookup: MethodHandles.Loo
                         visitInsn(LRETURN)
                     }
 
+                    AbiClass.JvmAddressableNativeAddress,
                     AbiClass.JvmMemoryAddressNativeAddress -> {
                         visitInsn(ARETURN)
-                    }
-
-                    AbiClass.JvmAddressableNativeAddress, is AbiClass.StructByValue -> {
-                        throw AssertionError()
                     }
                 }
 
@@ -353,20 +321,21 @@ internal fun <S : Struct> StructType(klass: KClass<S>, lookup: MethodHandles.Loo
                 implWriter.visitMethod(ACC_PUBLIC, setter.name, setter.descriptorString, null, null).apply {
                     visitCode()
 
+                    visitLdcInsn(nativeVarHandleConstant)
+
                     visitVarInsn(ALOAD, 0)
+
                     visitFieldInsn(
                         GETFIELD,
-                        AbstractStructImpl::class.java.internalName,
-                        coerceAs<KProperty<*>>(AbstractStructImpl::segment).javaField!!.name,
-                        MemorySegment::class.java.descriptorString(),
+                        AbstractStructImpl.INTERNAL_NAME,
+                        AbstractStructImpl.SEGMENT_FIELD_NAME,
+                        AbstractStructImpl.SEGMENT_FIELD_DESCRIPTOR
                     )
 
-                    visitLoadValueLayout(abiClass)
-
-                    visitLdcInsn(offset)
-
                     when (abiClass) {
-                        AbiClass.JvmByteNativeI8, AbiClass.JvmShortNativeI16, AbiClass.JvmIntNativeI32 -> {
+                        AbiClass.JvmByteNativeI8,
+                        AbiClass.JvmShortNativeI16,
+                        AbiClass.JvmIntNativeI32 -> {
                             visitVarInsn(ILOAD, 1)
                         }
 
@@ -382,84 +351,63 @@ internal fun <S : Struct> StructType(klass: KClass<S>, lookup: MethodHandles.Loo
                             visitVarInsn(DLOAD, 1)
                         }
 
-                        AbiClass.JvmLongNativeI32Sext, AbiClass.JvmLongNativeI32Zext -> {
+                        AbiClass.JvmLongNativeI32Sext,
+                        AbiClass.JvmLongNativeI32Zext -> {
                             visitVarInsn(LLOAD, 1)
                             visitInsn(L2I)
+                        }
+
+                        AbiClass.JvmAddressableNativeAddress -> {
+                            visitVarInsn(ALOAD, 1)
+
+                            visitMethodInsn(
+                                INVOKEINTERFACE,
+                                ADDRESSABLE_INTERNAL_NAME,
+                                ADDRESSABLE_ADDRESS_METHOD_NAME,
+                                ADDRESSABLE_ADDRESS_METHOD_DESCRIPTOR,
+                                true,
+                            )
                         }
 
                         AbiClass.JvmMemoryAddressNativeAddress -> {
                             visitVarInsn(ALOAD, 1)
                         }
-
-                        AbiClass.JvmAddressableNativeAddress, is AbiClass.StructByValue -> {
-                            throw AssertionError()
-                        }
                     }
 
-                    when (abiClass) {
-                        AbiClass.JvmByteNativeI8 -> visitMethodInsn(
-                            INVOKEINTERFACE,
-                            MemorySegment::class.java.internalName,
-                            "set",
-                            "(${ValueLayout.OfByte::class.java.descriptorString()}JB)V",
-                            true,
-                        )
+                    val nativeSetDescriptor = when (abiClass) {
+                        AbiClass.JvmByteNativeI8 -> {
+                            SET_BYTE_DESCRIPTOR
+                        }
 
-                        AbiClass.JvmShortNativeI16 -> visitMethodInsn(
-                            INVOKEINTERFACE,
-                            MemorySegment::class.java.internalName,
-                            "set",
-                            "(${ValueLayout.OfShort::class.java.descriptorString()}JS)V",
-                            true,
-                        )
+                        AbiClass.JvmShortNativeI16 -> {
+                            SET_SHORT_DESCRIPTOR
+                        }
 
                         AbiClass.JvmIntNativeI32,
                         AbiClass.JvmLongNativeI32Sext,
-                        AbiClass.JvmLongNativeI32Zext -> visitMethodInsn(
-                            INVOKEINTERFACE,
-                            MemorySegment::class.java.internalName,
-                            "set",
-                            "(${ValueLayout.OfInt::class.java.descriptorString()}JI)V",
-                            true,
-                        )
+                        AbiClass.JvmLongNativeI32Zext -> {
+                            SET_INT_DESCRIPTOR
+                        }
 
-                        AbiClass.JvmLongNativeI64 -> visitMethodInsn(
-                            INVOKEINTERFACE,
-                            MemorySegment::class.java.internalName,
-                            "set",
-                            "(${ValueLayout.OfLong::class.java.descriptorString()}JJ)V",
-                            true,
-                        )
+                        AbiClass.JvmLongNativeI64 -> {
+                            SET_LONG_DESCRIPTOR
+                        }
 
-                        AbiClass.JvmFloatNativeF32 -> visitMethodInsn(
-                            INVOKEINTERFACE,
-                            MemorySegment::class.java.internalName,
-                            "set",
-                            "(${ValueLayout.OfFloat::class.java.descriptorString()}JF)V",
-                            true,
-                        )
+                        AbiClass.JvmFloatNativeF32 -> {
+                            SET_FLOAT_DESCRIPTOR
+                        }
 
-                        AbiClass.JvmDoubleNativeF64 -> visitMethodInsn(
-                            INVOKEINTERFACE,
-                            MemorySegment::class.java.internalName,
-                            "set",
-                            "(${ValueLayout.OfDouble::class.java.descriptorString()}JD)V",
-                            true,
-                        )
+                        AbiClass.JvmDoubleNativeF64 -> {
+                            SET_DOUBLE_DESCRIPTOR
+                        }
 
-                        AbiClass.JvmMemoryAddressNativeAddress -> visitMethodInsn(
-                            INVOKEINTERFACE,
-                            MemorySegment::class.java.internalName,
-                            "set",
-                            "(${ValueLayout.OfAddress::class.java.descriptorString()}J" +
-                                "${MemoryAddress::class.java.internalName})V",
-                            true,
-                        )
-
-                        AbiClass.JvmAddressableNativeAddress, is AbiClass.StructByValue -> {
-                            throw AssertionError()
+                        AbiClass.JvmAddressableNativeAddress,
+                        AbiClass.JvmMemoryAddressNativeAddress -> {
+                            SET_ADDRESS_DESCRIPTOR
                         }
                     }
+
+                    visitMethodInsn(INVOKEVIRTUAL, VAR_HANDLE_INTERNAL_NAME, "set", nativeSetDescriptor, false)
 
                     visitInsn(RETURN)
                     visitMaxs(0, 0)
@@ -583,6 +531,12 @@ internal abstract class AbstractStructTypeImpl<S : Struct>(final override val la
     }
 }
 
+private class StructClassData {
+    @Volatile lateinit var type: StructType<*>
+}
+
+private data class StructTypeClassData(val instanceConstructor: MethodHandle, val layout: GroupLayout)
+
 internal fun nativeMemberBootstrap(lookup: MethodHandles.Lookup, name: String, type: Class<VarHandle>): VarHandle {
     return MethodHandles.classData(lookup, "_", StructClassData::class.java)
         .type
@@ -602,12 +556,6 @@ internal fun typeBootstrap(lookup: MethodHandles.Lookup, name: String, type: Cla
     return MethodHandles.classData(lookup, "_", StructClassData::class.java).type
 }
 
-private class StructClassData {
-    @Volatile lateinit var type: StructType<*>
-}
-
-private data class StructTypeClassData(val instanceConstructor: MethodHandle, val layout: GroupLayout)
-
 private fun Method.asBootstrapHandle(): Handle {
     return Handle(
         H_INVOKESTATIC,
@@ -617,6 +565,101 @@ private fun Method.asBootstrapHandle(): Handle {
         false,
     )
 }
+
+private fun methodDescriptor(returnType: Class<*>, vararg argumentTypes: Class<*>): String {
+    return methodType(returnType, argumentTypes).descriptorString()
+}
+
+private val VAR_HANDLE_INTERNAL_NAME = VarHandle::class.java.internalName
+
+private val VAR_HANDLE_DESCRIPTOR = VarHandle::class.java.descriptorString()
+
+private val MEMORY_SEGMENT_INTERNAL_NAME = MemorySegment::class.java.internalName
+
+private val MEMORY_SEGMENT_DESCRIPTOR = MemorySegment::class.java.descriptorString()
+
+private val ADDRESSABLE_INTERNAL_NAME = Addressable::class.java.internalName
+
+private val ADDRESSABLE_ADDRESS_METHOD_NAME = Addressable::address.javaMethod!!.name
+
+private val ADDRESSABLE_ADDRESS_METHOD_DESCRIPTOR = Addressable::address.javaMethod!!.descriptorString
+
+private val GET_BYTE_DESCRIPTOR = methodDescriptor(
+    Byte::class.java,
+    MemorySegment::class.java,
+)
+
+private val GET_SHORT_DESCRIPTOR = methodDescriptor(
+    Short::class.java,
+    MemorySegment::class.java,
+)
+
+private val GET_INT_DESCRIPTOR = methodDescriptor(
+    Int::class.java,
+    MemorySegment::class.java,
+)
+
+private val GET_LONG_DESCRIPTOR = methodDescriptor(
+    Long::class.java,
+    MemorySegment::class.java,
+)
+
+private val GET_FLOAT_DESCRIPTOR = methodDescriptor(
+    Float::class.java,
+    MemorySegment::class.java,
+)
+
+private val GET_DOUBLE_DESCRIPTOR = methodDescriptor(
+    Double::class.java,
+    MemorySegment::class.java,
+)
+
+private val GET_ADDRESS_DESCRIPTOR = methodDescriptor(
+    MemoryAddress::class.java,
+    MemorySegment::class.java,
+)
+
+private val SET_BYTE_DESCRIPTOR = methodDescriptor(
+    Void.TYPE,
+    MemorySegment::class.java,
+    Byte::class.java,
+)
+
+private val SET_SHORT_DESCRIPTOR = methodDescriptor(
+    Void.TYPE,
+    MemorySegment::class.java,
+    Short::class.java,
+)
+
+private val SET_INT_DESCRIPTOR = methodDescriptor(
+    Void.TYPE,
+    MemorySegment::class.java,
+    Int::class.java,
+)
+
+private val SET_LONG_DESCRIPTOR = methodDescriptor(
+    Void.TYPE,
+    MemorySegment::class.java,
+    Long::class.java,
+)
+
+private val SET_FLOAT_DESCRIPTOR = methodDescriptor(
+    Void.TYPE,
+    MemorySegment::class.java,
+    Float::class.java,
+)
+
+private val SET_DOUBLE_DESCRIPTOR = methodDescriptor(
+    Void.TYPE,
+    MemorySegment::class.java,
+    Double::class.java,
+)
+
+private val SET_ADDRESS_DESCRIPTOR = methodDescriptor(
+    Void.TYPE,
+    MemorySegment::class.java,
+    MemoryAddress::class.java,
+)
 
 private val NATIVE_MEMBER_BOOTSTRAP = ::nativeMemberBootstrap.javaMethod!!.asBootstrapHandle()
 
