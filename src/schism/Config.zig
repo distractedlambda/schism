@@ -34,11 +34,11 @@ pub const UsbDevice = struct {
     manufacturer: ?[]const u8 = null,
     product: ?[]const u8 = null,
     serial_number: ?[]const u8 = null,
-    interfaces: []const UsbInterface = &[_]UsbInterface{},
+    interfaces: []const UsbInterface = &.{},
 
     pub fn addInterface(comptime self: *@This(), comptime interface: UsbInterface) u8 {
         comptime {
-            defer self.interfaces = self.interfaces ++ &[_]UsbInterface{interface};
+            defer self.interfaces = self.interfaces ++ &.{interface};
             return @intCast(u8, self.interfaces.len);
         }
     }
@@ -49,11 +49,11 @@ pub const UsbInterface = struct {
     class: u8,
     subclass: u8,
     protocol: u8,
-    endpoints: []const UsbEndpoint = &[_]UsbEndpoint{},
+    endpoints: []const UsbEndpoint = &.{},
 
     pub fn addEndpoint(comptime self: *@This(), comptime endpoint: UsbEndpoint) u4 {
         comptime {
-            defer self.endpoints = self.endpoints ++ &[_]UsbEndpoint{endpoint};
+            defer self.endpoints = self.endpoints ++ &.{endpoint};
             return @intCast(u4, self.endpoints.len);
         }
     }

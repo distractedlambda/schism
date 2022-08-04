@@ -16,7 +16,7 @@ pub const CtrlFreqRange = enum(u12) {
 };
 
 pub const ctrl = PeripheralRegister(base_address + 0x00, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "enable",
             .type = CtrlEnable,
@@ -39,7 +39,7 @@ pub const StatusFreqRange = enum(u2) {
 };
 
 pub const status = PeripheralRegister(base_address + 0x04, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "stable",
             .type = bool,
@@ -71,7 +71,7 @@ pub const dormant = PeripheralRegister(base_address + 0x08, .{
 });
 
 pub const startup = PeripheralRegister(base_address + 0x0c, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "x4",
             .type = bool,

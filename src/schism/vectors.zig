@@ -9,12 +9,7 @@ const resets = @import("resets.zig");
 const rp2040 = @import("rp2040.zig");
 const usb = @import("usb.zig");
 
-comptime {
-    @export(vector_table, .{ .name = "__vectors", .section = ".vectors" });
-    @export(vector_table, .{ .name = "__VECTOR_TABLE", .section = ".vectors" });
-}
-
-pub var vector_table = VectorTable{
+pub export var vector_table linksection(".vectors") = VectorTable{
     .stack_top = config.core0_stack_top,
     .reset = handleReset,
     .nmi = handleNmi,

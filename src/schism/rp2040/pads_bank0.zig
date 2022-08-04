@@ -25,7 +25,7 @@ pub const SlewRate = enum(u1) {
 };
 
 const spec = bits.BitStructSpec{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "od",
             .type = bool,

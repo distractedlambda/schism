@@ -7,7 +7,7 @@ const base_address = 0x40034000;
 const controller_stride = 0x40038000 - base_address;
 
 pub const uartdr = PeripheralRegisterArray(2, base_address + 0x000, controller_stride, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "oe",
             .type = bool,
@@ -41,7 +41,7 @@ pub const uartdr = PeripheralRegisterArray(2, base_address + 0x000, controller_s
 });
 
 pub const uartrsr = PeripheralRegisterArray(2, base_address + 0x004, controller_stride, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "oe",
             .type = bool,
@@ -70,7 +70,7 @@ pub const uartrsr = PeripheralRegisterArray(2, base_address + 0x004, controller_
 });
 
 pub const uartfr = PeripheralRegisterArray(2, base_address + 0x018, controller_stride, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "ri",
             .type = bool,
@@ -132,7 +132,7 @@ pub const uartfbrd = PeripheralRegisterArray(2, base_address + 0x028, controller
 });
 
 pub const uartlcr_h = PeripheralRegisterArray(2, base_address + 0x02c, controller_stride, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "sps",
             .type = bool,
@@ -179,7 +179,7 @@ pub const uartlcr_h = PeripheralRegisterArray(2, base_address + 0x02c, controlle
 });
 
 pub const uartcr = PeripheralRegisterArray(2, base_address + 0x030, controller_stride, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "ctsen",
             .type = bool,
@@ -256,7 +256,7 @@ pub const uartcr = PeripheralRegisterArray(2, base_address + 0x030, controller_s
 });
 
 pub const uartifls = PeripheralRegisterArray(2, base_address + 0x034, controller_stride, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "rxiflsel",
             .type = u3,

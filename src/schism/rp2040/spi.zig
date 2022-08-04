@@ -14,7 +14,7 @@ pub const FrameFormat = enum(u2) {
 };
 
 pub const sspcr0 = PeripheralRegisterArray(2, base_address + 0x000, controller_stride, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "scr",
             .type = u8,
@@ -54,7 +54,7 @@ pub const ModeSelect = enum(u1) {
 };
 
 pub const sppcr1 = PeripheralRegisterArray(2, base_address + 0x004, controller_stride, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "sod",
             .type = bool,
@@ -87,7 +87,7 @@ pub const sspdr = PeripheralRegisterArray(2, base_address + 0x008, controller_st
 });
 
 pub const sspsr = PeripheralRegisterArray(2, base_address + 0x00c, controller_stride, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "bsy",
             .type = bool,
@@ -121,7 +121,7 @@ pub const sspcpsr = PeripheralRegisterArray(2, base_address + 0x010, controller_
 });
 
 const interrupt_spec = bits.BitStructSpec{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "txim",
             .type = bool,
@@ -156,7 +156,7 @@ pub const sspris = PeripheralRegisterArray(2, base_address + 0x018, controller_s
 pub const sspmis = PeripheralRegisterArray(2, base_address + 0x01c, controller_stride, interrupt_spec);
 
 pub const sspicr = PeripheralRegisterArray(2, base_address + 0x020, controller_stride, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "rtic",
             .type = bool,
@@ -173,7 +173,7 @@ pub const sspicr = PeripheralRegisterArray(2, base_address + 0x020, controller_s
 });
 
 pub const sspdmacr = PeripheralRegisterArray(2, base_address + 0x024, controller_stride, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "txdmae",
             .type = bool,

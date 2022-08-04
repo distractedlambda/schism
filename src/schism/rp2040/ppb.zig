@@ -40,7 +40,7 @@ pub const syst_calib = struct {
 };
 
 const irq_spec = bits.BitStructSpec{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "timer_irq0",
             .type = bool,

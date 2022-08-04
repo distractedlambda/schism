@@ -71,7 +71,7 @@ pub fn BitStruct(comptime Int: type, comptime spec: BitStructSpec) type {
                     .Struct = .{
                         .layout = .Auto,
                         .fields = &unpacked_fields,
-                        .decls = &[_]std.builtin.Type.Declaration{},
+                        .decls = &.{},
                         .is_tuple = false,
                     },
                 });
@@ -80,7 +80,7 @@ pub fn BitStruct(comptime Int: type, comptime spec: BitStructSpec) type {
                     .Struct = .{
                         .layout = .Auto,
                         .fields = flag_mask_fields[0..next_flag_mask_field],
-                        .decls = &[_]std.builtin.Type.Declaration{},
+                        .decls = &.{},
                         .is_tuple = false,
                     },
                 });

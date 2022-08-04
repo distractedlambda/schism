@@ -5,7 +5,7 @@ const PeripheralRegister = @import("peripheral_register.zig").PeripheralRegister
 const base_address = 0x4000c000;
 
 const spec = bits.BitStructSpec{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "usbctrl",
             .type = bool,

@@ -7,7 +7,7 @@ const Mutex = @import("../Mutex.zig");
 
 const interface_number = blk: {
     for (Config.resolved.usb.?.Device.interfaces) |interface, inumber| {
-        if (!std.mem.eql(u8, interface.name orelse &[_]u8{}, "Schism Logging")) {
+        if (!std.mem.eql(u8, interface.name orelse &.{}, "Schism Logging")) {
             continue;
         }
 

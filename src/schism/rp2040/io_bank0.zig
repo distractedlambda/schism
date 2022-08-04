@@ -54,7 +54,7 @@ pub const gpio_status = struct {
 };
 
 pub const gpio_ctrl = PeripheralRegisterArray(30, base_address + 0x004, 0x8, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "irqover",
             .type = Override,

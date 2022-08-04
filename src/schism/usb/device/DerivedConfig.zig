@@ -19,7 +19,7 @@ pub const resolved: @This() = blk: {
                 var descriptor0_string: [languages.len]u16 = undefined;
                 for (languages) |language, i| descriptor0_string[i] = @enumToInt(language);
                 const descriptor0 = protocol.StringDescriptor(languages.len){ .string = descriptor0_string };
-                return .{ .descriptors = &[_][]const u8{&std.mem.toBytes(descriptor0)} };
+                return .{ .descriptors = &.{&std.mem.toBytes(descriptor0)} };
             }
         }
 
@@ -28,7 +28,7 @@ pub const resolved: @This() = blk: {
                 const utf8 = utf8_or_null orelse return 0;
                 const utf16 = std.unicode.utf8ToUtf16LeStringLiteral(utf8).*;
                 const descriptor = protocol.StringDescriptor(utf16.len){ .string = utf16 };
-                self.descriptors = self.descriptors ++ &[_][]const u8{&std.mem.toBytes(descriptor)};
+                self.descriptors = self.descriptors ++ [_][]const u8{&std.mem.toBytes(descriptor)};
                 return self.descriptors.len - 1;
             }
         }
@@ -36,15 +36,15 @@ pub const resolved: @This() = blk: {
 
     const usb_device_config = config.usb.?.Device;
 
-    var string_descriptor_table = StringDescriptorTable.init(&[_]protocol.LanguageId{usb_device_config.language_id});
-    var interface_descriptors_blob: []const u8 = &[_]u8{};
-    var channel_assignments: []const []const u4 = &[_][]const u4{};
+    var string_descriptor_table = StringDescriptorTable.init(&.{usb_device_config.language_id});
+    var interface_descriptors_blob: []const u8 = &.{};
+    var channel_assignments: []const []const u4 = &.{};
     var num_tx_channels: u4 = 0;
     var num_rx_channels: u4 = 0;
 
     for (usb_device_config.interfaces) |interface_config, interface_index| {
         var endpoint_channel_assignments: [interface_config.endpoints.len]u4 = undefined;
-        var endpoint_descriptors_blob: []const u8 = &[_]u8{};
+        var endpoint_descriptors_blob: []const u8 = &.{};
 
         for (interface_config.endpoints) |endpoint_config, endpoint_index| {
             endpoint_channel_assignments[endpoint_index] = pick_channel: {

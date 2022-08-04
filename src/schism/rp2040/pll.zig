@@ -5,7 +5,7 @@ const PeripheralRegister = @import("peripheral_register.zig").PeripheralRegister
 pub fn Pll(comptime base_address: u32) type {
     return struct {
         pub const cs = PeripheralRegister(base_address + 0x0, .{
-            .Record = &[_]bits.BitStructField{
+            .Record = &.{
                 .{
                     .name = "lock",
                     .type = bool,
@@ -28,7 +28,7 @@ pub fn Pll(comptime base_address: u32) type {
         });
 
         pub const pwr = PeripheralRegister(base_address + 0x4, .{
-            .Record = &[_]bits.BitStructField{
+            .Record = &.{
                 .{
                     .name = "vcopd",
                     .type = bool,
@@ -61,7 +61,7 @@ pub fn Pll(comptime base_address: u32) type {
         });
 
         pub const prim = PeripheralRegister(base_address + 0xc, .{
-            .Record = &[_]bits.BitStructField{
+            .Record = &.{
                 .{
                     .name = "postdiv1",
                     .type = u3,

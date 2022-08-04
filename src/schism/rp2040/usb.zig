@@ -14,7 +14,7 @@ pub const IntepDir = enum(u1) {
 };
 
 pub const addr_endp = RegisterArray(16, base_address, 0x04, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "intep_preamble",
             .type = bool,
@@ -48,7 +48,7 @@ pub const HostNdevice = enum(u1) {
 };
 
 pub const main_ctrl = Register(base_address + 0x40, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "sim_timing",
             .type = bool,
@@ -75,7 +75,7 @@ pub const sof_wr = Register(base_address + 0x44, u11);
 pub const sof_rd = Register(base_address + 0x48, u11);
 
 pub const sie_ctrl = PeripheralRegister(base_address + 0x4c, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "ep0_int_stall",
             .type = bool,
@@ -231,7 +231,7 @@ pub const Speed = enum(u2) {
 };
 
 pub const sie_status = PeripheralRegister(base_address + 0x50, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "data_seq_error",
             .type = bool,
@@ -380,7 +380,7 @@ pub const nak_poll = Register(base_address + 0x6c, .{
 pub const ep_status_stall_nak = Register(base_address + 0x70, u32);
 
 pub const usb_muxing = Register(base_address + 0x74, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "softcon",
             .type = bool,
@@ -409,7 +409,7 @@ pub const usb_muxing = Register(base_address + 0x74, .{
 });
 
 pub const usb_pwr = Register(base_address + 0x78, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "overcurr_detect_en",
             .type = bool,
@@ -450,7 +450,7 @@ pub const usb_pwr = Register(base_address + 0x78, .{
 });
 
 const interrupt_spec = bits.BitStructSpec{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "ep_stall_nak",
             .type = bool,
@@ -590,7 +590,7 @@ pub const DeviceEpCtrlType = enum(u2) {
 };
 
 pub const device_ep_ctrl = RegisterArray(30, dpram_base_address + 0x08, 0x04, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "en",
             .type = bool,
@@ -650,7 +650,7 @@ pub const IsochronousOffset = enum(u2) {
 };
 
 pub const device_ep_buf_ctrl = RegisterArray(32, dpram_base_address + 0x80, 0x04, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "buf1_full",
             .type = bool,

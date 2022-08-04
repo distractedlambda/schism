@@ -22,13 +22,13 @@ fn run() void {
             switch (sp.request_type.direction) {
                 .Out => switch (sp.request) {
                     .SetAddress => {
-                        ep0.send(connection_id, &[_]u8{}, 1) catch continue :reconnect_loop;
+                        ep0.send(connection_id, &.{}, 1) catch continue :reconnect_loop;
                         rp2040.usb.addr_endp.write(0, .{ .address = @truncate(u7, sp.value) });
                     },
 
                     .SetConfiguration => {
                         // FIXME: handle re-configuration, un-configuration
-                        ep0.send(connection_id, &[_]u8{}, 1) catch continue :reconnect_loop;
+                        ep0.send(connection_id, &.{}, 1) catch continue :reconnect_loop;
 
                         if (connection_id != connection.current) {
                             continue :reconnect_loop;
@@ -50,14 +50,14 @@ fn run() void {
                         .Device => {
                             const len = @minimum(sp.length, derived_config.device_descriptor.len);
                             ep0.send(connection_id, derived_config.device_descriptor[0..len], 1) catch continue :reconnect_loop;
-                            _ = ep0.receive(connection_id, &[_]u8{}, 1) catch continue :reconnect_loop;
+                            _ = ep0.receive(connection_id, &.{}, 1) catch continue :reconnect_loop;
                         },
 
                         .Configuration => {
                             const len = @minimum(sp.length, derived_config.configuration_descriptor.len);
                             // FIXME: handle long configuration descriptors
                             ep0.send(connection_id, derived_config.configuration_descriptor[0..len], 1) catch continue :reconnect_loop;
-                            _ = ep0.receive(connection_id, &[_]u8{}, 1) catch continue :reconnect_loop;
+                            _ = ep0.receive(connection_id, &.{}, 1) catch continue :reconnect_loop;
                         },
 
                         .String => {
@@ -67,7 +67,7 @@ fn run() void {
                                 const len = @minimum(descriptor.len, sp.length);
                                 // FIXME: handle long string descriptors
                                 ep0.send(connection_id, descriptor[0..len], 1) catch continue :reconnect_loop;
-                                _ = ep0.receive(connection_id, &[_]u8{}, 1) catch continue :reconnect_loop;
+                                _ = ep0.receive(connection_id, &.{}, 1) catch continue :reconnect_loop;
                             }
                         },
 

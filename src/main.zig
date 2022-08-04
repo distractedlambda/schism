@@ -53,13 +53,13 @@ pub const schism_config = blk: {
             .product_id = 0x4004,
             .vendor_id = 0xcafe,
             .serial_number = "123456",
-            .interfaces = &[_]schism.Config.UsbInterface{
+            .interfaces = &.{
                 .{
                     .name = "Schism Device Logger",
                     .class = 0xFF,
                     .subclass = 0,
                     .protocol = 0,
-                    .endpoints = &[_]schism.Config.UsbEndpoint{
+                    .endpoints = &.{
                         .{ .direction = .In },
                     },
                 },

@@ -19,7 +19,7 @@ pub const FreqRange = enum(u12) {
 };
 
 pub const ctrl = PeripheralRegister(base_address + 0x00, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "enable",
             .type = Enable,

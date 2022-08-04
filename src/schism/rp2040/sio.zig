@@ -53,7 +53,7 @@ pub const div_quotient = Register(base_address + 0x070, .{ .Scalar = u32 });
 pub const div_remainder = Register(base_address + 0x074, .{ .Scalar = u32 });
 
 pub const div_csr = Register(base_address + 0x078, .{
-    .Record = &[_]bits.BitStructField{
+    .Record = &.{
         .{
             .name = "dirty",
             .type = bool,
