@@ -1,18 +1,18 @@
 const std = @import("std");
 
-pub fn BitStruct(comptime Int: type, comptime spec: BitStructSpec) type {
-    if (@typeInfo(Int) != .Int or @typeInfo(Int).Int.signedness != .unsigned) {
-        @compileError("expected an unsigned integer type, got " ++ @typeName(Int));
+pub fn BitStruct(comptime Int_: type, comptime spec: BitStructSpec) type {
+    if (@typeInfo(Int_) != .Int or @typeInfo(Int_).Int.signedness != .unsigned) {
+        @compileError("expected an unsigned integer type, got " ++ @typeName(Int_));
     }
 
     switch (spec) {
         .Scalar => |value_type| {
-            if (@bitSizeOf(value_type) > @bitSizeOf(Int)) {
-                @compileError(@typeName(spec) ++ " does not fit in " ++ @typeName(Int));
+            if (@bitSizeOf(value_type) > @bitSizeOf(Int_)) {
+                @compileError(@typeName(spec) ++ " does not fit in " ++ @typeName(Int_));
             }
 
             return struct {
-                pub const Int = Int;
+                pub const Int = Int_;
 
                 pub const Unpacked = value_type;
 
@@ -27,14 +27,14 @@ pub fn BitStruct(comptime Int: type, comptime spec: BitStructSpec) type {
         },
 
         .Record => |field_specs| {
-            comptime var population: Int = 0;
+            comptime var population: Int_ = 0;
             comptime var unpacked_fields: [field_specs.len]std.builtin.Type.StructField = undefined;
             comptime var flag_mask_fields: [field_specs.len]std.builtin.Type.StructField = undefined;
             comptime var next_flag_mask_field = 0;
 
             inline for (field_specs) |field_spec, i| {
-                if (field_spec.lsb + @bitSizeOf(field_spec.type) > @bitSizeOf(Int)) {
-                    @compileError("field '" ++ field_spec.name ++ "' does not fit in " ++ @typeName(Int));
+                if (field_spec.lsb + @bitSizeOf(field_spec.type) > @bitSizeOf(Int_)) {
+                    @compileError("field '" ++ field_spec.name ++ "' does not fit in " ++ @typeName(Int_));
                 }
 
                 if (@truncate(std.meta.Int(.unsigned, @bitSizeOf(field_spec.type)), population >> field_spec.lsb) != 0) {
@@ -65,7 +65,7 @@ pub fn BitStruct(comptime Int: type, comptime spec: BitStructSpec) type {
             }
 
             return struct {
-                pub const Int = Int;
+                pub const Int = Int_;
 
                 pub const Unpacked = @Type(.{
                     .Struct = .{

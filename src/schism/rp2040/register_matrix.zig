@@ -3,8 +3,8 @@ const std = @import("std");
 const bits = @import("../bits.zig");
 
 pub fn RegisterMatrix(
-    comptime rows: comptime_int,
-    comptime cols: comptime_int,
+    comptime rows_: comptime_int,
+    comptime cols_: comptime_int,
     comptime base_address: usize,
     comptime row_stride: usize,
     comptime col_stride: usize,
@@ -13,8 +13,8 @@ pub fn RegisterMatrix(
     return struct {
         pub const Bits = bits.BitStruct(u32, spec);
 
-        pub const rows = rows;
-        pub const cols = cols;
+        pub const rows = rows_;
+        pub const cols = cols_;
 
         pub inline fn address(row: usize, col: usize) usize {
             std.debug.assert(row < rows);

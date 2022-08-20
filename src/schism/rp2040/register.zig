@@ -1,10 +1,10 @@
 const bits = @import("../bits.zig");
 
-pub fn Register(comptime address: usize, comptime spec: bits.BitStructSpec) type {
+pub fn Register(comptime address_: usize, comptime spec: bits.BitStructSpec) type {
     return struct {
         pub const Bits = bits.BitStruct(u32, spec);
 
-        pub const address = address;
+        pub const address = address_;
 
         pub inline fn readNonVolatileRaw() u32 {
             return @intToPtr(*const u32, address).*;

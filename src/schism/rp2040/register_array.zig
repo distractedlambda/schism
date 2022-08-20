@@ -3,7 +3,7 @@ const std = @import("std");
 const bits = @import("../bits.zig");
 
 pub fn RegisterArray(
-    comptime len: usize,
+    comptime len_: usize,
     comptime base_address: usize,
     comptime stride: usize,
     comptime spec: bits.BitStructSpec,
@@ -11,7 +11,7 @@ pub fn RegisterArray(
     return struct {
         pub const Bits = bits.BitStruct(u32, spec);
 
-        pub const len = len;
+        pub const len = len_;
 
         inline fn address(index: usize) usize {
             std.debug.assert(index < len);
