@@ -1,37 +1,35 @@
 const builtin = @import("builtin");
+const std = @import("std");
 
-comptime {
-    if (builtin.cpu.arch.endian() != .Little) {
-        @compileError("packed struct definitions in this file assume a little-endian target");
-    }
-}
+const BitStruct = @import("../bits.zig").BitStruct;
+const LittleEndian = @import("../endian.zig").LittleEndian;
 
-pub const SetupPacket = packed struct {
+pub const SetupPacket = struct {
     request_type: RequestType,
     request: Request,
-    value: u16,
-    index: u16,
-    length: u16,
+    value: LittleEndian(u16),
+    index: LittleEndian(u16),
+    length: LittleEndian(u16),
 
-    pub const RequestType = packed struct {
-        recipient: enum(u5) {
-            Device,
-            Interface,
-            Endpoint,
-            Other,
-            _,
+    pub const RequestType = BitStruct(u8, .{
+        .Record = &.{
+            .{
+                .name = "direction",
+                .type = enum(u1) { Out, In },
+                .lsb = 7,
+            },
+            .{
+                .name = "type",
+                .type = enum(u2) { Standard, Class, Vendor, _ },
+                .lsb = 5,
+            },
+            .{
+                .name = "recipient",
+                .type = enum(u5) { Device, Interface, Endpoint, Other, _ },
+                .lsb = 0,
+            },
         },
-        type: enum(u2) {
-            Standard,
-            Class,
-            Vendor,
-            Reserved,
-        },
-        direction: enum(u1) {
-            Out,
-            In,
-        },
-    };
+    });
 
     pub const Request = enum(u8) {
         GetStatus = 0x00,

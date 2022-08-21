@@ -18,16 +18,16 @@ pub fn PeripheralRegister(comptime address: usize, comptime spec: bits.BitStruct
             @intToPtr(*volatile u32, address + 0x3000).* = mask;
         }
 
-        pub inline fn toggle(mask: @This().Bits.FlagMask) void {
-            toggleRaw(@This().Bits.packFlagMask(mask));
+        pub inline fn toggle(flags: @This().Fields.Flags) void {
+            toggleRaw(@This().Fields.packFlags(flags));
         }
 
-        pub inline fn set(mask: @This().Bits.FlagMask) void {
-            setRaw(@This().Bits.packFlagMask(mask));
+        pub inline fn set(flags: @This().Fields.Flags) void {
+            setRaw(@This().Fields.packFlags(flags));
         }
 
-        pub inline fn clear(mask: @This().Bits.FlagMask) void {
-            clearRaw(@This().Bits.packFlagMask(mask));
+        pub inline fn clear(flags: @This().Fields.Flags) void {
+            clearRaw(@This().Fields.packFlags(flags));
         }
     };
 }

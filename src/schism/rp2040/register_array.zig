@@ -9,7 +9,7 @@ pub fn RegisterArray(
     comptime spec: bits.BitStructSpec,
 ) type {
     return struct {
-        pub const Bits = bits.BitStruct(u32, spec);
+        pub const Fields = bits.BitStruct(u32, spec);
 
         pub const len = len_;
 
@@ -26,12 +26,12 @@ pub fn RegisterArray(
             @intToPtr(*volatile u32, address(index)).* = value;
         }
 
-        pub inline fn read(index: usize) Bits.Unpacked {
-            return Bits.unpack(readRaw(index));
+        pub inline fn read(index: usize) Fields.Unpacked {
+            return Fields.unpack(readRaw(index));
         }
 
-        pub inline fn write(index: usize, unpacked: Bits.Unpacked) void {
-            writeRaw(index, Bits.pack(unpacked));
+        pub inline fn write(index: usize, value: Fields.Unpacked) void {
+            writeRaw(index, Fields.pack(value));
         }
     };
 }

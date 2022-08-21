@@ -1,40 +1,54 @@
 const std = @import("std");
 
-pub fn BitStruct(comptime Int_: type, comptime spec: BitStructSpec) type {
-    if (@typeInfo(Int_) != .Int or @typeInfo(Int_).Int.signedness != .unsigned) {
-        @compileError("expected an unsigned integer type, got " ++ @typeName(Int_));
+pub fn BitStruct(comptime Bits_: type, comptime spec: BitStructSpec) type {
+    if (@typeInfo(Bits_) != .Int or @typeInfo(Bits_).Int.signedness != .unsigned) {
+        @compileError("expected an unsigned integer type, got " ++ @typeName(Bits_));
     }
 
     switch (spec) {
         .Scalar => |value_type| {
-            if (@bitSizeOf(value_type) > @bitSizeOf(Int_)) {
-                @compileError(@typeName(spec) ++ " does not fit in " ++ @typeName(Int_));
+            if (@bitSizeOf(value_type) > @bitSizeOf(Bits_)) {
+                @compileError(@typeName(spec) ++ " does not fit in " ++ @typeName(Bits_));
             }
 
-            return struct {
-                pub const Int = Int_;
+            return extern struct {
+                pub const Bits = Bits_;
 
                 pub const Unpacked = value_type;
 
-                pub inline fn pack(value: Unpacked) Int {
-                    return asBits(value);
+                bits: Bits,
+
+                pub inline fn init(value: Unpacked) @This() {
+                    return .{ .bits = toBits(value) };
                 }
 
-                pub inline fn unpack(int: Int) Unpacked {
-                    return fromBits(Unpacked, @truncate(std.meta.Int(.unsigned, @bitSizeOf(Unpacked)), int));
+                pub inline fn get(self: @This()) Unpacked {
+                    return unpack(self.bits);
+                }
+
+                pub inline fn assign(self: *@This(), value: Unpacked) void {
+                    self.bits = pack(value);
+                }
+
+                pub inline fn unpack(bits: Bits) Unpacked {
+                    return fromBits(Unpacked, @truncate(std.meta.Int(.unsigned, @bitSizeOf(Unpacked)), bits));
+                }
+
+                pub inline fn pack(value: Unpacked) Bits {
+                    return toBits(value);
                 }
             };
         },
 
         .Record => |field_specs| {
-            comptime var population: Int_ = 0;
+            comptime var population: Bits_ = 0;
             comptime var unpacked_fields: [field_specs.len]std.builtin.Type.StructField = undefined;
-            comptime var flag_mask_fields: [field_specs.len]std.builtin.Type.StructField = undefined;
-            comptime var next_flag_mask_field = 0;
+            comptime var flags_fields: [field_specs.len]std.builtin.Type.StructField = undefined;
+            comptime var next_flags_field = 0;
 
             inline for (field_specs) |field_spec, i| {
-                if (field_spec.lsb + @bitSizeOf(field_spec.type) > @bitSizeOf(Int_)) {
-                    @compileError("field '" ++ field_spec.name ++ "' does not fit in " ++ @typeName(Int_));
+                if (field_spec.lsb + @bitSizeOf(field_spec.type) > @bitSizeOf(Bits_)) {
+                    @compileError("field '" ++ field_spec.name ++ "' does not fit in " ++ @typeName(Bits_));
                 }
 
                 if (@truncate(std.meta.Int(.unsigned, @bitSizeOf(field_spec.type)), population >> field_spec.lsb) != 0) {
@@ -52,7 +66,7 @@ pub fn BitStruct(comptime Int_: type, comptime spec: BitStructSpec) type {
                 };
 
                 if (field_spec.type == bool) {
-                    flag_mask_fields[next_flag_mask_field] = .{
+                    flags_fields[next_flags_field] = .{
                         .name = field_spec.name,
                         .field_type = bool,
                         .is_comptime = false,
@@ -60,12 +74,12 @@ pub fn BitStruct(comptime Int_: type, comptime spec: BitStructSpec) type {
                         .default_value = &false,
                     };
 
-                    next_flag_mask_field += 1;
+                    next_flags_field += 1;
                 }
             }
 
-            return struct {
-                pub const Int = Int_;
+            return extern struct {
+                pub const Bits = Bits_;
 
                 pub const Unpacked = @Type(.{
                     .Struct = .{
@@ -76,44 +90,70 @@ pub fn BitStruct(comptime Int_: type, comptime spec: BitStructSpec) type {
                     },
                 });
 
-                pub const FlagMask = @Type(.{
+                pub const Flags = @Type(.{
                     .Struct = .{
                         .layout = .Auto,
-                        .fields = flag_mask_fields[0..next_flag_mask_field],
+                        .fields = flags_fields[0..next_flags_field],
                         .decls = &.{},
                         .is_tuple = false,
                     },
                 });
 
-                pub inline fn pack(unpacked: Unpacked) Int {
-                    var int: Int = 0;
+                bits: Bits,
+
+                pub inline fn init(value: Unpacked) @This() {
+                    return .{ .bits = pack(value) };
+                }
+
+                pub inline fn get(self: @This()) Unpacked {
+                    return unpack(self.bits);
+                }
+
+                pub inline fn assign(self: *@This(), value: Unpacked) void {
+                    self.bits = pack(value);
+                }
+
+                pub inline fn set(self: *@This(), flags: Flags) void {
+                    self.bits |= packFlags(flags);
+                }
+
+                pub inline fn clear(self: *@This(), flags: Flags) void {
+                    self.bits &= ~packFlags(flags);
+                }
+
+                pub inline fn toggle(self: *@This(), flags: Flags) void {
+                    self.bits ^= packFlags(flags);
+                }
+
+                pub inline fn pack(unpacked: Unpacked) Bits {
+                    var int: Bits = 0;
 
                     inline for (field_specs) |field_spec| {
-                        int |= @as(Int, asBits(@field(unpacked, field_spec.name))) << field_spec.lsb;
+                        int |= @as(Bits, toBits(@field(unpacked, field_spec.name))) << field_spec.lsb;
                     }
 
                     return int;
                 }
 
-                pub inline fn unpack(int: Int) Unpacked {
+                pub inline fn unpack(bits: Bits) Unpacked {
                     var unpacked: Unpacked = undefined;
 
                     inline for (field_specs) |field_spec| {
                         @field(unpacked, field_spec.name) = fromBits(
                             field_spec.type,
-                            @truncate(std.meta.Int(.unsigned, @bitSizeOf(field_spec.type)), int >> field_spec.lsb),
+                            @truncate(std.meta.Int(.unsigned, @bitSizeOf(field_spec.type)), bits >> field_spec.lsb),
                         );
                     }
 
                     return unpacked;
                 }
 
-                pub inline fn packFlagMask(mask: FlagMask) Int {
-                    var int: Int = 0;
+                pub inline fn packFlags(flags: Flags) Bits {
+                    var int: Bits = 0;
 
                     inline for (field_specs) |field_spec| {
-                        if (@hasField(FlagMask, field_spec.name)) {
-                            int |= @as(Int, asBits(@field(mask, field_spec.name))) << field_spec.lsb;
+                        if (@hasField(Flags, field_spec.name)) {
+                            int |= @as(Bits, toBits(@field(flags, field_spec.name))) << field_spec.lsb;
                         }
                     }
 
@@ -140,12 +180,12 @@ pub fn BitsOf(comptime T: type) type {
     return std.meta.Int(.unsigned, @bitSizeOf(T));
 }
 
-pub inline fn asBits(value: anytype) BitsOf(@TypeOf(value)) {
+pub inline fn toBits(value: anytype) BitsOf(@TypeOf(value)) {
     const Bits = BitsOf(@TypeOf(value));
     return switch (@typeInfo(@TypeOf(value))) {
         .Bool => @boolToInt(value),
         .Float => @bitCast(Bits, value),
-        .Enum => asBits(@enumToInt(value)),
+        .Enum => toBits(@enumToInt(value)),
         .Int => |int| if (int.signedness == .unsigned) value else @bitCast(Bits, value),
         else => @compileError("unsupported type '" ++ @typeName(@TypeOf(value)) ++ "' for asBits"),
     };

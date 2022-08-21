@@ -4,8 +4,8 @@ pub inline fn reset(blocks: rp2040.resets.reset.Bits.FlagMask) void {
     rp2040.resets.reset.set(blocks);
 }
 
-pub inline fn unreset(blocks: rp2040.resets.reset.Bits.FlagMask) void {
-    const mask = rp2040.resets.reset.Bits.packFlagMask(blocks);
+pub inline fn unreset(blocks: rp2040.resets.reset.Fields.Flags) void {
+    const mask = rp2040.resets.reset.Fields.packFlags(blocks);
     rp2040.resets.reset.clearRaw(mask);
     while (rp2040.resets.reset_done.readRaw() & mask != mask) {}
 }
