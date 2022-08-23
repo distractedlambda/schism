@@ -1,7 +1,10 @@
 const std = @import("std");
 
 const config = @import("../../Config.zig").resolved;
+const endian = @import("../../endian.zig");
 const protocol = @import("../protocol.zig");
+
+const LittleEndian = endian.LittleEndian;
 
 device_descriptor: []const u8,
 configuration_descriptor: []const u8,
@@ -16,8 +19,8 @@ pub const resolved: @This() = blk: {
 
         fn init(comptime languages: []const protocol.LanguageId) @This() {
             comptime {
-                var descriptor0_string: [languages.len]u16 = undefined;
-                for (languages) |language, i| descriptor0_string[i] = @enumToInt(language);
+                var descriptor0_string: [languages.len]LittleEndian(u16) = undefined;
+                for (languages) |language, i| descriptor0_string[i].assign(@enumToInt(language));
                 const descriptor0 = protocol.StringDescriptor(languages.len){ .string = descriptor0_string };
                 return .{ .descriptors = &.{&std.mem.toBytes(descriptor0)} };
             }
@@ -27,7 +30,7 @@ pub const resolved: @This() = blk: {
             comptime {
                 const utf8 = utf8_or_null orelse return 0;
                 const utf16 = std.unicode.utf8ToUtf16LeStringLiteral(utf8).*;
-                const descriptor = protocol.StringDescriptor(utf16.len){ .string = utf16 };
+                const descriptor = protocol.StringDescriptor(utf16.len){ .string = @bitCast([utf16.len]LittleEndian(u16), @as([utf16.len]u16, utf16)) };
                 self.descriptors = self.descriptors ++ [_][]const u8{&std.mem.toBytes(descriptor)};
                 return self.descriptors.len - 1;
             }
@@ -62,12 +65,12 @@ pub const resolved: @This() = blk: {
             };
 
             const endpoint_descriptor = std.mem.toBytes(protocol.EndpointDescriptor{
-                .endpoint_address = .{
+                .endpoint_address = protocol.EndpointDescriptor.EndpointAddress.init(.{
                     .endpoint_number = endpoint_channel_assignments[endpoint_index] + 1,
                     .direction = endpoint_config.direction,
-                },
-                .attributes = .{ .transfer_type = .Bulk },
-                .max_packet_size = 64,
+                }),
+                .attributes = protocol.EndpointDescriptor.Attributes.init(.{ .transfer_type = .Bulk }),
+                .max_packet_size = LittleEndian(u16).init(64),
                 .interval = 0, // FIXME correct value?
             });
 
@@ -89,14 +92,14 @@ pub const resolved: @This() = blk: {
     }
 
     const device_descriptor = std.mem.toBytes(protocol.DeviceDescriptor{
-        .bcd_usb = .@"1.1",
+        .bcd_usb = LittleEndian(protocol.DeviceDescriptor.BcdUsb).init(.@"1.1"),
         .device_class = .Device,
         .device_subclass = 0,
         .device_protocol = 0,
         .ep0_max_packet_size = 64,
-        .vendor_id = usb_device_config.vendor_id,
-        .product_id = usb_device_config.product_id,
-        .bcd_device = usb_device_config.bcd_device,
+        .vendor_id = LittleEndian(u16).init(usb_device_config.vendor_id),
+        .product_id = LittleEndian(u16).init(usb_device_config.product_id),
+        .bcd_device = LittleEndian(u16).init(usb_device_config.bcd_device),
         .manufacturer_string_index = string_descriptor_table.addUtf8(usb_device_config.manufacturer),
         .product_string_index = string_descriptor_table.addUtf8(usb_device_config.product),
         .serial_number_string_index = string_descriptor_table.addUtf8(usb_device_config.serial_number),
@@ -104,11 +107,14 @@ pub const resolved: @This() = blk: {
     });
 
     const configuration_descriptor = std.mem.toBytes(protocol.ConfigurationDescriptor{
-        .total_length = @sizeOf(protocol.ConfigurationDescriptor) + interface_descriptors_blob.len,
+        .total_length = LittleEndian(u16).init(@sizeOf(protocol.ConfigurationDescriptor) + interface_descriptors_blob.len),
         .num_interfaces = usb_device_config.interfaces.len,
         .configuration_value = 1,
         .configuration_string_index = 0,
-        .attributes = .{ .remote_wakeup = false, .self_powered = true },
+        .attributes = protocol.ConfigurationDescriptor.Attributes.init(.{
+            .remote_wakeup = false,
+            .self_powered = true,
+        }),
         .max_power = 50,
     });
 

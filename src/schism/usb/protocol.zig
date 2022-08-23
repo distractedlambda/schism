@@ -4,7 +4,7 @@ const std = @import("std");
 const BitStruct = @import("../bits.zig").BitStruct;
 const LittleEndian = @import("../endian.zig").LittleEndian;
 
-pub const SetupPacket = struct {
+pub const SetupPacket = extern struct {
     request_type: RequestType,
     request: Request,
     value: LittleEndian(u16),
@@ -56,17 +56,17 @@ pub const DescriptorType = enum(u8) {
     _,
 };
 
-pub const DeviceDescriptor = packed struct {
+pub const DeviceDescriptor = extern struct {
     length: u8 = @sizeOf(@This()),
     descriptor_type: DescriptorType = .Device,
-    bcd_usb: BcdUsb,
+    bcd_usb: LittleEndian(BcdUsb),
     device_class: DeviceClass,
     device_subclass: u8,
     device_protocol: u8,
     ep0_max_packet_size: u8,
-    vendor_id: u16,
-    product_id: u16,
-    bcd_device: u16,
+    vendor_id: LittleEndian(u16),
+    product_id: LittleEndian(u16),
+    bcd_device: LittleEndian(u16),
     manufacturer_string_index: u8,
     product_string_index: u8,
     serial_number_string_index: u8,
@@ -91,25 +91,41 @@ pub const DeviceDescriptor = packed struct {
     };
 };
 
-pub const ConfigurationDescriptor = packed struct {
+pub const ConfigurationDescriptor = extern struct {
     length: u8 = @sizeOf(@This()),
     descriptor_type: DescriptorType = .Configuration,
-    total_length: u16,
+    total_length: LittleEndian(u16),
     num_interfaces: u8,
     configuration_value: u8,
     configuration_string_index: u8,
     attributes: Attributes,
     max_power: u8,
 
-    pub const Attributes = packed struct {
-        reserved_0: u5 = 0,
-        remote_wakeup: bool,
-        self_powered: bool,
-        reserved_1: u1 = 1,
-    };
+    pub const Attributes = BitStruct(u8, .{
+        .Record = &.{
+            .{
+                .name = "usb_1_0_bus_powered",
+                .type = bool,
+                .lsb = 7,
+                .default = &true,
+            },
+            .{
+                .name = "self_powered",
+                .type = bool,
+                .lsb = 6,
+                .default = &false,
+            },
+            .{
+                .name = "remote_wakeup",
+                .type = bool,
+                .lsb = 5,
+                .default = &false,
+            },
+        },
+    });
 };
 
-pub const InterfaceDescriptor = packed struct {
+pub const InterfaceDescriptor = extern struct {
     length: u8 = @sizeOf(@This()),
     descriptor_type: DescriptorType = .Interface,
     interface_number: u8,
@@ -121,50 +137,74 @@ pub const InterfaceDescriptor = packed struct {
     interface_string_index: u8,
 };
 
-pub const EndpointDescriptor = packed struct {
+pub const EndpointDescriptor = extern struct {
     length: u8 = @sizeOf(@This()),
     descriptor_type: DescriptorType = .Endpoint,
     endpoint_address: EndpointAddress,
     attributes: Attributes,
-    max_packet_size: u16,
+    max_packet_size: LittleEndian(u16),
     interval: u8,
 
-    pub const EndpointAddress = packed struct {
-        endpoint_number: u4,
-        reserved: u3 = 0,
-        direction: Direction,
+    pub const EndpointAddress = BitStruct(u8, .{
+        .Record = &.{
+            .{
+                .name = "direction",
+                .type = Direction,
+                .lsb = 7,
+            },
+            .{
+                .name = "endpoint_number",
+                .type = u4,
+                .lsb = 0,
+            },
+        },
+    });
 
-        pub const Direction = enum(u1) {
-            Out,
-            In,
-        };
+    pub const Direction = enum(u1) {
+        Out,
+        In,
     };
 
-    pub const Attributes = packed struct {
-        transfer_type: TransferType,
-        synchronization_type: SynchronizationType = .None,
-        usage_type: UsageType = .Data,
-        reserved: u2 = 0,
+    pub const Attributes = BitStruct(u8, .{
+        .Record = &.{
+            .{
+                .name = "usage_type",
+                .type = IsochronousUsageType,
+                .lsb = 4,
+                .default = &@as(IsochronousUsageType, .Data),
+            },
+            .{
+                .name = "synchronization_type",
+                .type = IsochronousSynchronizationType,
+                .lsb = 2,
+                .default = &@as(IsochronousSynchronizationType, .None),
+            },
+            .{
+                .name = "transfer_type",
+                .type = TransferType,
+                .lsb = 0,
+            },
+        },
+    });
 
-        pub const TransferType = enum(u2) {
-            Control,
-            Isochronous,
-            Bulk,
-            Interrupt,
-        };
+    pub const IsochronousUsageType = enum(u2) {
+        Data,
+        Feedback,
+        ExplicitFeedbackData,
+    };
 
-        pub const SynchronizationType = enum(u2) {
-            None,
-            Asynchronous,
-            Adaptive,
-            Synchronous,
-        };
+    pub const IsochronousSynchronizationType = enum(u2) {
+        None,
+        Asynchronous,
+        Adaptive,
+        Synchronous,
+    };
 
-        pub const UsageType = enum(u2) {
-            Data,
-            Feedback,
-            ExplicitFeedbackData,
-        };
+    pub const TransferType = enum(u2) {
+        Control,
+        Isochronous,
+        Bulk,
+        Interrupt,
     };
 };
 
@@ -174,9 +214,9 @@ pub const LanguageId = enum(u16) {
 };
 
 pub fn StringDescriptor(comptime len: usize) type {
-    return packed struct {
+    return extern struct {
         length: u8 = @sizeOf(@This()),
         descriptor_type: DescriptorType = .String,
-        string: [len]u16,
+        string: [len]LittleEndian(u16),
     };
 }

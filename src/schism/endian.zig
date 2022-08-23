@@ -6,23 +6,23 @@ pub fn EndianValue(comptime T: type, comptime endianness: std.builtin.Endian) ty
     return extern struct {
         endian_bits: bits.BitsOf(T),
 
-        fn toEndianBits(value: T) bits.BitsOf(T) {
+        inline fn toEndianBits(value: T) bits.BitsOf(T) {
             return std.mem.nativeTo(bits.BitsOf(T), bits.toBits(value), endianness);
         }
 
-        fn fromEndianBits(endian_bits: bits.BitsOf(T)) T {
+        inline fn fromEndianBits(endian_bits: bits.BitsOf(T)) T {
             return bits.fromBits(T, std.mem.toNative(bits.BitsOf(T), endian_bits, endianness));
         }
 
-        pub fn init(value: T) @This() {
+        pub inline fn init(value: T) @This() {
             return .{ .endian_bits = toEndianBits(value) };
         }
 
-        pub fn get(self: @This()) T {
+        pub inline fn get(self: @This()) T {
             return fromEndianBits(self.endian_bits);
         }
 
-        pub fn assign(self: *@This(), value: T) void {
+        pub inline fn assign(self: *@This(), value: T) void {
             self.endian_bits = toEndianBits(value);
         }
     };

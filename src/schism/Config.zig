@@ -63,7 +63,7 @@ pub const UsbEndpoint = struct {
     direction: UsbTransferDirection,
 };
 
-pub const UsbTransferDirection = usb.protocol.EndpointDescriptor.EndpointAddress.Direction;
+pub const UsbTransferDirection = usb.protocol.EndpointDescriptor.Direction;
 
 pub const UsbLanguageId = usb.protocol.LanguageId;
 

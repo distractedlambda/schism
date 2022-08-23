@@ -1,14 +1,7 @@
 const std = @import("std");
 const rp2040 = @import("rp2040.zig");
 
-comptime {
-    @export(idiv, .{ .name = "__aeabi_idiv", .linkage = .Weak });
-    @export(idivmod, .{ .name = "__aeabi_idivmod", .linkage = .Weak });
-    @export(uidiv, .{ .name = "__aeabi_uidiv", .linkage = .Weak });
-    @export(uidivmod, .{ .name = "__aeabi_uidivmod", .linkage = .Weak });
-}
-
-fn idiv(dividend: i32, divisor: i32) callconv(.C) i32 {
+export fn __aeabi_idiv(dividend: i32, divisor: i32) callconv(.C) i32 {
     rp2040.sio.div_sdividend.write(dividend);
     rp2040.sio.div_sdivisor.write(divisor);
 
@@ -17,7 +10,7 @@ fn idiv(dividend: i32, divisor: i32) callconv(.C) i32 {
     return @bitCast(i32, rp2040.sio.div_quotient.read());
 }
 
-fn idivmod(dividend: i32, divisor: i32) callconv(.C) u64 {
+export fn __aeabi_idivmod(dividend: i32, divisor: i32) callconv(.C) u64 {
     rp2040.sio.div_sdividend.write(dividend);
     rp2040.sio.div_sdivisor.write(divisor);
 
@@ -29,7 +22,7 @@ fn idivmod(dividend: i32, divisor: i32) callconv(.C) u64 {
     return (@as(u64, remainder) << 32) | quotient;
 }
 
-fn uidiv(dividend: u32, divisor: u32) callconv(.C) u32 {
+export fn __aeabi_uidiv(dividend: u32, divisor: u32) callconv(.C) u32 {
     rp2040.sio.div_udividend.write(dividend);
     rp2040.sio.div_udivisor.write(divisor);
 
@@ -38,7 +31,7 @@ fn uidiv(dividend: u32, divisor: u32) callconv(.C) u32 {
     return rp2040.sio.div_quotient.read();
 }
 
-fn uidivmod(dividend: u32, divisor: u32) callconv(.C) u64 {
+export fn __aeabi_uidivmod(dividend: u32, divisor: u32) callconv(.C) u64 {
     rp2040.sio.div_udividend.write(dividend);
     rp2040.sio.div_udivisor.write(divisor);
 
