@@ -3,8 +3,8 @@ const std = @import("std");
 const bits = @import("bits.zig");
 
 pub fn EndianValue(comptime T: type, comptime endianness: std.builtin.Endian) type {
-    return extern struct {
-        endian_bits: bits.BitsOf(T),
+    return enum(bits.BitsOf(T)) {
+        _,
 
         inline fn toEndianBits(value: T) bits.BitsOf(T) {
             return std.mem.nativeTo(bits.BitsOf(T), bits.toBits(value), endianness);
@@ -15,15 +15,15 @@ pub fn EndianValue(comptime T: type, comptime endianness: std.builtin.Endian) ty
         }
 
         pub inline fn init(value: T) @This() {
-            return .{ .endian_bits = toEndianBits(value) };
+            return @intToEnum(@This(), toEndianBits(value));
         }
 
         pub inline fn get(self: @This()) T {
-            return fromEndianBits(self.endian_bits);
+            return fromEndianBits(@enumToInt(self));
         }
 
         pub inline fn assign(self: *@This(), value: T) void {
-            self.endian_bits = toEndianBits(value);
+            self.* = init(value);
         }
     };
 }

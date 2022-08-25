@@ -46,7 +46,7 @@ pub const UsbDevice = struct {
 
 pub const UsbInterface = struct {
     name: ?[]const u8 = null,
-    class: u8,
+    class: usb.protocol.InterfaceClass,
     subclass: u8,
     protocol: u8,
     endpoints: []const UsbEndpoint = &.{},

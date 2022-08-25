@@ -1,10 +1,8 @@
-const builtin = @import("builtin");
-const std = @import("std");
-
 const BitStruct = @import("../bits.zig").BitStruct;
 const LittleEndian = @import("../endian.zig").LittleEndian;
 
-pub const SetupPacket = extern struct {
+// FIXME
+pub const SetupPacket = packed struct {
     request_type: RequestType,
     request: Request,
     value: LittleEndian(u16),
@@ -53,10 +51,30 @@ pub const DescriptorType = enum(u8) {
     String = 0x03,
     Interface = 0x04,
     Endpoint = 0x05,
+    ClassSpecificInterface = 0x24,
+    ClassSpecificEndpoint = 0x25,
     _,
 };
 
-pub const DeviceDescriptor = extern struct {
+pub const DeviceClass = enum(u8) {
+    Device = 0x00,
+    Cdc = 0x02,
+    Hub = 0x09,
+    Billboard = 0x11,
+    Diagnostic = 0xdc,
+    Miscellaneous = 0xef,
+    VendorSpecific = 0xff,
+    _,
+};
+
+pub const InterfaceClass = enum(u8) {
+    Cdc = 0x02,
+    Data = 0x0a,
+    _,
+};
+
+// FIXME
+pub const DeviceDescriptor = packed struct {
     length: u8 = @sizeOf(@This()),
     descriptor_type: DescriptorType = .Device,
     bcd_usb: LittleEndian(BcdUsb),
@@ -78,20 +96,9 @@ pub const DeviceDescriptor = extern struct {
         @"2.0" = 0x0200,
         _,
     };
-
-    pub const DeviceClass = enum(u8) {
-        Device = 0x00,
-        Cdc = 0x02,
-        Hub = 0x09,
-        Billboard = 0x11,
-        Diagnostic = 0xdc,
-        Miscellaneous = 0xef,
-        VendorSpecific = 0xff,
-        _,
-    };
 };
 
-pub const ConfigurationDescriptor = extern struct {
+pub const ConfigurationDescriptor = packed struct {
     length: u8 = @sizeOf(@This()),
     descriptor_type: DescriptorType = .Configuration,
     total_length: LittleEndian(u16),
@@ -125,19 +132,19 @@ pub const ConfigurationDescriptor = extern struct {
     });
 };
 
-pub const InterfaceDescriptor = extern struct {
+pub const InterfaceDescriptor = packed struct {
     length: u8 = @sizeOf(@This()),
     descriptor_type: DescriptorType = .Interface,
     interface_number: u8,
     alternate_setting: u8,
     num_endpoints: u8,
-    interface_class: u8,
+    interface_class: InterfaceClass,
     interface_subclass: u8,
     interface_protocol: u8,
     interface_string_index: u8,
 };
 
-pub const EndpointDescriptor = extern struct {
+pub const EndpointDescriptor = packed struct {
     length: u8 = @sizeOf(@This()),
     descriptor_type: DescriptorType = .Endpoint,
     endpoint_address: EndpointAddress,
@@ -214,7 +221,7 @@ pub const LanguageId = enum(u16) {
 };
 
 pub fn StringDescriptor(comptime len: usize) type {
-    return extern struct {
+    return packed struct {
         length: u8 = @sizeOf(@This()),
         descriptor_type: DescriptorType = .String,
         string: [len]LittleEndian(u16),

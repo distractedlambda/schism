@@ -54,15 +54,6 @@ pub const schism_config = blk: {
             .vendor_id = 0xcafe,
             .serial_number = "123456",
             .interfaces = &.{
-                .{
-                    .name = "Schism Device Logger",
-                    .class = 0xFF,
-                    .subclass = 0,
-                    .protocol = 0,
-                    .endpoints = &.{
-                        .{ .direction = .In },
-                    },
-                },
             },
         },
     };
@@ -73,10 +64,10 @@ pub const schism_config = blk: {
 fn driveLed(comptime led_gpio: u5, comptime button_gpio: u5) void {
     schism.enableGpioOutput(led_gpio);
     while (true) {
-        std.log.info("Clearing gpio {}", .{led_gpio});
+        // std.log.info("Clearing gpio {}", .{led_gpio});
         schism.clearGpio(led_gpio);
         schism.yieldUntilGpioLow(button_gpio);
-        std.log.info("Setting gpio {}", .{led_gpio});
+        // std.log.info("Setting gpio {}", .{led_gpio});
         schism.setGpio(led_gpio);
         schism.yieldUntilGpioHigh(button_gpio);
     }

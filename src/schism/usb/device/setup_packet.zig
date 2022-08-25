@@ -35,7 +35,7 @@ pub fn receive(connection_id: connection.Id) Error!protocol.SetupPacket {
 }
 
 pub fn handleInterrupt() void {
-    const setup_packet = @intToPtr(*const volatile protocol.SetupPacket, rp2040.usb.dpram_base_address).*;
+    const setup_packet = @bitCast(protocol.SetupPacket, @intToPtr(*const volatile [8]u8, rp2040.usb.dpram_base_address).*);
     rp2040.usb.sie_status.clear(.{ .setup_rec = true });
     if (waiters.popFront()) |continuation| {
         const waiter = @fieldParentPtr(Waiter, "continuation", continuation);
