@@ -21,6 +21,11 @@ pub const ConnectionId = connection.Id;
 pub const Error = @import("device/error.zig").Error;
 pub const TransmitBuffer = tx.Buffer;
 
+pub const ControlRequestHandler = struct {
+    request: protocol.SetupPacket.Request,
+    func: fn (protocol.SetupPacket, ConnectionId) anyerror!void,
+};
+
 pub fn handleIrq() void {
     arm.disableInterrupts();
     defer arm.enableInterrupts();

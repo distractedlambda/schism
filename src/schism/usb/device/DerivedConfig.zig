@@ -1,11 +1,14 @@
 const std = @import("std");
 
 const config = @import("../../Config.zig").resolved;
+const control = @import("control.zig");
+const device = @import("../device.zig");
 const endian = @import("../../endian.zig");
 const protocol = @import("../protocol.zig");
 
 const LittleEndian = endian.LittleEndian;
 
+control_request_handlers: []const device.ControlRequestHandler,
 device_descriptor: []const u8,
 configuration_descriptor: []const u8,
 string_descriptors: []const []const u8,
@@ -119,6 +122,7 @@ pub const resolved: @This() = blk: {
     });
 
     break :blk .{
+        .control_request_handlers = usb_device_config.control_request_handlers ++ control.standard_request_handlers,
         .device_descriptor = &device_descriptor,
         .configuration_descriptor = &configuration_descriptor,
         .string_descriptors = string_descriptor_table.descriptors,

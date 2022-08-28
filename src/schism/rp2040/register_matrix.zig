@@ -11,7 +11,7 @@ pub fn RegisterMatrix(
     comptime spec: bits.BitStructSpec,
 ) type {
     return struct {
-        pub const Fields = bits.BitStruct(u32, spec);
+        pub const Fields = bits.BitStruct(32, spec);
 
         pub const rows = rows_;
         pub const cols = cols_;

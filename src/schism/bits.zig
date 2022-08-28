@@ -1,33 +1,29 @@
 const std = @import("std");
 
-pub fn BitStruct(comptime Bits_: type, comptime spec: BitStructSpec) type {
-    if (@typeInfo(Bits_) != .Int or @typeInfo(Bits_).Int.signedness != .unsigned) {
-        @compileError("expected an unsigned integer type, got " ++ @typeName(Bits_));
-    }
-
+pub fn BitStruct(comptime bit_count: u16, comptime spec: BitStructSpec) type {
     switch (spec) {
         .Scalar => |value_type| {
-            if (@bitSizeOf(value_type) > @bitSizeOf(Bits_)) {
-                @compileError(@typeName(spec) ++ " does not fit in " ++ @typeName(Bits_));
+            if (@bitSizeOf(value_type) > bit_count) {
+                @compileError(@typeName(spec) ++ " requires more bits than are available");
             }
 
-            return extern struct {
-                pub const Bits = Bits_;
+            return enum(std.meta.Int(.unsigned, bit_count)) {
+                _,
+
+                pub const Bits = std.meta.Tag(@This());
 
                 pub const Unpacked = value_type;
 
-                bits: Bits,
-
                 pub inline fn init(value: Unpacked) @This() {
-                    return .{ .bits = toBits(value) };
+                    return @intToEnum(@This(), pack(value));
                 }
 
                 pub inline fn get(self: @This()) Unpacked {
-                    return unpack(self.bits);
+                    return unpack(@enumToInt(self));
                 }
 
                 pub inline fn assign(self: *@This(), value: Unpacked) void {
-                    self.bits = pack(value);
+                    self.* = init(value);
                 }
 
                 pub inline fn unpack(bits: Bits) Unpacked {
@@ -41,14 +37,14 @@ pub fn BitStruct(comptime Bits_: type, comptime spec: BitStructSpec) type {
         },
 
         .Record => |field_specs| {
-            comptime var population: Bits_ = 0;
+            comptime var population: std.meta.Int(.unsigned, bit_count) = 0;
             comptime var unpacked_fields: [field_specs.len]std.builtin.Type.StructField = undefined;
             comptime var flags_fields: [field_specs.len]std.builtin.Type.StructField = undefined;
             comptime var next_flags_field = 0;
 
             inline for (field_specs) |field_spec, i| {
-                if (field_spec.lsb + @bitSizeOf(field_spec.type) > @bitSizeOf(Bits_)) {
-                    @compileError("field '" ++ field_spec.name ++ "' does not fit in " ++ @typeName(Bits_));
+                if (field_spec.lsb + @bitSizeOf(field_spec.type) > bit_count) {
+                    @compileError("field '" ++ field_spec.name ++ "' does not fit");
                 }
 
                 if (@truncate(std.meta.Int(.unsigned, @bitSizeOf(field_spec.type)), population >> field_spec.lsb) != 0) {
@@ -78,8 +74,10 @@ pub fn BitStruct(comptime Bits_: type, comptime spec: BitStructSpec) type {
                 }
             }
 
-            return extern struct {
-                pub const Bits = Bits_;
+            return enum(std.meta.Int(.unsigned, bit_count)) {
+                _,
+
+                pub const Bits = std.meta.Tag(@This());
 
                 pub const Unpacked = @Type(.{
                     .Struct = .{
@@ -99,30 +97,28 @@ pub fn BitStruct(comptime Bits_: type, comptime spec: BitStructSpec) type {
                     },
                 });
 
-                bits: Bits,
-
                 pub inline fn init(value: Unpacked) @This() {
-                    return .{ .bits = pack(value) };
+                    return @intToEnum(@This(), pack(value));
                 }
 
                 pub inline fn get(self: @This()) Unpacked {
-                    return unpack(self.bits);
+                    return unpack(@enumToInt(self));
                 }
 
                 pub inline fn assign(self: *@This(), value: Unpacked) void {
-                    self.bits = pack(value);
+                    self = init(value);
                 }
 
                 pub inline fn set(self: *@This(), flags: Flags) void {
-                    self.bits |= packFlags(flags);
+                    self.* = @intToEnum(@This(), @enumToInt(self.*) | packFlags(flags));
                 }
 
                 pub inline fn clear(self: *@This(), flags: Flags) void {
-                    self.bits &= ~packFlags(flags);
+                    self.* = @intToEnum(@This(), @enumToInt(self.*) & packFlags(flags));
                 }
 
                 pub inline fn toggle(self: *@This(), flags: Flags) void {
-                    self.bits ^= packFlags(flags);
+                    self.* = @intToEnum(@This(), @enumToInt(self.*) ^ packFlags(flags));
                 }
 
                 pub inline fn pack(unpacked: Unpacked) Bits {

@@ -1,16 +1,19 @@
 const BitStruct = @import("../bits.zig").BitStruct;
 const LittleEndian = @import("../endian.zig").LittleEndian;
 
-// FIXME
 pub const SetupPacket = packed struct {
-    request_type: RequestType,
-    request: Request,
+    request: LittleEndian(Request),
     value: LittleEndian(u16),
     index: LittleEndian(u16),
     length: LittleEndian(u16),
 
-    pub const RequestType = BitStruct(u8, .{
+    pub const Request = BitStruct(16, .{
         .Record = &.{
+            .{
+                .name = "code",
+                .type = u8,
+                .lsb = 8,
+            },
             .{
                 .name = "direction",
                 .type = enum(u1) { Out, In },
@@ -28,21 +31,6 @@ pub const SetupPacket = packed struct {
             },
         },
     });
-
-    pub const Request = enum(u8) {
-        GetStatus = 0x00,
-        ClearFeature = 0x01,
-        SetFeature = 0x03,
-        SetAddress = 0x05,
-        GetDescriptor = 0x06,
-        SetDescriptor = 0x07,
-        GetConfiguration = 0x08,
-        SetConfiguration = 0x09,
-        GetInterface = 0x0A,
-        SetInterface = 0x11,
-        SynchFrame = 0x12,
-        _,
-    };
 };
 
 pub const DescriptorType = enum(u8) {
@@ -108,7 +96,7 @@ pub const ConfigurationDescriptor = packed struct {
     attributes: Attributes,
     max_power: u8,
 
-    pub const Attributes = BitStruct(u8, .{
+    pub const Attributes = BitStruct(8, .{
         .Record = &.{
             .{
                 .name = "usb_1_0_bus_powered",
@@ -152,7 +140,7 @@ pub const EndpointDescriptor = packed struct {
     max_packet_size: LittleEndian(u16),
     interval: u8,
 
-    pub const EndpointAddress = BitStruct(u8, .{
+    pub const EndpointAddress = BitStruct(8, .{
         .Record = &.{
             .{
                 .name = "direction",
@@ -172,7 +160,7 @@ pub const EndpointDescriptor = packed struct {
         In,
     };
 
-    pub const Attributes = BitStruct(u8, .{
+    pub const Attributes = BitStruct(8, .{
         .Record = &.{
             .{
                 .name = "usage_type",

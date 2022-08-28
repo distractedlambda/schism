@@ -2,7 +2,7 @@ const bits = @import("../bits.zig");
 
 pub fn Register(comptime address_: usize, comptime spec: bits.BitStructSpec) type {
     return struct {
-        pub const Fields = bits.BitStruct(u32, spec);
+        pub const Fields = bits.BitStruct(32, spec);
 
         pub const address = address_;
 

@@ -218,3 +218,39 @@ pub const LineCoding = packed struct {
         Space,
     };
 };
+
+pub const AbstractControlManagementDescriptor = packed struct {
+    function_length: u8 = @sizeOf(@This()),
+    descriptor_type: DescriptorType = .ClassSpecificInterface,
+    descriptor_subtype: DescriptorSubtype = .AbstractControlManagement,
+    capabilities: Capabilities,
+
+    pub const Capabilities = BitStruct(u8, .{
+        .Record = &.{
+            .{
+                .name = "network_connection",
+                .type = bool,
+                .lsb = 3,
+                .default = &false,
+            },
+            .{
+                .name = "send_break",
+                .type = bool,
+                .lsb = 2,
+                .default = &false,
+            },
+            .{
+                .name = "line_coding_and_state",
+                .type = bool,
+                .lsb = 1,
+                .default = &false,
+            },
+            .{
+                .name = "comm_features",
+                .type = bool,
+                .lsb = 0,
+                .default = &false,
+            },
+        },
+    });
+};

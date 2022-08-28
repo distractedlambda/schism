@@ -9,7 +9,7 @@ pub fn RegisterArray(
     comptime spec: bits.BitStructSpec,
 ) type {
     return struct {
-        pub const Fields = bits.BitStruct(u32, spec);
+        pub const Fields = bits.BitStruct(32, spec);
 
         pub const len = len_;
 

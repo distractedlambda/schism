@@ -53,8 +53,7 @@ pub const schism_config = blk: {
             .product_id = 0x4004,
             .vendor_id = 0xcafe,
             .serial_number = "123456",
-            .interfaces = &.{
-            },
+            .interfaces = &.{},
         },
     };
 
