@@ -146,7 +146,7 @@ pub const Usb = union(enum) {
     Device: Device,
 
     pub const Device = struct {
-        language_id: usb.protocol.LanguageId = .EnglishUnitedStates,
+        language_id: usb.LanguageId = .EnglishUnitedStates,
         vendor_id: u16 = 0,
         product_id: u16 = 1,
         bcd_device: u16 = 0,
@@ -165,8 +165,8 @@ pub const Usb = union(enum) {
 
         pub fn addControlRequestHandler(
             comptime self: *@This(),
-            comptime request: usb.protocol.SetupPacket.Request,
-            comptime func: fn (usb.protocol.SetupPacket, usb.device.ConnectionId) anyerror!void,
+            comptime request: usb.SetupRequest,
+            comptime func: fn (usb.SetupPacket, usb.device.ConnectionId) anyerror!void,
         ) void {
             comptime {
                 const handler = usb.device.ControlRequestHandler{ request, func };
@@ -177,7 +177,7 @@ pub const Usb = union(enum) {
 
     pub const Interface = struct {
         name: ?[]const u8 = null,
-        class: usb.protocol.InterfaceClass,
+        class: usb.InterfaceClass,
         subclass: u8,
         protocol: u8,
         endpoints: []const Endpoint = &.{},
@@ -191,7 +191,7 @@ pub const Usb = union(enum) {
     };
 
     pub const Endpoint = struct {
-        direction: usb.protocol.EndpointDescriptor.Direction,
+        direction: usb.EndpointDirection,
     };
 };
 

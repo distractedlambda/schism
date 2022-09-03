@@ -1,9 +1,7 @@
 const multicore = @import("../multicore.zig");
 
-pub fn CoreLocal(comptime T_: type) type {
+pub fn CoreLocal(comptime T: type) type {
     return struct {
-        pub const T = T_;
-
         storage: [2]T,
 
         pub inline fn init(value: T) @This() {
